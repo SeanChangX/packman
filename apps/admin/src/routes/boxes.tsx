@@ -2,9 +2,14 @@ import { createFileRoute } from '@tanstack/react-router'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useForm } from 'react-hook-form'
 import { useState } from 'react'
-import { Plus, Trash2 } from 'lucide-react'
+import { Plus, Trash2, Pencil, Check, X } from 'lucide-react'
 import { adminApi } from '../lib/api'
 import { Select } from '../lib/select'
+
+const SHIPPING_OPTIONS = [
+  { value: 'CHECKED', label: '託運' },
+  { value: 'CARRY_ON', label: '登機' },
+] as const
 
 function BoxesPage() {
   const qc = useQueryClient()
@@ -12,19 +17,34 @@ function BoxesPage() {
   const { register, handleSubmit, reset } = useForm<{ label: string; notes?: string }>()
   const { data: boxes } = useQuery({ queryKey: ['admin-boxes'], queryFn: adminApi.boxes })
 
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [editLabel, setEditLabel] = useState('')
+  const [editShipping, setEditShipping] = useState('CHECKED')
+  const [editNotes, setEditNotes] = useState('')
+
   const create = useMutation({
     mutationFn: (data: { label: string; notes?: string }) =>
       adminApi.createBox({ ...data, shippingMethod }),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['admin-boxes'] })
-      reset()
-    },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['admin-boxes'] }); reset() },
+  })
+
+  const update = useMutation({
+    mutationFn: ({ id, data }: { id: string; data: { label: string; shippingMethod: string; notes?: string } }) =>
+      adminApi.updateBox(id, data),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['admin-boxes'] }); setEditingId(null) },
   })
 
   const del = useMutation({
     mutationFn: adminApi.deleteBox,
     onSuccess: () => qc.invalidateQueries({ queryKey: ['admin-boxes'] }),
   })
+
+  const startEdit = (box: { id: string; label: string; shippingMethod: string; notes?: string | null }) => {
+    setEditingId(box.id)
+    setEditLabel(box.label)
+    setEditShipping(box.shippingMethod)
+    setEditNotes(box.notes ?? '')
+  }
 
   return (
     <div className="space-y-5">
@@ -35,15 +55,15 @@ function BoxesPage() {
         </div>
       </div>
 
-      <form className="card grid gap-3 p-4 md:grid-cols-[1fr_12rem_1fr_auto]" onSubmit={handleSubmit((data) => create.mutate(data))}>
+      <form
+        className="card relative z-10 grid gap-3 p-4 md:grid-cols-[1fr_12rem_1fr_auto]"
+        onSubmit={handleSubmit((data) => create.mutate(data))}
+      >
         <input className="input" placeholder="箱子名稱，例如：工具箱 A" {...register('label', { required: true })} />
         <Select
           value={shippingMethod}
           onChange={setShippingMethod}
-          options={[
-            { value: 'CHECKED', label: '託運' },
-            { value: 'CARRY_ON', label: '登機' },
-          ]}
+          options={SHIPPING_OPTIONS}
         />
         <input className="input" placeholder="備註" {...register('notes')} />
         <button className="btn-primary" disabled={create.isPending}>
@@ -62,22 +82,69 @@ function BoxesPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-black/5 dark:divide-white/10">
-              {boxes?.map((box) => (
-                <tr key={box.id}>
-                  <td className="px-4 py-3 font-semibold">箱 {box.label}</td>
-                  <td className="px-4 py-3 text-muted">{box.shippingMethod === 'CHECKED' ? '託運' : '登機'}</td>
-                  <td className="px-4 py-3 text-muted">{box.status}</td>
-                  <td className="px-4 py-3 text-muted">{box.notes ?? '-'}</td>
-                  <td className="px-4 py-3">
-                    <button
-                      className="btn-danger px-3"
-                      onClick={() => { if (confirm(`刪除箱子 ${box.label}？`)) del.mutate(box.id) }}
-                    >
-                      <Trash2 className="h-4 w-4" /> 刪除
-                    </button>
-                  </td>
-                </tr>
-              ))}
+              {boxes?.map((box) =>
+                editingId === box.id ? (
+                  <tr key={box.id} className="bg-brand-500/5">
+                    <td className="px-4 py-2">
+                      <input
+                        className="input py-1.5 text-sm"
+                        value={editLabel}
+                        onChange={e => setEditLabel(e.target.value)}
+                      />
+                    </td>
+                    <td className="px-4 py-2">
+                      <Select
+                        value={editShipping}
+                        onChange={setEditShipping}
+                        options={SHIPPING_OPTIONS}
+                      />
+                    </td>
+                    <td className="px-4 py-2 text-muted">{box.status}</td>
+                    <td className="px-4 py-2">
+                      <input
+                        className="input py-1.5 text-sm"
+                        value={editNotes}
+                        onChange={e => setEditNotes(e.target.value)}
+                        placeholder="備註"
+                      />
+                    </td>
+                    <td className="px-4 py-2">
+                      <div className="flex gap-2">
+                        <button
+                          className="btn-primary px-3"
+                          onClick={() => update.mutate({ id: box.id, data: { label: editLabel, shippingMethod: editShipping, notes: editNotes || undefined } })}
+                          disabled={update.isPending}
+                        >
+                          <Check className="h-4 w-4" />
+                        </button>
+                        <button className="btn-secondary px-3" onClick={() => setEditingId(null)}>
+                          <X className="h-4 w-4" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ) : (
+                  <tr key={box.id}>
+                    <td className="px-4 py-3 font-semibold">{box.label}</td>
+                    <td className="px-4 py-3 text-muted">{box.shippingMethod === 'CHECKED' ? '託運' : '登機'}</td>
+                    <td className="px-4 py-3 text-muted">{box.status}</td>
+                    <td className="px-4 py-3 text-muted">{box.notes ?? '-'}</td>
+                    <td className="px-4 py-3">
+                      <div className="flex gap-2">
+                        <button className="btn-secondary px-3" onClick={() => startEdit(box)}>
+                          <Pencil className="h-4 w-4" />
+                        </button>
+                        <button
+                          className="btn-danger px-3"
+                          onClick={() => { if (confirm(`刪除箱子 ${box.label}？`)) del.mutate(box.id) }}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                )
+              )}
             </tbody>
           </table>
         </div>

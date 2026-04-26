@@ -1,14 +1,12 @@
-import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify'
+import { FastifyInstance } from 'fastify'
+import axios from 'axios'
 import { prisma } from '../plugins/prisma'
+import { requireAdminOrAdminSecret } from '../plugins/auth'
 
-const ADMIN_API_SECRET = process.env.ADMIN_API_SECRET ?? ''
-
-async function requireAdminSecret(request: FastifyRequest, reply: FastifyReply) {
-  const header = request.headers['x-admin-auth']
-  if (!ADMIN_API_SECRET || header !== ADMIN_API_SECRET) {
-    reply.status(403).send({ message: 'Forbidden' })
-  }
-}
+const OLLAMA_BASE_URL = process.env.OLLAMA_BASE_URL ?? 'http://localhost:11434'
+const OLLAMA_MODEL = process.env.OLLAMA_VISION_MODEL ?? 'llava'
+const TAG_PROMPT =
+  '請用繁體中文列出這個物品的5個簡短標籤，只需要輸出標籤，用逗號分隔，不要有其他說明。例如：電子設備, 充電器, 攜帶型, 黑色, 科技'
 
 function toCsvRow(row: Record<string, unknown>): string {
   return Object.values(row)
@@ -21,7 +19,7 @@ function toCsv(headers: string[], rows: Record<string, unknown>[]): string {
 }
 
 export async function adminRoutes(app: FastifyInstance) {
-  app.addHook('preHandler', requireAdminSecret)
+  app.addHook('preHandler', requireAdminOrAdminSecret)
 
   app.get('/users', async () => {
     return prisma.user.findMany({
@@ -102,6 +100,43 @@ export async function adminRoutes(app: FastifyInstance) {
       .header('Content-Type', 'text/csv; charset=utf-8')
       .header('Content-Disposition', 'attachment; filename="items.csv"')
       .send('﻿' + toCsv(headers, rows)) // BOM for Excel UTF-8
+  })
+
+  app.get('/ollama-status', async (_request, reply) => {
+    try {
+      const res = await axios.get<{ models: { name: string }[] }>(`${OLLAMA_BASE_URL}/api/tags`, { timeout: 5000 })
+      const models = res.data.models?.map((m) => m.name) ?? []
+      return { ok: true, models, activeModel: OLLAMA_MODEL }
+    } catch {
+      return reply.status(503).send({ ok: false, message: 'Ollama 無法連線' })
+    }
+  })
+
+  app.post('/ollama-test', async (request, reply) => {
+    const data = await request.file()
+    if (!data) return reply.status(400).send({ message: '請上傳圖片' })
+
+    const buffer = await data.toBuffer()
+    const base64Image = buffer.toString('base64')
+
+    try {
+      const response = await axios.post<{ response: string }>(
+        `${OLLAMA_BASE_URL}/api/generate`,
+        { model: OLLAMA_MODEL, prompt: TAG_PROMPT, images: [base64Image], stream: false },
+        { timeout: 60_000 }
+      )
+
+      const rawText = response.data.response.trim()
+      const tags = rawText
+        .split(/[,，、]/)
+        .map((t) => t.trim())
+        .filter((t) => t.length > 0 && t.length <= 30)
+        .slice(0, 8)
+
+      return { ok: true, tags, raw: rawText, model: OLLAMA_MODEL }
+    } catch (err: any) {
+      return reply.status(503).send({ ok: false, message: err?.message ?? 'Ollama 請求失敗' })
+    }
   })
 
   app.get('/export/batteries', async (request, reply) => {

@@ -1,4 +1,4 @@
-# Packman — 行李管理系統
+# Packman 行李管理系統
 
 Competition luggage management system for robotics teams. Built to replace the Notion-based workflow for international competitions.
 
@@ -64,15 +64,36 @@ docker compose up -d
 
 ### 4. Initial Data
 
-The API seeds default data automatically on startup. This creates:
-- **Groups**: 行政組, 相機組, 主程式組, 共用工具設備, 共用電力設備, 定位組, 導航組, 宏組, SIMA組, 倫倫組, 行李工具
-- **Boxes**: 1-9 (託運), A-F (登機), 大機, 推車1
+The API seeds default data automatically on first startup. This creates:
+- **Groups**: 一個範例組別（可在管理後台刪除）
+- **Boxes**: 一個範例箱（可在管理後台刪除）
 
 The admin panel is protected separately with `ADMIN_USER` / `ADMIN_PASSWORD`, and forwards `ADMIN_API_SECRET` to the API internally. Slack login is only for normal app users.
 
 ## Development
 
 All code runs inside Docker — no local Node.js required.
+
+### UI Development (with HMR)
+
+Use the dev compose file when iterating on frontend code — Vite dev servers with Hot Module Replacement, no rebuild needed on every change:
+
+```bash
+docker compose -f docker-compose.dev.yml up --build
+```
+
+- Web app: http://localhost:3000
+- Admin panel: http://localhost:3001
+
+Changes to `apps/web/src/` and `apps/admin/src/` are reflected instantly.
+Rebuilding is only needed when adding packages or changing `packages/shared`.
+
+### Production Build
+
+```bash
+docker compose build
+docker compose up -d
+```
 
 ```bash
 # View logs

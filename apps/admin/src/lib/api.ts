@@ -6,6 +6,10 @@ async function req<T>(url: string, options?: RequestInit): Promise<T> {
     headers: { 'Content-Type': 'application/json', ...options?.headers },
     ...options,
   })
+  if (res.status === 401) {
+    window.location.href = '/login'
+    throw new Error('Unauthorized')
+  }
   if (!res.ok) {
     const err = await res.json().catch(() => ({ message: res.statusText }))
     throw new Error(err.message)
@@ -15,6 +19,18 @@ async function req<T>(url: string, options?: RequestInit): Promise<T> {
 }
 
 export const adminApi = {
+  login: async (username: string, password: string) => {
+    const res = await fetch('/auth/admin-login', {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, password }),
+    })
+    if (!res.ok) throw new Error('帳號或密碼錯誤')
+  },
+  logout: () =>
+    req<void>('/auth/admin-logout', { method: 'POST' }),
+
   stats: () => req<{
     users: number; groups: number; boxes: number
     items: number; batteries: number; packedItems: number; sealedBoxes: number

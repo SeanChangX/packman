@@ -33,6 +33,7 @@ services:
       retries: 5
 
   api:
+    image: seanchangx/packman-api:latest
     build:
       context: .
       dockerfile: apps/api/Dockerfile
@@ -45,6 +46,8 @@ services:
       MINIO_ENDPOINT: minio
       MINIO_PORT: "9000"
       PORT: "8080"
+      ADMIN_USER: ${ADMIN_USER:-admin}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-changeme}
     depends_on:
       postgres:
         condition: service_healthy
@@ -57,6 +60,7 @@ services:
       retries: 5
 
   web:
+    image: seanchangx/packman-web:dev
     build:
       context: .
       dockerfile: apps/web/Dockerfile.dev
@@ -66,11 +70,13 @@ services:
       API_PROXY: http://api:8080
     volumes:
       - ./apps/web:/app/apps/web
+      - /app/apps/web/node_modules
     depends_on:
       api:
         condition: service_healthy
 
   admin:
+    image: seanchangx/packman-admin:dev
     build:
       context: .
       dockerfile: apps/admin/Dockerfile.dev
@@ -78,11 +84,9 @@ services:
       - "3001:3001"
     environment:
       API_PROXY: http://api:8080
-      ADMIN_USER: ${ADMIN_USER:-admin}
-      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-changeme}
-      ADMIN_API_SECRET: ${ADMIN_API_SECRET:-}
     volumes:
       - ./apps/admin:/app/apps/admin
+      - /app/apps/admin/node_modules
     depends_on:
       api:
         condition: service_healthy

@@ -5,12 +5,23 @@ import { useState } from 'react'
 import { Plus, Pencil, Trash2, X } from 'lucide-react'
 import { adminApi } from '../lib/api'
 
-const PRESET_COLORS = ['#DE272C', '#111111', '#6e6e73', '#c91f24', '#7f1d1d', '#374151', '#991b1b', '#52525b']
+const PRESET_COLORS = [
+  '#EF4444', // red
+  '#F97316', // orange
+  '#EAB308', // yellow
+  '#22C55E', // green
+  '#14B8A6', // teal
+  '#06B6D4', // cyan
+  '#3B82F6', // blue
+  '#6366F1', // indigo
+  '#A855F7', // purple
+  '#EC4899', // pink
+]
 
 function GroupModal({ initial, onClose }: { initial?: { id: string; name: string; color: string }; onClose: () => void }) {
   const qc = useQueryClient()
   const { register, handleSubmit, watch, setValue } = useForm({
-    defaultValues: { name: initial?.name ?? '', color: initial?.color ?? '#6366f1' },
+    defaultValues: { name: initial?.name ?? '', color: initial?.color ?? '#EF4444' },
   })
   const color = watch('color')
 
@@ -34,17 +45,31 @@ function GroupModal({ initial, onClose }: { initial?: { id: string; name: string
           </div>
           <div>
             <label className="label">顏色</label>
-            <div className="mt-1 flex flex-wrap gap-2">
+            <div className="mt-2 flex gap-2">
               {PRESET_COLORS.map((c) => (
                 <button
                   key={c}
                   type="button"
-                  className={`h-8 w-8 rounded-full border-2 transition-transform ${color === c ? 'scale-110 border-brand-500' : 'border-transparent'}`}
+                  className={`h-6 w-6 shrink-0 rounded-full border-2 transition-transform hover:scale-110 ${color === c ? 'scale-110 border-white' : 'border-transparent'}`}
                   style={{ backgroundColor: c }}
                   onClick={() => setValue('color', c)}
                 />
               ))}
-              <input type="color" value={color} onChange={(e) => setValue('color', e.target.value)} className="h-7 w-7 cursor-pointer rounded" />
+            </div>
+            <div className="mt-2 flex w-36 overflow-hidden rounded-lg border border-white/10">
+              <span className="h-9 w-9 shrink-0" style={{ backgroundColor: color }} />
+              <input
+                type="text"
+                value={color.toUpperCase()}
+                onChange={(e) => {
+                  const v = e.target.value
+                  if (/^#[0-9a-fA-F]{0,6}$/.test(v)) setValue('color', v.toLowerCase())
+                }}
+                className="w-full bg-transparent px-2 font-mono text-xs focus:outline-none"
+                placeholder="#000000"
+                maxLength={7}
+                spellCheck={false}
+              />
             </div>
           </div>
           <div className="flex justify-end gap-2">
@@ -91,7 +116,7 @@ function GroupsPage() {
           </thead>
           <tbody className="divide-y divide-black/5 dark:divide-white/10">
             {isLoading
-              ? Array.from({ length: 3 }).map((_, i) => <tr key={i}><td colSpan={3} className="px-4 py-3"><div className="h-4 animate-pulse rounded bg-gray-200" /></td></tr>)
+              ? Array.from({ length: 3 }).map((_, i) => <tr key={i}><td colSpan={3} className="px-4 py-3"><div className="h-4 animate-pulse rounded bg-white/10" /></td></tr>)
               : groups?.map((g) => (
                   <tr key={g.id} className="hover:bg-black/5 dark:hover:bg-white/5">
                     <td className="px-4 py-3">

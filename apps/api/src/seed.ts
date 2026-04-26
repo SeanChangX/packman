@@ -41,27 +41,9 @@ async function ensureExampleBox() {
 export async function seedDefaultData() {
   console.log('Seeding database...')
 
-  // Create default groups from the Notion screenshots
-  const groupData = [
-    { name: '行政組', color: '#f59e0b' },
-    { name: '相機組', color: '#8b5cf6' },
-    { name: '主程式組', color: '#6366f1' },
-    { name: '共用工具設備', color: '#10b981' },
-    { name: '共用電力設備', color: '#f97316' },
-    { name: '定位組', color: '#3b82f6' },
-    { name: '導航組', color: '#06b6d4' },
-    { name: '宏組', color: '#ec4899' },
-    { name: 'SIMA組', color: '#84cc16' },
-    { name: '倫倫組', color: '#ef4444' },
-    { name: '行李工具', color: '#78716c' },
-  ]
-
-  for (const g of groupData) {
-    await prisma.group.upsert({
-      where: { name: g.name },
-      update: {},
-      create: g,
-    })
+  const groupCount = await prisma.group.count()
+  if (groupCount === 0) {
+    await prisma.group.create({ data: { name: '範例組別', color: '#6366F1' } })
   }
 
   await ensureExampleBox()

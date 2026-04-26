@@ -1,5 +1,6 @@
-import { createRootRoute, Outlet, Link } from '@tanstack/react-router'
-import { Users, Layers, Download, LayoutDashboard, Package, Box, Battery } from 'lucide-react'
+import { createRootRoute, Outlet, Link, redirect, useLocation } from '@tanstack/react-router'
+import { Users, Layers, Download, LayoutDashboard, Package, Box, Battery, LogOut, Cpu } from 'lucide-react'
+import { adminApi } from '../lib/api'
 
 const navItems = [
   { to: '/' as const, icon: LayoutDashboard, label: '儀表板' },
@@ -8,9 +9,18 @@ const navItems = [
   { to: '/groups' as const, icon: Layers, label: '組別管理' },
   { to: '/battery-regulations' as const, icon: Battery, label: '電池規定' },
   { to: '/export' as const, icon: Download, label: '匯出資料' },
+  { to: '/ollama' as const, icon: Cpu, label: 'Ollama 測試' },
 ]
 
 function AdminLayout() {
+  const { pathname } = useLocation()
+  if (pathname === '/login') return <Outlet />
+
+  const handleLogout = async () => {
+    try { await adminApi.logout() } catch {}
+    window.location.href = '/login'
+  }
+
   return (
     <div className="app-shell flex overflow-hidden">
       <aside className="glass-nav hidden w-64 shrink-0 flex-col border-r md:flex">
@@ -34,6 +44,15 @@ function AdminLayout() {
               {label}
             </Link>
           ))}
+          <div className="mt-auto pt-2">
+            <button
+              onClick={handleLogout}
+              className="flex w-full items-center gap-3 rounded-2xl px-3 py-3 text-sm font-semibold text-white/50 transition-colors hover:bg-white/10 hover:text-white"
+            >
+              <LogOut className="h-4 w-4" />
+              登出
+            </button>
+          </div>
         </nav>
       </aside>
       <div className="flex flex-1 flex-col overflow-hidden">
@@ -68,4 +87,11 @@ function AdminLayout() {
   )
 }
 
-export const Route = createRootRoute({ component: AdminLayout })
+export const Route = createRootRoute({
+  beforeLoad: async ({ location }) => {
+    if (location.pathname === '/login') return
+    const res = await fetch('/auth/admin-me', { credentials: 'include' })
+    if (!res.ok) throw redirect({ to: '/login' })
+  },
+  component: AdminLayout,
+})

@@ -61,8 +61,20 @@ export async function requireAdmin(request: FastifyRequest, reply: FastifyReply)
   }
 }
 
+function hasAdminPanelCookie(request: FastifyRequest): boolean {
+  const token = request.cookies['packman_admin_token']
+  if (!token) return false
+  try {
+    const payload = verifyToken(token)
+    return payload.role === 'ADMIN_PANEL'
+  } catch {
+    return false
+  }
+}
+
 export async function requireAuthOrAdminSecret(request: FastifyRequest, reply: FastifyReply) {
   if (ADMIN_API_SECRET && request.headers['x-admin-auth'] === ADMIN_API_SECRET) return
+  if (hasAdminPanelCookie(request)) return
   if (!request.userId) {
     reply.status(401).send({ message: 'Unauthorized' })
   }
@@ -70,6 +82,7 @@ export async function requireAuthOrAdminSecret(request: FastifyRequest, reply: F
 
 export async function requireAdminOrAdminSecret(request: FastifyRequest, reply: FastifyReply) {
   if (ADMIN_API_SECRET && request.headers['x-admin-auth'] === ADMIN_API_SECRET) return
+  if (hasAdminPanelCookie(request)) return
   await requireAdmin(request, reply)
 }
 

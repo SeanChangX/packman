@@ -1,13 +1,15 @@
 import { FastifyInstance } from 'fastify'
 import axios from 'axios'
 import { prisma } from '../plugins/prisma'
-import { requireAuth, setAuthCookie } from '../plugins/auth'
+import { requireAuth, setAuthCookie, signToken, verifyToken } from '../plugins/auth'
 
 const SLACK_CLIENT_ID = process.env.SLACK_CLIENT_ID ?? ''
 const SLACK_CLIENT_SECRET = process.env.SLACK_CLIENT_SECRET ?? ''
 const SLACK_REDIRECT_URI = process.env.SLACK_REDIRECT_URI ?? ''
 const SLACK_WORKSPACE_ID = process.env.SLACK_WORKSPACE_ID ?? ''
 const APP_URL = process.env.APP_URL ?? 'http://localhost:3000'
+const ADMIN_USER = process.env.ADMIN_USER ?? 'admin'
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD ?? 'changeme'
 
 export async function authRoutes(app: FastifyInstance) {
   // Initiate Slack OAuth
@@ -102,6 +104,46 @@ export async function authRoutes(app: FastifyInstance) {
       }
     }
   )
+
+  // Admin panel login
+  app.post<{ Body: { username: string; password: string } }>(
+    '/admin-login',
+    async (request, reply) => {
+      const { username, password } = request.body
+      if (username !== ADMIN_USER || password !== ADMIN_PASSWORD) {
+        return reply.status(401).send({ message: '帳號或密碼錯誤' })
+      }
+      const token = signToken({ userId: '__admin__', role: 'ADMIN_PANEL' })
+      reply.setCookie('packman_admin_token', token, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        path: '/',
+        maxAge: 60 * 60 * 24,
+      })
+      return { ok: true }
+    }
+  )
+
+  // Admin panel logout
+  app.post('/admin-logout', async (request, reply) => {
+    reply.clearCookie('packman_admin_token', { path: '/' })
+    return { ok: true }
+  })
+
+  // Check admin session
+  app.get('/admin-me', async (request, reply) => {
+    const token = request.cookies['packman_admin_token']
+    if (!token) return reply.status(401).send({ message: 'Not authenticated' })
+    try {
+      const payload = verifyToken(token)
+      if (payload.role !== 'ADMIN_PANEL') throw new Error()
+      return { ok: true }
+    } catch {
+      reply.clearCookie('packman_admin_token', { path: '/' })
+      return reply.status(401).send({ message: 'Invalid session' })
+    }
+  })
 
   // Get current user
   app.get('/me', { preHandler: requireAuth }, async (request, reply) => {

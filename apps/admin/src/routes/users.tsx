@@ -6,8 +6,8 @@ import type { User } from '@packman/shared'
 
 function UsersPage() {
   const qc = useQueryClient()
-  const { data: users, isLoading } = useQuery({ queryKey: ['admin-users'], queryFn: adminApi.users })
-  const { data: groups } = useQuery({ queryKey: ['admin-groups'], queryFn: adminApi.groups })
+  const { data: users, isLoading } = useQuery({ queryKey: ['admin-users'], queryFn: adminApi.users, staleTime: 30_000 })
+  const { data: groups } = useQuery({ queryKey: ['admin-groups'], queryFn: adminApi.groups, staleTime: 30_000 })
 
   const updateUser = useMutation({
     mutationFn: ({ id, data }: { id: string; data: { role?: string; groupId?: string | null } }) =>
@@ -44,7 +44,7 @@ function UsersPage() {
               ? Array.from({ length: 5 }).map((_, i) => (
                   <tr key={i}>
                     {Array.from({ length: 5 }).map((_, j) => (
-                      <td key={j} className="px-4 py-3"><div className="h-4 animate-pulse rounded bg-gray-200" /></td>
+                      <td key={j} className="px-4 py-3"><div className="h-4 animate-pulse rounded bg-white/10" /></td>
                     ))}
                   </tr>
                 ))
