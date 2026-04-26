@@ -1,0 +1,84 @@
+export type Role = 'ADMIN' | 'MEMBER'
+export type ShippingMethod = 'CHECKED' | 'CARRY_ON'
+export type PackingStatus = 'NOT_PACKED' | 'PACKED' | 'SEALED'
+export type UseCategory = 'HIGH_FREQ' | 'RETURN_ONLY' | 'ONE_WAY' | 'LOW_FREQ'
+export type BatteryType = 'POWER_TOOL' | 'BEACON_CHARGER' | 'LIFEPO4'
+export type AiTagStatus = 'NONE' | 'PENDING' | 'DONE' | 'FAILED'
+
+export interface Group {
+  id: string
+  name: string
+  color: string
+  createdAt: string
+}
+
+export interface User {
+  id: string
+  slackId: string
+  name: string
+  email?: string
+  avatarUrl?: string
+  role: Role
+  groupId?: string
+  group?: Group
+  createdAt: string
+}
+
+export interface Box {
+  id: string
+  label: string
+  shippingMethod: ShippingMethod
+  ownerId?: string
+  owner?: User
+  status: PackingStatus
+  notes?: string
+  priority?: number
+  items?: Item[]
+  itemCount?: number
+  createdAt: string
+}
+
+export interface Item {
+  id: string
+  name: string
+  ownerId?: string
+  owner?: User
+  createdById?: string
+  createdBy?: User
+  shippingMethod?: ShippingMethod
+  groupId?: string
+  group?: Group
+  quantity: number
+  status: PackingStatus
+  notes?: string
+  boxId?: string
+  box?: Box
+  useCategory?: UseCategory
+  tags: string[]
+  specialNotes?: string
+  photoUrl?: string
+  aiTagStatus: AiTagStatus
+  createdAt: string
+}
+
+export interface Battery {
+  id: string
+  batteryId: string
+  ownerId?: string
+  owner?: User
+  notes?: string
+  batteryType: BatteryType
+  createdAt: string
+}
+
+export interface PaginatedResponse<T> {
+  data: T[]
+  total: number
+  page: number
+  pageSize: number
+}
+
+export interface ApiError {
+  message: string
+  code?: string
+}

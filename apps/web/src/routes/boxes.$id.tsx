@@ -1,0 +1,146 @@
+import { createFileRoute, useNavigate } from '@tanstack/react-router'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useState } from 'react'
+import { ArrowLeft, Download, QrCode, CheckSquare, Square } from 'lucide-react'
+import { boxesApi, itemsApi } from '../lib/api'
+import { STATUS_LABELS, STATUS_COLORS, SHIPPING_LABELS, cn } from '../lib/utils'
+import type { PackingStatus } from '@packman/shared'
+
+function BoxDetailPage() {
+  const { id } = Route.useParams()
+  const navigate = useNavigate()
+  const qc = useQueryClient()
+  const [stickerSize, setStickerSize] = useState<'SMALL' | 'MEDIUM' | 'LARGE' | 'A4_SHEET'>('MEDIUM')
+
+  const { data: box, isLoading } = useQuery({
+    queryKey: ['box', id],
+    queryFn: () => boxesApi.get(id),
+  })
+
+  const updateItem = useMutation({
+    mutationFn: ({ itemId, status }: { itemId: string; status: PackingStatus }) =>
+      itemsApi.update(itemId, { status }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['box', id] }),
+  })
+
+  const updateBox = useMutation({
+    mutationFn: (status: PackingStatus) => boxesApi.update(id, { status }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['box', id] }),
+  })
+
+  if (isLoading) return <div className="flex justify-center py-12"><div className="h-8 w-8 animate-spin rounded-full border-4 border-brand-500 border-t-transparent" /></div>
+  if (!box) return <p>箱子不存在</p>
+
+  const items = box.items ?? []
+  const packedCount = items.filter((i) => i.status !== 'NOT_PACKED').length
+
+  return (
+    <div className="mx-auto max-w-2xl space-y-6">
+      <div className="flex items-center gap-3">
+        <button onClick={() => navigate({ to: '/boxes' })} className="btn-secondary p-2">
+          <ArrowLeft className="h-4 w-4" />
+        </button>
+        <div className="flex-1">
+          <div className="flex items-center gap-2">
+            <h1 className="text-2xl font-bold">箱 {box.label}</h1>
+            <span className="badge bg-blue-100 text-blue-800">{SHIPPING_LABELS[box.shippingMethod]}</span>
+          </div>
+          {box.owner && <p className="text-sm text-gray-500">整箱負責人: {box.owner.name}</p>}
+        </div>
+        <span className={cn('badge text-sm', STATUS_COLORS[box.status])}>{STATUS_LABELS[box.status]}</span>
+      </div>
+
+      {/* Actions */}
+      <div className="card flex flex-wrap gap-3 p-4">
+        <div className="flex items-center gap-2">
+          <label className="label">貼紙尺寸:</label>
+          <select className="input w-auto" value={stickerSize} onChange={(e) => setStickerSize(e.target.value as any)}>
+            <option value="SMALL">小 (50×30mm)</option>
+            <option value="MEDIUM">中 (100×50mm)</option>
+            <option value="LARGE">大 (150×100mm)</option>
+            <option value="A4_SHEET">A4 紙張</option>
+          </select>
+        </div>
+        <a
+          href={boxesApi.stickerUrl(id, stickerSize)}
+          download
+          className="btn-secondary gap-1"
+        >
+          <Download className="h-4 w-4" /> 下載貼紙
+        </a>
+        <a href={boxesApi.qrUrl(id)} download className="btn-secondary gap-1">
+          <QrCode className="h-4 w-4" /> QR Code
+        </a>
+
+        <div className="ml-auto flex items-center gap-2">
+          <span className="text-sm text-gray-600">{packedCount} / {items.length} 已打包</span>
+          <select
+            className={cn('badge cursor-pointer border-0', STATUS_COLORS[box.status])}
+            value={box.status}
+            onChange={(e) => updateBox.mutate(e.target.value as PackingStatus)}
+          >
+            <option value="NOT_PACKED">尚未裝箱</option>
+            <option value="PACKED">已裝箱</option>
+            <option value="SEALED">已封箱</option>
+          </select>
+        </div>
+      </div>
+
+      {/* QR preview */}
+      <div className="card flex items-center gap-4 p-4">
+        <img src={boxesApi.qrUrl(id)} alt="QR" className="h-20 w-20 rounded" />
+        <div>
+          <p className="font-medium">掃描此 QR Code</p>
+          <p className="text-sm text-gray-500">開啟箱子清單，勾選已清點物品</p>
+        </div>
+      </div>
+
+      {/* Items checklist */}
+      <div className="card">
+        <div className="border-b px-4 py-3">
+          <h2 className="font-semibold">物品清單 ({items.length})</h2>
+        </div>
+        {items.length === 0
+          ? <p className="py-8 text-center text-sm text-gray-400">此箱子尚無物品</p>
+          : (
+            <ul className="divide-y">
+              {items.map((item) => {
+                const isPacked = item.status !== 'NOT_PACKED'
+                return (
+                  <li key={item.id} className="flex items-center gap-3 px-4 py-3">
+                    <button
+                      onClick={() =>
+                        updateItem.mutate({
+                          itemId: item.id,
+                          status: isPacked ? 'NOT_PACKED' : 'PACKED',
+                        })
+                      }
+                      className="flex-shrink-0 text-brand-500"
+                    >
+                      {isPacked ? <CheckSquare className="h-5 w-5" /> : <Square className="h-5 w-5 text-gray-300" />}
+                    </button>
+                    <div className="flex-1">
+                      <span className={cn('font-medium', isPacked && 'line-through text-gray-400')}>
+                        {item.name}
+                      </span>
+                      <div className="flex gap-2 text-xs text-gray-500">
+                        {item.quantity > 1 && <span>× {item.quantity}</span>}
+                        {item.owner && <span>{item.owner.name}</span>}
+                        {item.group && <span style={{ color: item.group.color }}>{item.group.name}</span>}
+                      </div>
+                    </div>
+                    <span className={cn('badge text-xs', STATUS_COLORS[item.status])}>
+                      {STATUS_LABELS[item.status]}
+                    </span>
+                  </li>
+                )
+              })}
+            </ul>
+          )
+        }
+      </div>
+    </div>
+  )
+}
+
+export const Route = createFileRoute('/boxes/$id')({ component: BoxDetailPage })

@@ -1,0 +1,116 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id          String   @id @default(uuid())
+  slackId     String   @unique
+  name        String
+  email       String?
+  avatarUrl   String?
+  role        Role     @default(MEMBER)
+  groupId     String?
+  group       Group?   @relation(fields: [groupId], references: [id], onDelete: SetNull)
+  createdAt   DateTime @default(now())
+
+  ownedItems   Item[]    @relation("ItemOwner")
+  createdItems Item[]    @relation("ItemCreator")
+  ownedBoxes   Box[]
+  batteries    Battery[]
+}
+
+model Group {
+  id        String   @id @default(uuid())
+  name      String   @unique
+  color     String   @default("#6366f1")
+  users     User[]
+  items     Item[]
+  createdAt DateTime @default(now())
+}
+
+model Box {
+  id             String         @id @default(uuid())
+  label          String         @unique
+  shippingMethod ShippingMethod
+  ownerId        String?
+  owner          User?          @relation(fields: [ownerId], references: [id], onDelete: SetNull)
+  status         PackingStatus  @default(NOT_PACKED)
+  notes          String?
+  priority       Int?
+  items          Item[]
+  createdAt      DateTime       @default(now())
+}
+
+model Item {
+  id             String          @id @default(uuid())
+  name           String
+  ownerId        String?
+  owner          User?           @relation("ItemOwner", fields: [ownerId], references: [id], onDelete: SetNull)
+  createdById    String?
+  createdBy      User?           @relation("ItemCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  shippingMethod ShippingMethod?
+  groupId        String?
+  group          Group?          @relation(fields: [groupId], references: [id], onDelete: SetNull)
+  quantity       Int             @default(1)
+  status         PackingStatus   @default(NOT_PACKED)
+  notes          String?
+  boxId          String?
+  box            Box?            @relation(fields: [boxId], references: [id], onDelete: SetNull)
+  useCategory    UseCategory?
+  tags           String[]
+  specialNotes   String?
+  photoUrl       String?
+  aiTagStatus    AiTagStatus     @default(NONE)
+  createdAt      DateTime        @default(now())
+}
+
+model Battery {
+  id          String      @id @default(uuid())
+  batteryId   String      @unique
+  ownerId     String?
+  owner       User?       @relation(fields: [ownerId], references: [id], onDelete: SetNull)
+  notes       String?
+  batteryType BatteryType
+  createdAt   DateTime    @default(now())
+}
+
+enum Role {
+  ADMIN
+  MEMBER
+}
+
+enum ShippingMethod {
+  CHECKED
+  CARRY_ON
+}
+
+enum PackingStatus {
+  NOT_PACKED
+  PACKED
+  SEALED
+}
+
+enum UseCategory {
+  HIGH_FREQ
+  RETURN_ONLY
+  ONE_WAY
+  LOW_FREQ
+}
+
+enum BatteryType {
+  POWER_TOOL
+  BEACON_CHARGER
+  LIFEPO4
+}
+
+enum AiTagStatus {
+  NONE
+  PENDING
+  DONE
+  FAILED
+}

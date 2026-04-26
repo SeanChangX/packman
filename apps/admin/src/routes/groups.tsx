@@ -1,0 +1,132 @@
+import { createFileRoute } from '@tanstack/react-router'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useForm } from 'react-hook-form'
+import { useState } from 'react'
+import { Plus, Pencil, Trash2, X } from 'lucide-react'
+import { adminApi } from '../lib/api'
+
+const PRESET_COLORS = ['#6366f1', '#ec4899', '#f59e0b', '#10b981', '#3b82f6', '#8b5cf6', '#ef4444', '#14b8a6']
+
+function GroupModal({ initial, onClose }: { initial?: { id: string; name: string; color: string }; onClose: () => void }) {
+  const qc = useQueryClient()
+  const { register, handleSubmit, watch, setValue } = useForm({
+    defaultValues: { name: initial?.name ?? '', color: initial?.color ?? '#6366f1' },
+  })
+  const color = watch('color')
+
+  const save = useMutation({
+    mutationFn: (data: { name: string; color: string }) =>
+      initial ? adminApi.updateGroup(initial.id, data) : adminApi.createGroup(data),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['admin-groups'] }); onClose() },
+  })
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+      <div className="card w-full max-w-sm p-6">
+        <div className="mb-4 flex items-center justify-between">
+          <h2 className="font-bold">{initial ? '編輯組別' : '新增組別'}</h2>
+          <button onClick={onClose}><X className="h-4 w-4" /></button>
+        </div>
+        <form className="space-y-4" onSubmit={handleSubmit((d) => save.mutate(d))}>
+          <div>
+            <label className="label">組別名稱</label>
+            <input className="input mt-1" {...register('name', { required: true })} />
+          </div>
+          <div>
+            <label className="label">顏色</label>
+            <div className="mt-1 flex flex-wrap gap-2">
+              {PRESET_COLORS.map((c) => (
+                <button
+                  key={c}
+                  type="button"
+                  className={`h-7 w-7 rounded-full border-2 transition-transform ${color === c ? 'scale-110 border-gray-800' : 'border-transparent'}`}
+                  style={{ backgroundColor: c }}
+                  onClick={() => setValue('color', c)}
+                />
+              ))}
+              <input type="color" value={color} onChange={(e) => setValue('color', e.target.value)} className="h-7 w-7 cursor-pointer rounded" />
+            </div>
+          </div>
+          <div className="flex justify-end gap-2">
+            <button type="button" className="btn-secondary" onClick={onClose}>取消</button>
+            <button type="submit" className="btn-primary" disabled={save.isPending}>儲存</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  )
+}
+
+function GroupsPage() {
+  const qc = useQueryClient()
+  const [modal, setModal] = useState<{ id?: string; name?: string; color?: string } | null>(null)
+  const { data: groups, isLoading } = useQuery({ queryKey: ['admin-groups'], queryFn: adminApi.groups })
+
+  const del = useMutation({
+    mutationFn: adminApi.deleteGroup,
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['admin-groups'] }),
+  })
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-bold">組別管理</h1>
+        <button className="btn-primary gap-1" onClick={() => setModal({})}>
+          <Plus className="h-4 w-4" /> 新增組別
+        </button>
+      </div>
+
+      <div className="card overflow-hidden">
+        <table className="w-full text-sm">
+          <thead className="border-b bg-gray-50">
+            <tr>
+              {['組別', '顏色', '操作'].map((h) => (
+                <th key={h} className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody className="divide-y">
+            {isLoading
+              ? Array.from({ length: 3 }).map((_, i) => <tr key={i}><td colSpan={3} className="px-4 py-3"><div className="h-4 animate-pulse rounded bg-gray-200" /></td></tr>)
+              : groups?.map((g) => (
+                  <tr key={g.id} className="hover:bg-gray-50">
+                    <td className="px-4 py-3">
+                      <span className="badge" style={{ backgroundColor: g.color + '20', color: g.color }}>
+                        {g.name}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-2">
+                        <span className="inline-block h-5 w-5 rounded-full" style={{ backgroundColor: g.color }} />
+                        <code className="text-xs text-gray-500">{g.color}</code>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 flex gap-2">
+                      <button className="btn-secondary px-2 py-1 text-xs gap-1" onClick={() => setModal(g)}>
+                        <Pencil className="h-3 w-3" /> 編輯
+                      </button>
+                      <button
+                        className="btn-danger px-2 py-1 text-xs gap-1"
+                        onClick={() => { if (confirm(`確定刪除組別 ${g.name}？`)) del.mutate(g.id) }}
+                      >
+                        <Trash2 className="h-3 w-3" /> 刪除
+                      </button>
+                    </td>
+                  </tr>
+                ))
+            }
+          </tbody>
+        </table>
+      </div>
+
+      {modal !== null && (
+        <GroupModal
+          initial={modal.id ? modal as any : undefined}
+          onClose={() => setModal(null)}
+        />
+      )}
+    </div>
+  )
+}
+
+export const Route = createFileRoute('/groups')({ component: GroupsPage })
