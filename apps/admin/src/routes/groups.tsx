@@ -5,7 +5,7 @@ import { useState } from 'react'
 import { Plus, Pencil, Trash2, X } from 'lucide-react'
 import { adminApi } from '../lib/api'
 
-const PRESET_COLORS = ['#6366f1', '#ec4899', '#f59e0b', '#10b981', '#3b82f6', '#8b5cf6', '#ef4444', '#14b8a6']
+const PRESET_COLORS = ['#DE272C', '#111111', '#6e6e73', '#c91f24', '#7f1d1d', '#374151', '#991b1b', '#52525b']
 
 function GroupModal({ initial, onClose }: { initial?: { id: string; name: string; color: string }; onClose: () => void }) {
   const qc = useQueryClient()
@@ -39,7 +39,7 @@ function GroupModal({ initial, onClose }: { initial?: { id: string; name: string
                 <button
                   key={c}
                   type="button"
-                  className={`h-7 w-7 rounded-full border-2 transition-transform ${color === c ? 'scale-110 border-gray-800' : 'border-transparent'}`}
+                  className={`h-8 w-8 rounded-full border-2 transition-transform ${color === c ? 'scale-110 border-brand-500' : 'border-transparent'}`}
                   style={{ backgroundColor: c }}
                   onClick={() => setValue('color', c)}
                 />
@@ -69,27 +69,31 @@ function GroupsPage() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">組別管理</h1>
+      <div className="page-header">
+        <div>
+          <h1 className="page-title">組別管理</h1>
+          <p className="page-subtitle">團隊分類與標籤色彩</p>
+        </div>
         <button className="btn-primary gap-1" onClick={() => setModal({})}>
           <Plus className="h-4 w-4" /> 新增組別
         </button>
       </div>
 
-      <div className="card overflow-hidden">
+      <div className="card table-shell">
+        <div className="table-scroll">
         <table className="w-full text-sm">
-          <thead className="border-b bg-gray-50">
+          <thead className="border-b border-black/10 bg-black/5 dark:border-white/10 dark:bg-white/5">
             <tr>
               {['組別', '顏色', '操作'].map((h) => (
-                <th key={h} className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">{h}</th>
+                <th key={h} className="px-4 py-3 text-left text-xs font-semibold uppercase text-muted">{h}</th>
               ))}
             </tr>
           </thead>
-          <tbody className="divide-y">
+          <tbody className="divide-y divide-black/5 dark:divide-white/10">
             {isLoading
               ? Array.from({ length: 3 }).map((_, i) => <tr key={i}><td colSpan={3} className="px-4 py-3"><div className="h-4 animate-pulse rounded bg-gray-200" /></td></tr>)
               : groups?.map((g) => (
-                  <tr key={g.id} className="hover:bg-gray-50">
+                  <tr key={g.id} className="hover:bg-black/5 dark:hover:bg-white/5">
                     <td className="px-4 py-3">
                       <span className="badge" style={{ backgroundColor: g.color + '20', color: g.color }}>
                         {g.name}
@@ -98,7 +102,7 @@ function GroupsPage() {
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
                         <span className="inline-block h-5 w-5 rounded-full" style={{ backgroundColor: g.color }} />
-                        <code className="text-xs text-gray-500">{g.color}</code>
+                        <code className="text-xs text-muted">{g.color}</code>
                       </div>
                     </td>
                     <td className="px-4 py-3 flex gap-2">
@@ -117,6 +121,7 @@ function GroupsPage() {
             }
           </tbody>
         </table>
+        </div>
       </div>
 
       {modal !== null && (

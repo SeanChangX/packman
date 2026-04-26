@@ -1,6 +1,6 @@
 import { FastifyInstance } from 'fastify'
 import { prisma } from '../plugins/prisma'
-import { requireAuth } from '../plugins/auth'
+import { requireAdminOrAdminSecret } from '../plugins/auth'
 import { StickerRequestSchema } from '@packman/shared'
 import { generateItemStickerPdf, generateBoxStickerPdf } from '../services/pdf'
 
@@ -8,7 +8,7 @@ const APP_URL = process.env.APP_URL ?? 'http://localhost:3000'
 
 export async function stickerRoutes(app: FastifyInstance) {
   // Bulk item stickers PDF
-  app.post('/items', { preHandler: requireAuth }, async (request, reply) => {
+  app.post('/items', { preHandler: requireAdminOrAdminSecret }, async (request, reply) => {
     const body = StickerRequestSchema.parse(request.body)
 
     const items = await prisma.item.findMany({
@@ -29,7 +29,7 @@ export async function stickerRoutes(app: FastifyInstance) {
   })
 
   // Bulk box stickers PDF
-  app.post('/boxes', { preHandler: requireAuth }, async (request, reply) => {
+  app.post('/boxes', { preHandler: requireAdminOrAdminSecret }, async (request, reply) => {
     const body = StickerRequestSchema.parse(request.body)
 
     const boxes = await prisma.box.findMany({

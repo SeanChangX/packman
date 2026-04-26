@@ -1,4 +1,4 @@
-import type { User, Group } from '@packman/shared'
+import type { User, Group, Box, BatteryRegulation } from '@packman/shared'
 
 async function req<T>(url: string, options?: RequestInit): Promise<T> {
   const res = await fetch(url, {
@@ -33,6 +33,22 @@ export const adminApi = {
     req<Group>(`/api/groups/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
   deleteGroup: (id: string) =>
     req<void>(`/api/groups/${id}`, { method: 'DELETE' }),
+
+  boxes: () => req<Box[]>('/api/boxes'),
+  createBox: (data: { label: string; shippingMethod: string; notes?: string }) =>
+    req<Box>('/api/boxes', { method: 'POST', body: JSON.stringify(data) }),
+  updateBox: (id: string, data: { label?: string; shippingMethod?: string; notes?: string; status?: string }) =>
+    req<Box>(`/api/boxes/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
+  deleteBox: (id: string) =>
+    req<void>(`/api/boxes/${id}`, { method: 'DELETE' }),
+
+  batteryRegulations: () => req<BatteryRegulation[]>('/api/battery-regulations'),
+  createBatteryRegulation: (data: { title: string; content: string; sortOrder: number }) =>
+    req<BatteryRegulation>('/api/battery-regulations', { method: 'POST', body: JSON.stringify(data) }),
+  updateBatteryRegulation: (id: string, data: { title?: string; content?: string; sortOrder?: number }) =>
+    req<BatteryRegulation>(`/api/battery-regulations/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
+  deleteBatteryRegulation: (id: string) =>
+    req<void>(`/api/battery-regulations/${id}`, { method: 'DELETE' }),
 
   exportItems: () => window.open('/api/admin/export/items', '_blank'),
   exportBatteries: () => window.open('/api/admin/export/batteries', '_blank'),

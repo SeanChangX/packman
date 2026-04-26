@@ -4,8 +4,9 @@ import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { Plus, X } from 'lucide-react'
 import { boxesApi, usersApi } from '../lib/api'
-import { STATUS_LABELS, STATUS_COLORS, SHIPPING_LABELS, cn } from '../lib/utils'
+import { STATUS_LABELS, STATUS_COLORS, cn } from '../lib/utils'
 import type { CreateBoxInput } from '@packman/shared'
+import { useAuth } from '../lib/auth-context'
 
 function NewBoxModal({ onClose }: { onClose: () => void }) {
   const qc = useQueryClient()
@@ -22,7 +23,7 @@ function NewBoxModal({ onClose }: { onClose: () => void }) {
       <div className="card w-full max-w-md p-6">
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-lg font-bold">新增箱子</h2>
-          <button onClick={onClose} className="rounded p-1 hover:bg-gray-100"><X className="h-4 w-4" /></button>
+          <button onClick={onClose} className="rounded-2xl p-2 hover:bg-black/5 dark:hover:bg-white/10"><X className="h-4 w-4" /></button>
         </div>
         <form className="space-y-3" onSubmit={handleSubmit((d) => create.mutate(d))}>
           <div>
@@ -59,6 +60,7 @@ function NewBoxModal({ onClose }: { onClose: () => void }) {
 }
 
 function BoxesPage() {
+  const { user } = useAuth()
   const [showNew, setShowNew] = useState(false)
   const { data: boxes, isLoading } = useQuery({ queryKey: ['boxes'], queryFn: () => boxesApi.list() })
 
@@ -73,23 +75,35 @@ function BoxesPage() {
     >
       <div className="flex items-start justify-between">
         <div>
-          <span className="text-2xl font-bold text-gray-900">箱 {box!.label}</span>
+          <span className="text-2xl font-bold text-app">箱 {box!.label}</span>
           {box!.owner && (
-            <p className="mt-1 text-sm text-gray-500">負責人: {box!.owner.name}</p>
+            <p className="mt-1 text-sm text-muted">負責人: {box!.owner.name}</p>
           )}
         </div>
         <span className={cn('badge', STATUS_COLORS[box!.status])}>
           {STATUS_LABELS[box!.status]}
         </span>
       </div>
-      <p className="mt-2 text-xs text-gray-400">{(box as any)._count?.items ?? 0} 件物品</p>
+      <p className="mt-2 text-xs text-muted">{(box as any)._count?.items ?? 0} 件物品</p>
     </Link>
   )
 
+  if (user?.role !== 'ADMIN') {
+    return (
+      <div className="card mx-auto max-w-lg p-6 text-center">
+        <h1 className="text-xl font-bold">需要管理員權限</h1>
+        <p className="mt-2 text-sm text-muted">箱子管理只開放給 Admin 角色使用。</p>
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">箱子管理</h1>
+      <div className="page-header">
+        <div>
+          <h1 className="page-title">箱子管理</h1>
+          <p className="page-subtitle">託運與登機箱狀態</p>
+        </div>
         <button className="btn-primary gap-1" onClick={() => setShowNew(true)}>
           <Plus className="h-4 w-4" /> 新增箱子
         </button>
@@ -100,14 +114,14 @@ function BoxesPage() {
         : (
           <div className="space-y-6">
             <section>
-              <h2 className="mb-3 font-semibold text-gray-700">託運箱 ({checked.length})</h2>
-              <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
+              <h2 className="mb-3 font-semibold text-muted">託運箱 ({checked.length})</h2>
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                 {checked.map((b) => <BoxCard key={b.id} box={b} />)}
               </div>
             </section>
             <section>
-              <h2 className="mb-3 font-semibold text-gray-700">登機箱 ({carryOn.length})</h2>
-              <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
+              <h2 className="mb-3 font-semibold text-muted">登機箱 ({carryOn.length})</h2>
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                 {carryOn.map((b) => <BoxCard key={b.id} box={b} />)}
               </div>
             </section>

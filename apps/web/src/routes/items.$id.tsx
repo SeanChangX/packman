@@ -54,10 +54,10 @@ function ItemDetailPage() {
           <ArrowLeft className="h-4 w-4" />
         </button>
         <div className="flex-1">
-          <h1 className="text-2xl font-bold">{item.name}</h1>
+          <h1 className="page-title">{item.name}</h1>
           <div className="mt-1 flex gap-2">
             <span className={cn('badge', STATUS_COLORS[item.status])}>{STATUS_LABELS[item.status]}</span>
-            {item.shippingMethod && <span className="badge bg-blue-100 text-blue-800">{SHIPPING_LABELS[item.shippingMethod]}</span>}
+            {item.shippingMethod && <span className="badge bg-black/10 text-app dark:bg-white/10">{SHIPPING_LABELS[item.shippingMethod]}</span>}
           </div>
         </div>
         <button onClick={() => deleteItem.mutate()} className="btn-danger p-2" title="刪除">
@@ -68,10 +68,10 @@ function ItemDetailPage() {
       <div className="grid gap-6 md:grid-cols-2">
         {/* Photo + QR */}
         <div className="card space-y-4 p-4">
-          <div className="aspect-video overflow-hidden rounded-lg bg-gray-100">
+          <div className="aspect-video overflow-hidden rounded-[22px] bg-black/5 dark:bg-white/10">
             {item.photoUrl
               ? <img src={item.photoUrl} alt={item.name} className="h-full w-full object-cover" />
-              : <div className="flex h-full items-center justify-center text-gray-400">尚無照片</div>
+              : <div className="flex h-full items-center justify-center text-muted">尚無照片</div>
             }
           </div>
 
@@ -101,11 +101,11 @@ function ItemDetailPage() {
 
           {/* AI Tags */}
           <div>
-            <div className="flex items-center gap-1 text-sm font-medium text-gray-700">
+            <div className="flex items-center gap-1 text-sm font-semibold text-app">
               <Tag className="h-4 w-4" />
               <span>AI 標籤</span>
               {item.aiTagStatus === 'PENDING' && (
-                <span className="ml-1 text-xs text-amber-600 animate-pulse">辨識中...</span>
+                <span className="ml-1 animate-pulse text-xs text-brand-600">辨識中...</span>
               )}
               {item.aiTagStatus === 'FAILED' && (
                 <span className="ml-1 text-xs text-red-500">辨識失敗</span>
@@ -113,9 +113,9 @@ function ItemDetailPage() {
             </div>
             {item.tags.length > 0
               ? <div className="mt-2 flex flex-wrap gap-1">
-                  {item.tags.map((t) => <span key={t} className="badge bg-indigo-100 text-indigo-700">{t}</span>)}
+                  {item.tags.map((t) => <span key={t} className="badge bg-black/5 text-muted dark:bg-white/10">{t}</span>)}
                 </div>
-              : <p className="mt-1 text-xs text-gray-400">上傳照片後自動辨識標籤</p>
+              : <p className="mt-1 text-xs text-muted">上傳照片後自動辨識標籤</p>
             }
           </div>
 
@@ -202,8 +202,8 @@ function ItemDetailPage() {
                   ['須留意之處', item.specialNotes ?? '—'],
                 ].map(([label, value]) => (
                   <div key={String(label)} className="flex justify-between">
-                    <dt className="font-medium text-gray-500">{label}</dt>
-                    <dd className="text-gray-900">{value}</dd>
+                    <dt className="font-medium text-muted">{label}</dt>
+                    <dd className="text-app">{value}</dd>
                   </div>
                 ))}
                 <button className="btn-secondary mt-4 w-full" onClick={() => setEditing(true)}>

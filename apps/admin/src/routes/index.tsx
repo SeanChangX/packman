@@ -4,8 +4,8 @@ import { adminApi } from '../lib/api'
 
 function StatCard({ label, value, color }: { label: string; value: number; color: string }) {
   return (
-    <div className="card p-6">
-      <p className="text-sm text-gray-500">{label}</p>
+    <div className="metric-card">
+      <p className="text-sm font-semibold text-muted">{label}</p>
       <p className={`mt-1 text-3xl font-bold ${color}`}>{value}</p>
     </div>
   )
@@ -16,15 +16,20 @@ function AdminDashboard() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold">Admin 儀表板</h1>
+      <div className="page-header">
+        <div>
+          <h1 className="page-title">Admin 總覽</h1>
+          <p className="page-subtitle">系統資料與打包狀態</p>
+        </div>
+      </div>
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-        <StatCard label="用戶數" value={stats?.users ?? 0} color="text-indigo-600" />
-        <StatCard label="物品數" value={stats?.items ?? 0} color="text-blue-600" />
-        <StatCard label="箱子數" value={stats?.boxes ?? 0} color="text-amber-600" />
-        <StatCard label="電池數" value={stats?.batteries ?? 0} color="text-purple-600" />
-        <StatCard label="已打包物品" value={stats?.packedItems ?? 0} color="text-green-600" />
-        <StatCard label="已封箱" value={stats?.sealedBoxes ?? 0} color="text-green-700" />
-        <StatCard label="組別數" value={stats?.groups ?? 0} color="text-gray-600" />
+        <StatCard label="用戶數" value={stats?.users ?? 0} color="text-brand-600" />
+        <StatCard label="物品數" value={stats?.items ?? 0} color="text-app" />
+        <StatCard label="箱子數" value={stats?.boxes ?? 0} color="text-zinc-700 dark:text-zinc-200" />
+        <StatCard label="電池數" value={stats?.batteries ?? 0} color="text-brand-600" />
+        <StatCard label="已打包物品" value={stats?.packedItems ?? 0} color="text-app" />
+        <StatCard label="已封箱" value={stats?.sealedBoxes ?? 0} color="text-zinc-700 dark:text-zinc-200" />
+        <StatCard label="組別數" value={stats?.groups ?? 0} color="text-muted" />
       </div>
     </div>
   )

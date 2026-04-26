@@ -1,6 +1,6 @@
 import { FastifyInstance } from 'fastify'
 import { prisma } from '../plugins/prisma'
-import { requireAuthOrAdminSecret } from '../plugins/auth'
+import { requireAdminOrAdminSecret, requireAuthOrAdminSecret } from '../plugins/auth'
 import { CreateGroupSchema, UpdateGroupSchema } from '@packman/shared'
 
 export async function groupRoutes(app: FastifyInstance) {
@@ -8,7 +8,7 @@ export async function groupRoutes(app: FastifyInstance) {
     return prisma.group.findMany({ orderBy: { name: 'asc' } })
   })
 
-  app.post('/', { preHandler: requireAuthOrAdminSecret }, async (request, reply) => {
+  app.post('/', { preHandler: requireAdminOrAdminSecret }, async (request, reply) => {
     const body = CreateGroupSchema.parse(request.body)
     const group = await prisma.group.create({ data: body })
     return reply.status(201).send(group)
@@ -16,7 +16,7 @@ export async function groupRoutes(app: FastifyInstance) {
 
   app.patch<{ Params: { id: string } }>(
     '/:id',
-    { preHandler: requireAuthOrAdminSecret },
+      { preHandler: requireAdminOrAdminSecret },
     async (request, reply) => {
       const body = UpdateGroupSchema.parse(request.body)
       try {
@@ -33,7 +33,7 @@ export async function groupRoutes(app: FastifyInstance) {
 
   app.delete<{ Params: { id: string } }>(
     '/:id',
-    { preHandler: requireAuthOrAdminSecret },
+      { preHandler: requireAdminOrAdminSecret },
     async (request, reply) => {
       try {
         await prisma.group.delete({ where: { id: request.params.id } })

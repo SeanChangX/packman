@@ -4,6 +4,8 @@ import { useState } from 'react'
 import { Printer, Package, Box } from 'lucide-react'
 import { itemsApi, boxesApi, stickersApi } from '../lib/api'
 import { STATUS_LABELS, STATUS_COLORS, cn } from '../lib/utils'
+import { Select } from '../lib/select'
+import { useAuth } from '../lib/auth-context'
 
 type StickerSize = 'SMALL' | 'MEDIUM' | 'LARGE' | 'A4_SHEET'
 
@@ -15,6 +17,7 @@ const SIZE_LABELS: Record<StickerSize, string> = {
 }
 
 function StickersPage() {
+  const { user } = useAuth()
   const [mode, setMode] = useState<'items' | 'boxes'>('items')
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [size, setSize] = useState<StickerSize>('MEDIUM')
@@ -54,41 +57,53 @@ function StickersPage() {
     else setSelectedIds(new Set(list.map((i) => i.id)))
   }
 
+  if (user?.role !== 'ADMIN') {
+    return (
+      <div className="card mx-auto max-w-lg p-6 text-center">
+        <h1 className="text-xl font-bold">需要管理員權限</h1>
+        <p className="mt-2 text-sm text-muted">貼紙列印只開放給 Admin 角色使用。</p>
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold">貼紙列印</h1>
-        <p className="text-sm text-gray-500">選擇物品或箱子，生成 PDF 貼紙</p>
+      <div className="page-header">
+        <div>
+          <h1 className="page-title">貼紙列印</h1>
+          <p className="page-subtitle">選擇物品或箱子，生成 PDF 貼紙</p>
+        </div>
       </div>
 
       <div className="card p-4">
-        <div className="flex flex-wrap gap-4">
-          {/* Mode tabs */}
-          <div className="flex rounded-lg border p-1">
+        <div className="grid gap-4 lg:grid-cols-[auto_auto_1fr] lg:items-center">
+          <div className="flex rounded-2xl border border-black/10 bg-black/5 p-1 dark:border-white/10 dark:bg-white/5">
             <button
-              className={cn('flex items-center gap-1 rounded px-3 py-1.5 text-sm font-medium transition-colors', mode === 'items' ? 'bg-brand-500 text-white' : 'text-gray-600 hover:bg-gray-50')}
+              className={cn('flex min-h-10 flex-1 items-center justify-center gap-1 rounded-xl px-3 py-1.5 text-sm font-semibold transition-colors lg:flex-none', mode === 'items' ? 'bg-brand-500 text-white' : 'text-muted hover:bg-white/40 dark:hover:bg-white/10')}
               onClick={() => { setMode('items'); setSelectedIds(new Set()) }}
             >
               <Package className="h-4 w-4" /> 物品
             </button>
             <button
-              className={cn('flex items-center gap-1 rounded px-3 py-1.5 text-sm font-medium transition-colors', mode === 'boxes' ? 'bg-brand-500 text-white' : 'text-gray-600 hover:bg-gray-50')}
+              className={cn('flex min-h-10 flex-1 items-center justify-center gap-1 rounded-xl px-3 py-1.5 text-sm font-semibold transition-colors lg:flex-none', mode === 'boxes' ? 'bg-brand-500 text-white' : 'text-muted hover:bg-white/40 dark:hover:bg-white/10')}
               onClick={() => { setMode('boxes'); setSelectedIds(new Set()) }}
             >
               <Box className="h-4 w-4" /> 箱子
             </button>
           </div>
 
-          {/* Size picker */}
           <div className="flex items-center gap-2">
-            <label className="text-sm font-medium text-gray-700">尺寸:</label>
-            <select className="input w-auto" value={size} onChange={(e) => setSize(e.target.value as StickerSize)}>
-              {Object.entries(SIZE_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-            </select>
+            <label className="label whitespace-nowrap">尺寸</label>
+            <Select
+              className="w-full lg:w-44"
+              value={size}
+              onChange={setSize}
+              options={Object.entries(SIZE_LABELS).map(([value, label]) => ({ value: value as StickerSize, label }))}
+            />
           </div>
 
           <button
-            className="btn-primary ml-auto gap-1"
+            className="btn-primary justify-self-stretch gap-1 lg:justify-self-end"
             disabled={selectedIds.size === 0 || download.isPending}
             onClick={() => download.mutate()}
           >
@@ -99,32 +114,32 @@ function StickersPage() {
       </div>
 
       {download.isError && (
-        <div className="rounded-md bg-red-50 p-3 text-sm text-red-700">
+        <div className="rounded-2xl border border-red-500/15 bg-red-500/10 p-3 text-sm font-semibold text-brand-600">
           {(download.error as Error).message}
         </div>
       )}
 
       <div className="card overflow-hidden">
-        <div className="flex items-center gap-3 border-b px-4 py-3">
+        <div className="flex items-center gap-3 border-b border-black/10 px-4 py-3 dark:border-white/10">
           <input
             type="checkbox"
             checked={selectedIds.size === list.length && list.length > 0}
             onChange={toggleAll}
             className="h-4 w-4 rounded"
           />
-          <span className="text-sm text-gray-500">
+          <span className="text-sm text-muted">
             已選 {selectedIds.size} / {list.length}
           </span>
         </div>
 
-        <ul className="divide-y">
+        <ul className="divide-y divide-black/5 dark:divide-white/10">
           {list.map((item) => {
             const isItem = mode === 'items'
             const i = item as any
             return (
               <li
                 key={item.id}
-                className={cn('flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-gray-50', selectedIds.has(item.id) && 'bg-brand-50')}
+                className={cn('flex cursor-pointer items-center gap-3 px-4 py-3 hover:bg-black/5 dark:hover:bg-white/5', selectedIds.has(item.id) && 'bg-brand-500/10')}
                 onClick={() => toggle(item.id)}
               >
                 <input
@@ -136,8 +151,8 @@ function StickersPage() {
                 />
                 <div className="flex-1">
                   <p className="font-medium">{isItem ? i.name : `箱 ${i.label}`}</p>
-                  {isItem && i.owner && <p className="text-xs text-gray-500">{i.owner.name}</p>}
-                  {!isItem && i.owner && <p className="text-xs text-gray-500">負責人: {i.owner.name}</p>}
+                  {isItem && i.owner && <p className="text-xs text-muted">{i.owner.name}</p>}
+                  {!isItem && i.owner && <p className="text-xs text-muted">負責人: {i.owner.name}</p>}
                 </div>
                 {isItem && (
                   <span className={cn('badge', STATUS_COLORS[i.status])}>{STATUS_LABELS[i.status]}</span>

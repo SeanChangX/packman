@@ -1,5 +1,6 @@
 import PDFDocument from 'pdfkit'
 import QRCode from 'qrcode'
+import { existsSync } from 'fs'
 
 type StickerSize = 'SMALL' | 'MEDIUM' | 'LARGE' | 'A4_SHEET'
 
@@ -36,6 +37,27 @@ const SIZES: Record<StickerSize, StickerDimensions> = {
   },
 }
 
+const CJK_REGULAR_FONT_PATHS = [
+  '/usr/share/fonts/noto-cjk/NotoSansCJK-Regular.ttc',
+  '/usr/share/fonts/noto/NotoSansCJK-Regular.ttc',
+  '/usr/share/fonts/noto-cjk/NotoSansCJK-Regular.otf',
+]
+const CJK_BOLD_FONT_PATHS = [
+  '/usr/share/fonts/noto-cjk/NotoSansCJK-Bold.ttc',
+  '/usr/share/fonts/noto/NotoSansCJK-Bold.ttc',
+  '/usr/share/fonts/noto-cjk/NotoSansCJK-Bold.otf',
+]
+
+const CJK_REGULAR_FONT = CJK_REGULAR_FONT_PATHS.find((path) => existsSync(path))
+const CJK_BOLD_FONT = CJK_BOLD_FONT_PATHS.find((path) => existsSync(path))
+const REGULAR_FONT = CJK_REGULAR_FONT ? 'NotoCJKRegular' : 'Helvetica'
+const BOLD_FONT = CJK_BOLD_FONT ? 'NotoCJKBold' : REGULAR_FONT === 'NotoCJKRegular' ? 'NotoCJKRegular' : 'Helvetica-Bold'
+
+function registerFonts(doc: PDFKit.PDFDocument) {
+  if (CJK_REGULAR_FONT) doc.registerFont('NotoCJKRegular', CJK_REGULAR_FONT, 'NotoSansCJKtc-Regular')
+  if (CJK_BOLD_FONT) doc.registerFont('NotoCJKBold', CJK_BOLD_FONT, 'NotoSansCJKtc-Bold')
+}
+
 async function qrBuffer(url: string, size: number): Promise<Buffer> {
   return QRCode.toBuffer(url, { width: size, margin: 1 })
 }
@@ -57,7 +79,7 @@ async function drawItemLabel(
 
   // Title
   doc
-    .font('Helvetica-Bold')
+    .font(BOLD_FONT)
     .fontSize(fontSize.title)
     .text(item.name, x + padding, y + padding, {
       width: dim.width - qrSize - padding * 3,
@@ -70,9 +92,9 @@ async function drawItemLabel(
   // Owner
   if (item.owner) {
     doc
-      .font('Helvetica')
+      .font(REGULAR_FONT)
       .fontSize(fontSize.subtitle)
-      .text(`👤 ${item.owner.name}`, x + padding, lineY, {
+      .text(`負責人: ${item.owner.name}`, x + padding, lineY, {
         width: dim.width - qrSize - padding * 3,
       })
     lineY += fontSize.subtitle + 3
@@ -84,7 +106,7 @@ async function drawItemLabel(
     .join('  |  ')
   if (meta) {
     doc
-      .font('Helvetica')
+      .font(REGULAR_FONT)
       .fontSize(fontSize.small)
       .fillColor('#555555')
       .text(meta, x + padding, lineY, { width: dim.width - qrSize - padding * 3 })
@@ -123,7 +145,7 @@ async function drawBoxLabel(
 
   // Large box label
   doc
-    .font('Helvetica-Bold')
+    .font(BOLD_FONT)
     .fontSize(fontSize.title * 2)
     .text(`箱 ${box.label}`, x + padding, y + padding, {
       width: dim.width - qrSize - padding * 3,
@@ -133,7 +155,7 @@ async function drawBoxLabel(
 
   if (box.owner) {
     doc
-      .font('Helvetica')
+      .font(REGULAR_FONT)
       .fontSize(fontSize.subtitle)
       .text(`負責人: ${box.owner.name}`, x + padding, lineY, {
         width: dim.width - qrSize - padding * 3,
@@ -143,7 +165,7 @@ async function drawBoxLabel(
 
   if (box.owner?.email) {
     doc
-      .font('Helvetica')
+      .font(REGULAR_FONT)
       .fontSize(fontSize.small)
       .fillColor('#555555')
       .text(box.owner.email, x + padding, lineY, {
@@ -178,6 +200,7 @@ export async function generateItemStickerPdf(
       margins: { top: 0, left: 0, right: 0, bottom: 0 },
       autoFirstPage: false,
     })
+    registerFonts(doc)
     doc.on('data', (c: Buffer) => chunks.push(c))
     doc.on('end', () => resolve(Buffer.concat(chunks)))
     doc.on('error', reject)
@@ -235,6 +258,7 @@ export async function generateBoxStickerPdf(
       margins: { top: 0, left: 0, right: 0, bottom: 0 },
       autoFirstPage: false,
     })
+    registerFonts(doc)
     doc.on('data', (c: Buffer) => chunks.push(c))
     doc.on('end', () => resolve(Buffer.concat(chunks)))
     doc.on('error', reject)

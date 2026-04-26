@@ -68,6 +68,11 @@ export async function requireAuthOrAdminSecret(request: FastifyRequest, reply: F
   }
 }
 
+export async function requireAdminOrAdminSecret(request: FastifyRequest, reply: FastifyReply) {
+  if (ADMIN_API_SECRET && request.headers['x-admin-auth'] === ADMIN_API_SECRET) return
+  await requireAdmin(request, reply)
+}
+
 export async function setAuthCookie(reply: FastifyReply, userId: string, role: string) {
   const token = signToken({ userId, role })
   reply.setCookie('packman_token', token, {

@@ -1,7 +1,7 @@
 import { FastifyInstance } from 'fastify'
 import QRCode from 'qrcode'
 import { prisma } from '../plugins/prisma'
-import { requireAuth, requireAdmin } from '../plugins/auth'
+import { requireAuth, requireAdminOrAdminSecret, requireAuthOrAdminSecret } from '../plugins/auth'
 import { CreateBoxSchema, UpdateBoxSchema } from '@packman/shared'
 import { generateBoxStickerPdf } from '../services/pdf'
 
@@ -12,7 +12,7 @@ const boxInclude = {
 }
 
 export async function boxRoutes(app: FastifyInstance) {
-  app.get('/', { preHandler: requireAuth }, async (request) => {
+  app.get('/', { preHandler: requireAuthOrAdminSecret }, async (request) => {
     const query = request.query as { shippingMethod?: string }
     return prisma.box.findMany({
       where: query.shippingMethod
@@ -28,7 +28,7 @@ export async function boxRoutes(app: FastifyInstance) {
 
   app.get<{ Params: { id: string } }>(
     '/:id',
-    { preHandler: requireAuth },
+    { preHandler: requireAuthOrAdminSecret },
     async (request, reply) => {
       const box = await prisma.box.findUnique({
         where: { id: request.params.id },
@@ -48,7 +48,7 @@ export async function boxRoutes(app: FastifyInstance) {
     }
   )
 
-  app.post('/', { preHandler: requireAdmin }, async (request, reply) => {
+  app.post('/', { preHandler: requireAdminOrAdminSecret }, async (request, reply) => {
     const body = CreateBoxSchema.parse(request.body)
     const box = await prisma.box.create({ data: body, include: boxInclude })
     return reply.status(201).send(box)
@@ -56,7 +56,7 @@ export async function boxRoutes(app: FastifyInstance) {
 
   app.patch<{ Params: { id: string } }>(
     '/:id',
-    { preHandler: requireAuth },
+    { preHandler: requireAdminOrAdminSecret },
     async (request, reply) => {
       const body = UpdateBoxSchema.parse(request.body)
       try {
@@ -74,7 +74,7 @@ export async function boxRoutes(app: FastifyInstance) {
 
   app.delete<{ Params: { id: string } }>(
     '/:id',
-    { preHandler: requireAdmin },
+    { preHandler: requireAdminOrAdminSecret },
     async (request, reply) => {
       try {
         await prisma.box.delete({ where: { id: request.params.id } })

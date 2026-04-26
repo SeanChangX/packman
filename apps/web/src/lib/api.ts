@@ -1,5 +1,5 @@
 import type {
-  User, Group, Box, Item, Battery,
+  User, Group, Box, Item, Battery, BatteryRegulation,
   PaginatedResponse,
 } from '@packman/shared'
 import type {
@@ -19,7 +19,9 @@ async function request<T>(url: string, options?: RequestInit): Promise<T> {
     ...options,
   })
   if (res.status === 401) {
-    window.location.href = '/login'
+    if (window.location.pathname !== '/login') {
+      window.location.href = '/login'
+    }
     throw new Error('Unauthorized')
   }
   if (!res.ok) {
@@ -128,6 +130,10 @@ export const batteriesApi = {
     request<Battery>(`${BASE}/batteries/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
   delete: (id: string) =>
     request<void>(`${BASE}/batteries/${id}`, { method: 'DELETE' }),
+}
+
+export const batteryRegulationsApi = {
+  list: () => request<BatteryRegulation[]>(`${BASE}/battery-regulations`),
 }
 
 // ─── Stickers ──────────────────────────────────────────────────────

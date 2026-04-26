@@ -14,7 +14,7 @@ export async function authRoutes(app: FastifyInstance) {
   app.get('/slack', async (request, reply) => {
     const params = new URLSearchParams({
       client_id: SLACK_CLIENT_ID,
-      scope: 'identity.basic,identity.email,identity.avatar',
+      user_scope: 'identity.basic,identity.email,identity.avatar',
       redirect_uri: SLACK_REDIRECT_URI,
     })
     reply.redirect(`https://slack.com/oauth/v2/authorize?${params}`)
@@ -34,8 +34,7 @@ export async function authRoutes(app: FastifyInstance) {
         // Exchange code for token
         const tokenRes = await axios.post<{
           ok: boolean
-          access_token?: string
-          authed_user?: { id: string }
+          authed_user?: { id: string; access_token?: string }
           team?: { id: string }
           error?: string
         }>(
@@ -53,6 +52,9 @@ export async function authRoutes(app: FastifyInstance) {
           throw new Error(tokenRes.data.error ?? 'Slack OAuth failed')
         }
 
+        const accessToken = tokenRes.data.authed_user?.access_token
+        if (!accessToken) throw new Error('No user access token from Slack')
+
         // Restrict to specific workspace
         if (SLACK_WORKSPACE_ID && tokenRes.data.team?.id !== SLACK_WORKSPACE_ID) {
           return reply.redirect(`${APP_URL}/login?error=wrong_workspace`)
@@ -67,7 +69,7 @@ export async function authRoutes(app: FastifyInstance) {
           user?: { id: string; name: string; email: string; image_192?: string }
           team?: { id: string }
         }>('https://slack.com/api/users.identity', {
-          headers: { Authorization: `Bearer ${tokenRes.data.access_token}` },
+          headers: { Authorization: `Bearer ${accessToken}` },
         })
 
         if (!identityRes.data.ok || !identityRes.data.user) {

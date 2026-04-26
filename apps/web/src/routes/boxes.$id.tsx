@@ -42,19 +42,19 @@ function BoxDetailPage() {
         </button>
         <div className="flex-1">
           <div className="flex items-center gap-2">
-            <h1 className="text-2xl font-bold">箱 {box.label}</h1>
-            <span className="badge bg-blue-100 text-blue-800">{SHIPPING_LABELS[box.shippingMethod]}</span>
+            <h1 className="page-title">箱 {box.label}</h1>
+            <span className="badge bg-black/10 text-app dark:bg-white/10">{SHIPPING_LABELS[box.shippingMethod]}</span>
           </div>
-          {box.owner && <p className="text-sm text-gray-500">整箱負責人: {box.owner.name}</p>}
+          {box.owner && <p className="text-sm text-muted">整箱負責人: {box.owner.name}</p>}
         </div>
         <span className={cn('badge text-sm', STATUS_COLORS[box.status])}>{STATUS_LABELS[box.status]}</span>
       </div>
 
       {/* Actions */}
-      <div className="card flex flex-wrap gap-3 p-4">
+      <div className="card flex flex-col gap-3 p-4 lg:flex-row lg:flex-wrap lg:items-center">
         <div className="flex items-center gap-2">
           <label className="label">貼紙尺寸:</label>
-          <select className="input w-auto" value={stickerSize} onChange={(e) => setStickerSize(e.target.value as any)}>
+          <select className="input w-full sm:w-44" value={stickerSize} onChange={(e) => setStickerSize(e.target.value as any)}>
             <option value="SMALL">小 (50×30mm)</option>
             <option value="MEDIUM">中 (100×50mm)</option>
             <option value="LARGE">大 (150×100mm)</option>
@@ -73,7 +73,7 @@ function BoxDetailPage() {
         </a>
 
         <div className="ml-auto flex items-center gap-2">
-          <span className="text-sm text-gray-600">{packedCount} / {items.length} 已打包</span>
+          <span className="text-sm text-muted">{packedCount} / {items.length} 已打包</span>
           <select
             className={cn('badge cursor-pointer border-0', STATUS_COLORS[box.status])}
             value={box.status}
@@ -91,19 +91,19 @@ function BoxDetailPage() {
         <img src={boxesApi.qrUrl(id)} alt="QR" className="h-20 w-20 rounded" />
         <div>
           <p className="font-medium">掃描此 QR Code</p>
-          <p className="text-sm text-gray-500">開啟箱子清單，勾選已清點物品</p>
+          <p className="text-sm text-muted">開啟箱子清單，勾選已清點物品</p>
         </div>
       </div>
 
       {/* Items checklist */}
       <div className="card">
-        <div className="border-b px-4 py-3">
+        <div className="border-b border-black/10 px-4 py-3 dark:border-white/10">
           <h2 className="font-semibold">物品清單 ({items.length})</h2>
         </div>
         {items.length === 0
-          ? <p className="py-8 text-center text-sm text-gray-400">此箱子尚無物品</p>
+          ? <p className="py-8 text-center text-sm text-muted">此箱子尚無物品</p>
           : (
-            <ul className="divide-y">
+            <ul className="divide-y divide-black/5 dark:divide-white/10">
               {items.map((item) => {
                 const isPacked = item.status !== 'NOT_PACKED'
                 return (
@@ -117,13 +117,13 @@ function BoxDetailPage() {
                       }
                       className="flex-shrink-0 text-brand-500"
                     >
-                      {isPacked ? <CheckSquare className="h-5 w-5" /> : <Square className="h-5 w-5 text-gray-300" />}
+                        {isPacked ? <CheckSquare className="h-5 w-5" /> : <Square className="h-5 w-5 text-muted" />}
                     </button>
                     <div className="flex-1">
-                      <span className={cn('font-medium', isPacked && 'line-through text-gray-400')}>
+                      <span className={cn('font-medium', isPacked && 'text-muted line-through')}>
                         {item.name}
                       </span>
-                      <div className="flex gap-2 text-xs text-gray-500">
+                      <div className="flex gap-2 text-xs text-muted">
                         {item.quantity > 1 && <span>× {item.quantity}</span>}
                         {item.owner && <span>{item.owner.name}</span>}
                         {item.group && <span style={{ color: item.group.color }}>{item.group.name}</span>}

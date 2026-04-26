@@ -1,4 +1,5 @@
 FROM node:22-alpine AS base
+RUN apk add --no-cache openssl font-noto-cjk
 RUN corepack enable && corepack prepare pnpm@latest --activate
 WORKDIR /app
 
@@ -20,9 +21,7 @@ RUN pnpm --filter api db:generate
 RUN pnpm --filter api build
 
 # Production image
-FROM node:22-alpine AS runner
-RUN corepack enable && corepack prepare pnpm@latest --activate
-WORKDIR /app
+FROM base AS runner
 
 COPY package.json pnpm-workspace.yaml ./
 COPY packages/shared/package.json ./packages/shared/
@@ -39,4 +38,4 @@ ENV NODE_ENV=production
 
 EXPOSE 8080
 
-CMD ["sh", "-c", "npx prisma migrate deploy && node dist/index.js"]
+CMD ["sh", "-c", "pnpm exec prisma migrate deploy && node dist/index.js"]

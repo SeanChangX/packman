@@ -3,46 +3,40 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useForm } from 'react-hook-form'
 import { useState } from 'react'
 import { Plus, X, AlertTriangle } from 'lucide-react'
-import { batteriesApi, usersApi } from '../lib/api'
+import { batteriesApi, batteryRegulationsApi, usersApi } from '../lib/api'
 import { BATTERY_TYPE_LABELS } from '../lib/utils'
+import { Select } from '../lib/select'
 import type { CreateBatteryInput, BatteryType } from '@packman/shared'
 
 const BATTERY_COLORS: Record<BatteryType, string> = {
-  POWER_TOOL: 'bg-orange-100 text-orange-800',
-  BEACON_CHARGER: 'bg-green-100 text-green-800',
-  LIFEPO4: 'bg-purple-100 text-purple-800',
+  POWER_TOOL: 'bg-red-500/10 text-brand-600 ring-1 ring-red-500/15',
+  BEACON_CHARGER: 'bg-black/10 text-zinc-900 ring-1 ring-black/10 dark:bg-white/10 dark:text-white',
+  LIFEPO4: 'bg-black text-white dark:bg-white dark:text-black',
 }
 
 function BatteryRegulations() {
+  const { data: regulations } = useQuery({
+    queryKey: ['battery-regulations'],
+    queryFn: batteryRegulationsApi.list,
+  })
+
   return (
-    <div className="card border-amber-200 bg-amber-50 p-4">
-      <div className="mb-3 flex items-center gap-2 font-semibold text-amber-800">
+    <div className="card border-brand-500/20 bg-brand-500/10 p-4">
+      <div className="mb-3 flex items-center gap-2 font-semibold text-brand-600">
         <AlertTriangle className="h-5 w-5" />
         電池航空規定提醒
       </div>
       <div className="grid gap-4 text-sm md:grid-cols-2">
-        <div>
-          <h3 className="mb-2 font-medium text-gray-800">🇹🇼 台灣出入境 (CAA)</h3>
-          <ul className="list-disc space-y-1 pl-4 text-gray-700">
-            <li>鋰電池 <strong>禁止</strong> 放置於託運行李</li>
-            <li>行動電源需攜帶登機，每人限帶 2 個</li>
-            <li>≤100Wh：無限制（需過安檢）</li>
-            <li>100–160Wh：每人限 2 個，需航空公司許可</li>
-            <li>&gt;160Wh：<strong>禁止攜帶</strong></li>
-            <li>工具機電池（18V Li-ion）：登機手提，注意Wh</li>
-          </ul>
-        </div>
-        <div>
-          <h3 className="mb-2 font-medium text-gray-800">🇫🇷 法國入境 (DGAC)</h3>
-          <ul className="list-disc space-y-1 pl-4 text-gray-700">
-            <li>規定與 IATA 相同，鋰電池禁放託運</li>
-            <li>≤100Wh：可隨身攜帶（建議申報）</li>
-            <li>100–160Wh：每人最多 2 個，需航空公司批准</li>
-            <li>磷酸鋰鐵電池（LiFePO4）：與一般鋰電池同規定</li>
-            <li>建議提前聯繫航空公司取得書面許可</li>
-            <li>電池端子需保護，避免短路</li>
-          </ul>
-        </div>
+        {(regulations ?? []).map((regulation) => (
+          <div key={regulation.id}>
+            <h3 className="mb-2 font-medium text-app">{regulation.title}</h3>
+            <ul className="list-disc space-y-1 pl-4 text-muted">
+              {regulation.content.split('\n').filter(Boolean).map((line) => (
+                <li key={line}>{line}</li>
+              ))}
+            </ul>
+          </div>
+        ))}
       </div>
     </div>
   )
@@ -63,7 +57,7 @@ function NewBatteryModal({ onClose }: { onClose: () => void }) {
       <div className="card w-full max-w-md p-6">
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-lg font-bold">新增電池</h2>
-          <button onClick={onClose} className="rounded p-1 hover:bg-gray-100"><X className="h-4 w-4" /></button>
+          <button onClick={onClose} className="rounded-2xl p-2 hover:bg-black/5 dark:hover:bg-white/10"><X className="h-4 w-4" /></button>
         </div>
         <form className="space-y-3" onSubmit={handleSubmit((d) => create.mutate(d))}>
           <div>
@@ -122,8 +116,11 @@ function BatteriesPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">電池分配名單</h1>
+      <div className="page-header">
+        <div>
+          <h1 className="page-title">電池分配</h1>
+          <p className="page-subtitle">登機攜帶電池與負責人</p>
+        </div>
         <button className="btn-primary gap-1" onClick={() => setShowNew(true)}>
           <Plus className="h-4 w-4" /> 新增電池
         </button>
@@ -131,25 +128,31 @@ function BatteriesPage() {
 
       <BatteryRegulations />
 
-      <div className="card overflow-hidden">
-        <div className="flex items-center justify-between border-b p-4">
+      <div className="card table-shell">
+        <div className="flex flex-col gap-3 border-b border-black/10 p-4 sm:flex-row sm:items-center sm:justify-between dark:border-white/10">
           <span className="font-semibold">電池清單 ({batteries?.length ?? 0})</span>
-          <select className="input w-auto" value={typeFilter} onChange={(e) => setTypeFilter(e.target.value as any)}>
-            <option value="">全部種類</option>
-            <option value="POWER_TOOL">工具機電池</option>
-            <option value="BEACON_CHARGER">Beacon行充</option>
-            <option value="LIFEPO4">磁酸鋰鐵電池</option>
-          </select>
+          <Select
+            className="w-full sm:w-48"
+            value={typeFilter}
+            onChange={(value) => setTypeFilter(value as BatteryType | '')}
+            options={[
+              { value: '', label: '全部種類' },
+              { value: 'POWER_TOOL', label: '工具機電池' },
+              { value: 'BEACON_CHARGER', label: 'Beacon行充' },
+              { value: 'LIFEPO4', label: '磁酸鋰鐵電池' },
+            ]}
+          />
         </div>
+        <div className="table-scroll">
         <table className="w-full text-sm">
-          <thead className="bg-gray-50">
+          <thead className="border-b border-black/10 bg-black/5 dark:border-white/10 dark:bg-white/5">
             <tr>
               {['電池編號', '種類', '負責人', '說明', ''].map((h) => (
-                <th key={h} className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">{h}</th>
+                <th key={h} className="px-4 py-3 text-left text-xs font-semibold uppercase text-muted">{h}</th>
               ))}
             </tr>
           </thead>
-          <tbody className="divide-y">
+          <tbody className="divide-y divide-black/5 dark:divide-white/10">
             {isLoading
               ? Array.from({ length: 5 }).map((_, i) => (
                   <tr key={i}>
@@ -159,7 +162,7 @@ function BatteriesPage() {
                   </tr>
                 ))
               : batteries?.map((b) => (
-                  <tr key={b.id} className="hover:bg-gray-50">
+                  <tr key={b.id} className="hover:bg-black/5 dark:hover:bg-white/5">
                     <td className="px-4 py-3 font-mono font-medium">{b.batteryId}</td>
                     <td className="px-4 py-3">
                       <span className={`badge ${BATTERY_COLORS[b.batteryType]}`}>
@@ -174,10 +177,10 @@ function BatteriesPage() {
                           </span>
                         : '—'}
                     </td>
-                    <td className="px-4 py-3 text-gray-500">{b.notes ?? '—'}</td>
+                    <td className="px-4 py-3 text-muted">{b.notes ?? '—'}</td>
                     <td className="px-4 py-3">
                       <button
-                        className="text-xs text-red-500 hover:text-red-700"
+                        className="text-xs font-semibold text-brand-600 hover:text-brand-700"
                         onClick={() => { if (confirm('確定刪除？')) deleteBattery.mutate(b.id) }}
                       >
                         刪除
@@ -188,6 +191,7 @@ function BatteriesPage() {
             }
           </tbody>
         </table>
+        </div>
       </div>
 
       {showNew && <NewBatteryModal onClose={() => setShowNew(false)} />}

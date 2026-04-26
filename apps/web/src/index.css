@@ -4,45 +4,175 @@
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
+    color-scheme: light dark;
+    --app-bg: #f5f5f7;
+    --app-surface: rgba(255, 255, 255, 0.86);
+    --app-surface-solid: #ffffff;
+    --app-elevated: rgba(255, 255, 255, 0.74);
+    --app-border: rgba(17, 17, 17, 0.10);
+    --app-text: #111111;
+    --app-muted: #6e6e73;
+    --app-danger: #DE272C;
+    --app-danger-strong: #c91f24;
+    --app-shadow: 0 18px 55px rgba(0, 0, 0, 0.08);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --app-bg: #050505;
+      --app-surface: rgba(28, 28, 30, 0.82);
+      --app-surface-solid: #151517;
+      --app-elevated: rgba(44, 44, 46, 0.72);
+      --app-border: rgba(255, 255, 255, 0.14);
+      --app-text: #f5f5f7;
+      --app-muted: #a1a1a6;
+      --app-shadow: 0 24px 70px rgba(0, 0, 0, 0.45);
+    }
+  }
+
+  html {
+    min-height: 100%;
+    -webkit-text-size-adjust: 100%;
   }
 
   body {
-    @apply bg-gray-50 text-gray-900 antialiased;
+    min-height: 100%;
+    background:
+      radial-gradient(circle at 12% -12%, rgba(222, 39, 44, 0.13), transparent 34rem),
+      linear-gradient(180deg, var(--app-bg), var(--app-bg));
+    color: var(--app-text);
+    font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Segoe UI", sans-serif;
+    @apply antialiased;
+  }
+
+  * {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  table {
+    min-width: 760px;
   }
 }
 
 @layer components {
+  .app-shell {
+    min-height: 100dvh;
+    background: transparent;
+  }
+
+  .safe-bottom {
+    padding-bottom: max(1rem, env(safe-area-inset-bottom));
+  }
+
+  .page {
+    @apply mx-auto w-full max-w-7xl space-y-5 px-4 py-4 sm:px-5 lg:px-8 lg:py-7;
+    padding-bottom: max(6.5rem, env(safe-area-inset-bottom));
+  }
+
+  @media (min-width: 768px) {
+    .page {
+      padding-bottom: 2rem;
+    }
+  }
+
+  .page-header {
+    @apply flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between;
+  }
+
+  .page-title {
+    @apply text-2xl font-bold tracking-normal sm:text-3xl;
+    color: var(--app-text);
+  }
+
+  .page-subtitle {
+    color: var(--app-muted);
+    @apply text-sm;
+  }
+
   .btn {
-    @apply inline-flex items-center justify-center rounded-md px-4 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 disabled:pointer-events-none disabled:opacity-50;
+    min-height: 44px;
+    @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 disabled:pointer-events-none disabled:opacity-50;
   }
 
   .btn-primary {
-    @apply btn bg-brand-500 text-white hover:bg-brand-600;
+    @apply btn bg-brand-500 text-white shadow-lg shadow-red-500/20 hover:bg-brand-600 active:scale-[0.98];
   }
 
   .btn-secondary {
-    @apply btn border border-gray-200 bg-white hover:bg-gray-50;
+    @apply btn active:scale-[0.98];
+    background: var(--app-elevated);
+    border: 1px solid var(--app-border);
+    color: var(--app-text);
   }
 
   .btn-danger {
-    @apply btn bg-red-500 text-white hover:bg-red-600;
+    @apply btn bg-brand-500 text-white hover:bg-brand-600 active:scale-[0.98];
   }
 
   .card {
-    @apply rounded-lg border border-gray-200 bg-white shadow-sm;
+    border: 1px solid var(--app-border);
+    background: var(--app-surface);
+    box-shadow: var(--app-shadow);
+    backdrop-filter: blur(22px) saturate(145%);
+    -webkit-backdrop-filter: blur(22px) saturate(145%);
+    @apply rounded-[20px];
   }
 
   .badge {
-    @apply inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium;
+    @apply inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold;
   }
 
   .input {
-    @apply block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500;
+    min-height: 44px;
+    color: var(--app-text);
+    background: var(--app-surface-solid);
+    border: 1px solid var(--app-border);
+    @apply block w-full rounded-xl px-3.5 py-2.5 text-sm shadow-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20;
   }
 
   .label {
-    @apply block text-sm font-medium text-gray-700;
+    color: var(--app-muted);
+    @apply block text-sm font-semibold;
+  }
+
+  .glass-nav {
+    background: rgba(10, 10, 10, 0.78);
+    border-color: rgba(255, 255, 255, 0.12);
+    backdrop-filter: blur(26px) saturate(160%);
+    -webkit-backdrop-filter: blur(26px) saturate(160%);
+  }
+
+  .mobile-tabbar {
+    padding-bottom: max(0.5rem, env(safe-area-inset-bottom));
+    @apply fixed inset-x-0 bottom-0 z-40 border-t px-2 pt-2 md:hidden;
+    background: rgba(10, 10, 10, 0.84);
+    border-color: rgba(255, 255, 255, 0.12);
+    backdrop-filter: blur(28px) saturate(170%);
+    -webkit-backdrop-filter: blur(28px) saturate(170%);
+  }
+
+  .table-shell {
+    @apply overflow-hidden;
+  }
+
+  .table-scroll {
+    @apply w-full overflow-x-auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .metric-card {
+    @apply card p-4 sm:p-5;
+  }
+
+  .surface-muted {
+    background: color-mix(in srgb, var(--app-surface-solid), transparent 20%);
+  }
+
+  .text-app {
+    color: var(--app-text);
+  }
+
+  .text-muted {
+    color: var(--app-muted);
   }
 }

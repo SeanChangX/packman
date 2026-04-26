@@ -15,6 +15,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true)
 
   const fetch = async () => {
+    if (window.location.pathname === '/login') {
+      setUser(null)
+      setLoading(false)
+      return
+    }
+
     try {
       const u = await authApi.me()
       setUser(u)

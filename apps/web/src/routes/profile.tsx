@@ -18,7 +18,10 @@ function ProfilePage() {
 
   return (
     <div className="mx-auto max-w-md space-y-6">
-      <h1 className="text-2xl font-bold">個人資料</h1>
+      <div>
+        <h1 className="page-title">個人資料</h1>
+        <p className="page-subtitle">Slack 帳號與組別設定</p>
+      </div>
 
       <div className="card p-6">
         <div className="flex items-center gap-4">
@@ -28,8 +31,8 @@ function ProfilePage() {
           }
           <div>
             <p className="text-xl font-bold">{user.name}</p>
-            {user.email && <p className="text-sm text-gray-500">{user.email}</p>}
-            <span className="badge mt-1 bg-gray-100 text-gray-700">{user.role}</span>
+            {user.email && <p className="text-sm text-muted">{user.email}</p>}
+            <span className="badge mt-1 bg-black/10 text-app dark:bg-white/10">{user.role}</span>
           </div>
         </div>
       </div>
@@ -50,7 +53,7 @@ function ProfilePage() {
             ))}
           </select>
           {user.group && (
-            <p className="mt-2 text-sm text-gray-500">
+            <p className="mt-2 text-sm text-muted">
               目前組別: <span style={{ color: user.group.color }} className="font-medium">{user.group.name}</span>
             </p>
           )}

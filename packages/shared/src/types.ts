@@ -71,6 +71,14 @@ export interface Battery {
   createdAt: string
 }
 
+export interface BatteryRegulation {
+  id: string
+  title: string
+  content: string
+  sortOrder: number
+  createdAt: string
+}
+
 export interface PaginatedResponse<T> {
   data: T[]
   total: number

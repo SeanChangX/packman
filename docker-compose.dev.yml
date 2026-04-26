@@ -59,10 +59,13 @@ services:
   web:
     build:
       context: .
-      dockerfile: apps/web/Dockerfile
-    restart: unless-stopped
+      dockerfile: apps/web/Dockerfile.dev
     ports:
-      - "3000:80"
+      - "3000:3000"
+    environment:
+      API_PROXY: http://api:8080
+    volumes:
+      - ./apps/web:/app/apps/web
     depends_on:
       api:
         condition: service_healthy
@@ -70,14 +73,16 @@ services:
   admin:
     build:
       context: .
-      dockerfile: apps/admin/Dockerfile
-    restart: unless-stopped
+      dockerfile: apps/admin/Dockerfile.dev
     ports:
-      - "3001:80"
+      - "3001:3001"
     environment:
+      API_PROXY: http://api:8080
       ADMIN_USER: ${ADMIN_USER:-admin}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:-changeme}
       ADMIN_API_SECRET: ${ADMIN_API_SECRET:-}
+    volumes:
+      - ./apps/admin:/app/apps/admin
     depends_on:
       api:
         condition: service_healthy

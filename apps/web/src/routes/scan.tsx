@@ -60,7 +60,7 @@ function ScanPage() {
     <div className="mx-auto max-w-md space-y-6">
       <div className="text-center">
         <h1 className="text-2xl font-bold">掃描 QR Code</h1>
-        <p className="text-sm text-gray-500">掃描箱子或物品上的 QR Code</p>
+        <p className="page-subtitle">掃描箱子或物品上的 QR Code</p>
       </div>
 
       {error && (

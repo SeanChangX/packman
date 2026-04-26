@@ -1,4 +1,4 @@
-import { createRootRoute, Outlet, Link, useNavigate } from '@tanstack/react-router'
+import { createRootRoute, Outlet, Link } from '@tanstack/react-router'
 import {
   Package, Box, Battery, Printer, QrCode,
   LayoutDashboard, LogOut, Menu, X, UserCircle,
@@ -8,17 +8,31 @@ import { useAuth } from '../lib/auth-context'
 import { authApi } from '../lib/api'
 import { cn } from '../lib/utils'
 
-function NavLink({ to, icon: Icon, label }: { to: string; icon: React.ElementType; label: string }) {
+const navItems = [
+  { to: '/', icon: LayoutDashboard, label: '總覽' },
+  { to: '/items', icon: Package, label: '物品' },
+  { to: '/boxes', icon: Box, label: '箱子', adminOnly: true },
+  { to: '/batteries', icon: Battery, label: '電池' },
+  { to: '/stickers', icon: Printer, label: '貼紙', adminOnly: true },
+  { to: '/profile', icon: UserCircle, label: '我的' },
+]
+
+function NavLink({ to, icon: Icon, label, compact = false }: {
+  to: string; icon: React.ElementType; label: string; compact?: boolean
+}) {
   return (
     <Link
       to={to}
       className={cn(
-        'flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors',
-        'text-gray-600 hover:bg-gray-100 hover:text-gray-900',
-        '[&.active]:bg-brand-50 [&.active]:text-brand-700'
+        compact
+          ? 'flex min-w-[4.4rem] flex-col items-center gap-1 rounded-2xl px-2 py-2 text-[11px] font-semibold text-white/60 transition-colors'
+          : 'flex items-center gap-3 rounded-2xl px-3 py-3 text-sm font-semibold text-white/70 transition-colors',
+        compact
+          ? '[&.active]:bg-white/12 [&.active]:text-white'
+          : 'hover:bg-white/10 hover:text-white [&.active]:bg-brand-500 [&.active]:text-white'
       )}
     >
-      <Icon className="h-4 w-4" />
+      <Icon className={compact ? 'h-5 w-5' : 'h-4 w-4'} />
       {label}
     </Link>
   )
@@ -26,62 +40,70 @@ function NavLink({ to, icon: Icon, label }: { to: string; icon: React.ElementTyp
 
 function Layout() {
   const { user, loading } = useAuth()
-  const navigate = useNavigate()
   const [mobileOpen, setMobileOpen] = useState(false)
+
+  const logout = async () => {
+    try {
+      await authApi.logout()
+    } finally {
+      window.location.href = '/login'
+    }
+  }
+
+  if (window.location.pathname === '/login') {
+    return <Outlet />
+  }
 
   if (loading) {
     return (
-      <div className="flex h-screen items-center justify-center">
+      <div className="app-shell flex items-center justify-center">
         <div className="h-8 w-8 animate-spin rounded-full border-4 border-brand-500 border-t-transparent" />
       </div>
     )
   }
 
   if (!user) {
-    // Allow login error page to render without auth
-    if (window.location.pathname === '/login') {
-      return <Outlet />
-    }
-    window.location.href = '/auth/slack'
+    window.location.href = '/login'
     return null
   }
 
+  const visibleNavItems = navItems.filter((item) => !item.adminOnly || user.role === 'ADMIN')
+
   const nav = (
     <nav className="flex flex-col gap-1 px-2">
-      <NavLink to="/" icon={LayoutDashboard} label="儀表板" />
-      <NavLink to="/items" icon={Package} label="物品清單" />
-      <NavLink to="/boxes" icon={Box} label="箱子管理" />
-      <NavLink to="/batteries" icon={Battery} label="電池分配" />
-      <NavLink to="/stickers" icon={Printer} label="貼紙列印" />
-      <NavLink to="/scan" icon={QrCode} label="掃描 QR" />
-      <NavLink to="/profile" icon={UserCircle} label="個人資料" />
+      {visibleNavItems.map((item) => <NavLink key={item.to} {...item} />)}
     </nav>
   )
 
   return (
-    <div className="flex h-screen overflow-hidden">
-      {/* Sidebar (desktop) */}
-      <aside className="hidden w-56 flex-col border-r border-gray-200 bg-white md:flex">
-        <div className="flex items-center gap-2 border-b px-4 py-4">
-          <Package className="h-6 w-6 text-brand-500" />
-          <span className="text-lg font-bold text-gray-900">Packman</span>
+    <div className="app-shell flex overflow-hidden">
+      <aside className="glass-nav hidden w-64 shrink-0 flex-col border-r md:flex">
+        <div className="flex items-center gap-3 border-b border-white/10 px-4 py-4">
+          <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-brand-500 shadow-lg shadow-red-500/30">
+            <Package className="h-5 w-5 text-white" />
+          </div>
+          <div>
+            <span className="block text-base font-bold text-white">Packman</span>
+            <span className="text-xs font-medium text-white/50">行李管理系統</span>
+          </div>
         </div>
         <div className="flex flex-1 flex-col gap-4 py-4">
           {nav}
         </div>
-        <div className="border-t p-4">
+        <div className="border-t border-white/10 p-4">
           <div className="flex items-center gap-2">
             {user.avatarUrl
               ? <img src={user.avatarUrl} className="h-8 w-8 rounded-full" alt={user.name} />
               : <div className="flex h-8 w-8 items-center justify-center rounded-full bg-brand-500 text-xs text-white">{user.name[0]}</div>
             }
             <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-medium">{user.name}</p>
-              <p className="truncate text-xs text-gray-500">{user.group?.name ?? '未分組'}</p>
+              <p className="truncate text-sm font-semibold text-white">{user.name}</p>
+              <p className="truncate text-xs text-white/50">{user.group?.name ?? '未分組'}</p>
             </div>
             <button
-              onClick={async () => { await authApi.logout(); window.location.href = '/auth/slack' }}
-              className="rounded p-1 text-gray-400 hover:text-gray-600"
+              onClick={logout}
+              className="rounded-xl p-2 text-white/50 hover:bg-white/10 hover:text-white"
+              title="登出"
             >
               <LogOut className="h-4 w-4" />
             </button>
@@ -89,29 +111,45 @@ function Layout() {
         </div>
       </aside>
 
-      {/* Mobile header */}
       <div className="flex flex-1 flex-col overflow-hidden">
-        <header className="flex items-center justify-between border-b bg-white px-4 py-3 md:hidden">
+        <header className="glass-nav sticky top-0 z-30 flex items-center justify-between border-b px-4 py-3 md:hidden">
           <div className="flex items-center gap-2">
-            <Package className="h-5 w-5 text-brand-500" />
-            <span className="font-bold">Packman</span>
+            <div className="flex h-9 w-9 items-center justify-center rounded-2xl bg-brand-500">
+              <Package className="h-5 w-5 text-white" />
+            </div>
+            <span className="font-bold text-white">Packman</span>
           </div>
-          <button onClick={() => setMobileOpen(!mobileOpen)} className="rounded p-1">
+          <button onClick={() => setMobileOpen(!mobileOpen)} className="rounded-2xl p-2 text-white/80">
             {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
           </button>
         </header>
 
-        {/* Mobile nav drawer */}
         {mobileOpen && (
-          <div className="absolute inset-0 z-50 bg-white pt-14 md:hidden">
+          <div className="glass-nav absolute inset-x-3 top-16 z-50 rounded-[28px] border p-3 md:hidden">
             <div className="p-4">{nav}</div>
+            <button
+              onClick={logout}
+              className="mx-4 mb-3 flex w-[calc(100%-2rem)] items-center justify-center gap-2 rounded-xl border border-white/10 px-3 py-3 text-sm font-semibold text-white/70 hover:bg-white/10 hover:text-white"
+            >
+              <LogOut className="h-4 w-4" />
+              登出
+            </button>
           </div>
         )}
 
-        <main className="flex-1 overflow-auto p-4 md:p-6">
-          <Outlet />
+        <main className="flex-1 overflow-auto">
+          <div className="page">
+            <Outlet />
+          </div>
         </main>
       </div>
+      <Link
+        to="/scan"
+        className="fixed bottom-5 right-5 z-50 flex h-14 w-14 items-center justify-center rounded-2xl bg-brand-500 text-white shadow-2xl shadow-red-500/30 transition-transform hover:scale-105 active:scale-95 md:bottom-6 md:right-6"
+        title="掃描 QR Code"
+      >
+        <QrCode className="h-6 w-6" />
+      </Link>
     </div>
   )
 }

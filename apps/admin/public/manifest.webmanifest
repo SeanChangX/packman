@@ -1,0 +1,20 @@
+{
+  "name": "Packman Admin",
+  "short_name": "Packman Admin",
+  "description": "Packman 管理控制台",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "display_override": ["standalone", "minimal-ui"],
+  "background_color": "#050505",
+  "theme_color": "#DE272C",
+  "orientation": "any",
+  "icons": [
+    {
+      "src": "/packman-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

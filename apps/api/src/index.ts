@@ -8,10 +8,12 @@ import { authRoutes } from './routes/auth'
 import { itemRoutes } from './routes/items'
 import { boxRoutes } from './routes/boxes'
 import { batteryRoutes } from './routes/batteries'
+import { batteryRegulationRoutes } from './routes/battery-regulations'
 import { groupRoutes } from './routes/groups'
 import { userRoutes } from './routes/users'
 import { stickerRoutes } from './routes/stickers'
 import { adminRoutes } from './routes/admin'
+import { seedDefaultData } from './seed'
 
 const PORT = parseInt(process.env.PORT ?? '8080', 10)
 const APP_URL = process.env.APP_URL ?? 'http://localhost:3000'
@@ -41,6 +43,7 @@ async function build() {
   await app.register(itemRoutes, { prefix: '/api/items' })
   await app.register(boxRoutes, { prefix: '/api/boxes' })
   await app.register(batteryRoutes, { prefix: '/api/batteries' })
+  await app.register(batteryRegulationRoutes, { prefix: '/api/battery-regulations' })
   await app.register(groupRoutes, { prefix: '/api/groups' })
   await app.register(userRoutes, { prefix: '/api/users' })
   await app.register(stickerRoutes, { prefix: '/api/stickers' })
@@ -50,6 +53,9 @@ async function build() {
 }
 
 build().then(async (app) => {
+  // Seed default groups and boxes on startup. The seed uses upserts, so this is safe to rerun.
+  await seedDefaultData()
+
   // Ensure MinIO bucket exists on startup
   try {
     await ensureBucket()

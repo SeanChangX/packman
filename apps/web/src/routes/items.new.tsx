@@ -30,7 +30,7 @@ function NewItemPage() {
         <button onClick={() => navigate({ to: '/items' })} className="btn-secondary p-2">
           <ArrowLeft className="h-4 w-4" />
         </button>
-        <h1 className="text-2xl font-bold">新增物品</h1>
+        <h1 className="page-title">新增物品</h1>
       </div>
 
       <form className="card space-y-4 p-6" onSubmit={handleSubmit((data) => create.mutate(data))}>
@@ -40,7 +40,7 @@ function NewItemPage() {
           {errors.name && <p className="mt-1 text-xs text-red-500">必填欄位</p>}
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid gap-4 sm:grid-cols-2">
           <div>
             <label className="label">物品負責人</label>
             <select className="input mt-1" {...register('ownerId')}>
@@ -57,7 +57,7 @@ function NewItemPage() {
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid gap-4 sm:grid-cols-2">
           <div>
             <label className="label">運送方式</label>
             <select className="input mt-1" {...register('shippingMethod')}>
@@ -72,7 +72,7 @@ function NewItemPage() {
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid gap-4 sm:grid-cols-2">
           <div>
             <label className="label">指定箱子</label>
             <select className="input mt-1" {...register('boxId')}>

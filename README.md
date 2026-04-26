@@ -62,31 +62,13 @@ docker compose build
 docker compose up -d
 ```
 
-### 4. Seed Default Data (first run only)
+### 4. Initial Data
 
-Run the seed to create default groups and boxes matching the standard layout:
-
-```bash
-docker compose exec api node dist/seed.js
-```
-
-This creates:
+The API seeds default data automatically on startup. This creates:
 - **Groups**: 行政組, 相機組, 主程式組, 共用工具設備, 共用電力設備, 定位組, 導航組, 宏組, SIMA組, 倫倫組, 行李工具
 - **Boxes**: 1-9 (託運), A-F (登機), 大機, 推車1
 
-### 5. Promote First Admin
-
-After first login with Slack, run in a new terminal:
-
-```bash
-docker compose exec api node -e "
-const {PrismaClient}=require('@prisma/client');
-const p=new PrismaClient();
-p.user.updateMany({data:{role:'ADMIN'}}).then(r=>{ console.log(r); p.\$disconnect(); });
-"
-```
-
-Then refresh the admin panel at `http://YOUR_IP:3001`.
+The admin panel is protected separately with `ADMIN_USER` / `ADMIN_PASSWORD`, and forwards `ADMIN_API_SECRET` to the API internally. Slack login is only for normal app users.
 
 ## Development
 

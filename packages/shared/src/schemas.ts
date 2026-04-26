@@ -45,6 +45,14 @@ export const CreateBatterySchema = z.object({
 
 export const UpdateBatterySchema = CreateBatterySchema.partial()
 
+export const CreateBatteryRegulationSchema = z.object({
+  title: z.string().min(1).max(100),
+  content: z.string().min(1).max(2000),
+  sortOrder: z.number().int().default(0),
+})
+
+export const UpdateBatteryRegulationSchema = CreateBatteryRegulationSchema.partial()
+
 export const UpdateUserSchema = z.object({
   groupId: z.string().uuid().nullable().optional(),
 })
@@ -72,6 +80,8 @@ export type CreateItemInput = z.infer<typeof CreateItemSchema>
 export type UpdateItemInput = z.infer<typeof UpdateItemSchema>
 export type CreateBatteryInput = z.infer<typeof CreateBatterySchema>
 export type UpdateBatteryInput = z.infer<typeof UpdateBatterySchema>
+export type CreateBatteryRegulationInput = z.infer<typeof CreateBatteryRegulationSchema>
+export type UpdateBatteryRegulationInput = z.infer<typeof UpdateBatteryRegulationSchema>
 export type UpdateUserInput = z.infer<typeof UpdateUserSchema>
 export type ItemsQuery = z.infer<typeof ItemsQuerySchema>
 export type StickerRequest = z.infer<typeof StickerRequestSchema>
