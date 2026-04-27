@@ -34,8 +34,16 @@ async function authPluginFn(app: FastifyInstance) {
 
     try {
       const payload = verifyToken(token)
-      request.userId = payload.userId
-      request.userRole = payload.role
+      const user = await prisma.user.findUnique({
+        where: { id: payload.userId },
+        select: { id: true, role: true },
+      })
+      if (!user) {
+        reply.clearCookie('packman_token')
+        return
+      }
+      request.userId = user.id
+      request.userRole = user.role
     } catch {
       // invalid token — clear it
       reply.clearCookie('packman_token')
@@ -47,17 +55,16 @@ export const authPlugin = fp(authPluginFn)
 
 export async function requireAuth(request: FastifyRequest, reply: FastifyReply) {
   if (!request.userId) {
-    reply.status(401).send({ message: 'Unauthorized' })
+    return reply.status(401).send({ message: 'Unauthorized' })
   }
 }
 
 export async function requireAdmin(request: FastifyRequest, reply: FastifyReply) {
   if (!request.userId) {
-    reply.status(401).send({ message: 'Unauthorized' })
-    return
+    return reply.status(401).send({ message: 'Unauthorized' })
   }
   if (request.userRole !== 'ADMIN') {
-    reply.status(403).send({ message: 'Forbidden' })
+    return reply.status(403).send({ message: 'Forbidden' })
   }
 }
 
@@ -76,7 +83,7 @@ export async function requireAuthOrAdminSecret(request: FastifyRequest, reply: F
   if (ADMIN_API_SECRET && request.headers['x-admin-auth'] === ADMIN_API_SECRET) return
   if (hasAdminPanelCookie(request)) return
   if (!request.userId) {
-    reply.status(401).send({ message: 'Unauthorized' })
+    return reply.status(401).send({ message: 'Unauthorized' })
   }
 }
 

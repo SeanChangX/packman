@@ -29,7 +29,7 @@ function NewBoxModal({ onClose }: { onClose: () => void }) {
         <form className="space-y-3" onSubmit={handleSubmit((d) => create.mutate(d))}>
           <div>
             <label className="label">箱子編號 *</label>
-            <input className="input mt-1" placeholder="例: 1, A, 大機, 推車1" {...register('label', { required: true })} />
+            <input className="input mt-1" placeholder="例: A箱, 大機, 推車1號" {...register('label', { required: true })} />
           </div>
           <div>
             <label className="label">運送方式 *</label>

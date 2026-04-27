@@ -2,6 +2,8 @@ import Fastify from 'fastify'
 import cookie from '@fastify/cookie'
 import cors from '@fastify/cors'
 import multipart from '@fastify/multipart'
+import { Prisma } from '@prisma/client'
+import { ZodError } from 'zod'
 import { authPlugin } from './plugins/auth'
 import { ensureBucket } from './services/minio'
 import { authRoutes } from './routes/auth'
@@ -22,6 +24,34 @@ const ADMIN_URL = process.env.ADMIN_URL ?? 'http://localhost:3001'
 
 async function build() {
   const app = Fastify({ logger: { level: 'info' } })
+
+  app.setErrorHandler((error, request, reply) => {
+    request.log.error(error)
+
+    if (error instanceof ZodError) {
+      return reply.status(400).send({ message: '請確認所有必填欄位已正確填寫' })
+    }
+
+    if (error instanceof Prisma.PrismaClientKnownRequestError) {
+      if (error.code === 'P2002') {
+        const target = Array.isArray(error.meta?.target) ? error.meta.target : []
+        if (target.includes('label')) {
+          return reply.status(409).send({ message: '箱子編號已存在' })
+        }
+        if (target.includes('name')) {
+          return reply.status(409).send({ message: '名稱已存在' })
+        }
+        if (target.includes('batteryId')) {
+          return reply.status(409).send({ message: '電池編號已存在' })
+        }
+        return reply.status(409).send({ message: '資料已存在，請勿重複建立' })
+      }
+    }
+
+    return reply.status(error.statusCode ?? 500).send({
+      message: error.statusCode && error.statusCode < 500 ? error.message : '伺服器發生錯誤',
+    })
+  })
 
   await app.register(cors, {
     origin: [APP_URL, ADMIN_URL],

@@ -282,7 +282,7 @@ function BatteriesPage() {
                     b={b}
                     users={users}
                     batteryTypeOpts={batteryTypeOpts}
-                    onDelete={(id) => { if (confirm('確定刪除？')) deleteBattery.mutate(id) }}
+                    onDelete={(id) => deleteBattery.mutate(id)}
                   />
                 ))
             }

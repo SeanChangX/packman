@@ -12,11 +12,19 @@ import type {
 
 const BASE = '/api'
 
+function buildHeaders(options?: RequestInit): Headers {
+  const headers = new Headers(options?.headers)
+  if (options?.body !== undefined && !(options.body instanceof FormData) && !headers.has('Content-Type')) {
+    headers.set('Content-Type', 'application/json')
+  }
+  return headers
+}
+
 async function request<T>(url: string, options?: RequestInit): Promise<T> {
   const res = await fetch(url, {
-    credentials: 'include',
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
     ...options,
+    credentials: 'include',
+    headers: buildHeaders(options),
   })
   if (res.status === 401) {
     if (window.location.pathname !== '/login') {
