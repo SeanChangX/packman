@@ -1,6 +1,8 @@
 import { createFileRoute } from '@tanstack/react-router'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { Plus, Pencil, Trash2, Check, X, ChevronUp, ChevronDown } from 'lucide-react'
+import { useToast } from '@packman/ui'
 import { adminApi } from '../lib/api'
 import type { SelectOption, SelectOptionType } from '@packman/shared'
 
@@ -35,9 +37,12 @@ function OptionRow({
 
   const handleSave = async () => {
     setSaving(true)
-    await onSave(opt.id, label)
-    setSaving(false)
-    setEditing(false)
+    try {
+      await onSave(opt.id, label)
+      setEditing(false)
+    } finally {
+      setSaving(false)
+    }
   }
 
   const handleCancel = () => {
@@ -48,7 +53,7 @@ function OptionRow({
   if (editing) {
     return (
       <tr className="bg-white/5">
-        <td className="px-4 py-2">
+        <td className="min-w-0 px-4 py-2">
           <input
             className="input py-1.5 text-sm"
             value={label}
@@ -56,8 +61,8 @@ function OptionRow({
             autoFocus
           />
         </td>
-        <td className="px-4 py-2">
-          <div className="flex gap-2">
+        <td className="w-36 px-4 py-2">
+          <div className="flex justify-end gap-2">
             <button onClick={handleSave} disabled={saving} className="btn-primary px-3 py-1.5 text-xs">
               <Check className="h-3.5 w-3.5" />
             </button>
@@ -72,9 +77,11 @@ function OptionRow({
 
   return (
     <tr className="hover:bg-white/5">
-      <td className="px-4 py-3 font-medium">{opt.label}</td>
-      <td className="px-4 py-3">
-        <div className="flex items-center gap-3">
+      <td className="min-w-0 px-4 py-3 font-medium">
+        <span className="block truncate">{opt.label}</span>
+      </td>
+      <td className="w-36 px-4 py-3">
+        <div className="flex items-center justify-end gap-3">
           <button
             disabled={idx === 0 || moving}
             onClick={() => onMove(opt.id, 'up')}
@@ -148,7 +155,7 @@ function AddOptionRow({
 
   return (
     <tr className="bg-brand-500/5">
-      <td className="px-4 py-2">
+      <td className="min-w-0 px-4 py-2">
         <input
           className="input py-1.5 text-sm"
           placeholder="顯示名稱"
@@ -159,8 +166,8 @@ function AddOptionRow({
         />
         {error && <p className="mt-1 text-xs text-brand-600">{error}</p>}
       </td>
-      <td className="px-4 py-2">
-        <div className="flex gap-2">
+      <td className="w-36 px-4 py-2">
+        <div className="flex justify-end gap-2">
           <button onClick={handleAdd} disabled={saving} className="btn-primary px-3 py-1.5 text-xs">
             <Check className="h-3.5 w-3.5" />
           </button>
@@ -174,49 +181,52 @@ function AddOptionRow({
 }
 
 function SelectOptionsPage() {
-  const [options, setOptions] = useState<SelectOption[]>([])
-  const [loading, setLoading] = useState(true)
-  const [moving, setMoving] = useState(false)
+  const qc = useQueryClient()
+  const { showToast } = useToast()
+  const { data: options = [], isLoading } = useQuery({
+    queryKey: ['admin-select-options'],
+    queryFn: adminApi.selectOptions,
+  })
 
-  const load = async () => {
-    setLoading(true)
-    try {
-      const data = await adminApi.selectOptions()
-      setOptions(data)
-    } finally {
-      setLoading(false)
-    }
-  }
+  const invalidateOptions = () => qc.invalidateQueries({ queryKey: ['admin-select-options'] })
 
-  useState(() => { load() })
+  const updateOption = useMutation({
+    mutationFn: ({ id, label }: { id: string; label: string }) =>
+      adminApi.updateSelectOption(id, { label }),
+    onSuccess: () => { invalidateOptions(); showToast('選項已更新', 'success') },
+    onError: (e: unknown) => showToast((e as Error)?.message ?? '選項更新失敗', 'error'),
+  })
 
-  const handleSave = async (id: string, label: string) => {
-    await adminApi.updateSelectOption(id, { label })
-    await load()
-  }
+  const deleteOption = useMutation({
+    mutationFn: adminApi.deleteSelectOption,
+    onSuccess: () => { invalidateOptions(); showToast('選項已刪除', 'success') },
+    onError: (e: unknown) => showToast((e as Error)?.message ?? '選項刪除失敗', 'error'),
+  })
 
-  const handleDelete = async (id: string) => {
-    await adminApi.deleteSelectOption(id)
-    await load()
-  }
-
-  const handleMove = async (type: SelectOptionType, id: string, direction: 'up' | 'down') => {
-    const sorted = options.filter((o) => o.type === type).sort((a, b) => a.sortOrder - b.sortOrder)
-    const idx = sorted.findIndex((o) => o.id === id)
-    const swapIdx = direction === 'up' ? idx - 1 : idx + 1
-    if (swapIdx < 0 || swapIdx >= sorted.length) return
-    const a = sorted[idx], b = sorted[swapIdx]
-    setMoving(true)
-    try {
+  const moveOption = useMutation({
+    mutationFn: async ({ type, id, direction }: { type: SelectOptionType; id: string; direction: 'up' | 'down' }) => {
+      const sorted = options.filter((o) => o.type === type).sort((a, b) => a.sortOrder - b.sortOrder)
+      const idx = sorted.findIndex((o) => o.id === id)
+      const swapIdx = direction === 'up' ? idx - 1 : idx + 1
+      if (swapIdx < 0 || swapIdx >= sorted.length) return
+      const a = sorted[idx], b = sorted[swapIdx]
       await Promise.all([
         adminApi.updateSelectOption(a.id, { sortOrder: b.sortOrder }),
         adminApi.updateSelectOption(b.id, { sortOrder: a.sortOrder }),
       ])
-      await load()
-    } finally {
-      setMoving(false)
-    }
-  }
+    },
+    onSuccess: invalidateOptions,
+    onError: (e: unknown) => showToast((e as Error)?.message ?? '排序更新失敗', 'error'),
+  })
+
+  const handleSave = (id: string, label: string) =>
+    updateOption.mutateAsync({ id, label }).then(() => undefined).catch(() => undefined)
+
+  const handleDelete = (id: string) =>
+    deleteOption.mutateAsync(id).then(() => undefined).catch(() => undefined)
+
+  const handleMove = (type: SelectOptionType, id: string, direction: 'up' | 'down') =>
+    moveOption.mutateAsync({ type, id, direction }).then(() => undefined).catch(() => undefined)
 
   return (
     <div className="space-y-6">
@@ -227,7 +237,7 @@ function SelectOptionsPage() {
         </div>
       </div>
 
-      {loading ? (
+      {isLoading ? (
         <div className="flex justify-center py-10">
           <div className="h-8 w-8 animate-spin rounded-full border-4 border-brand-500 border-t-transparent" />
         </div>
@@ -242,11 +252,11 @@ function SelectOptionsPage() {
               <div className="border-b border-white/10 px-5 py-3">
                 <h2 className="font-bold text-app">{TYPE_LABELS[type]}</h2>
               </div>
-              <table className="w-full text-sm">
+              <table className="w-full min-w-0 table-fixed text-sm">
                 <thead className="border-b border-white/10 bg-white/5">
                   <tr>
                     <th className="px-4 py-2 text-left text-xs font-semibold uppercase text-muted">顯示名稱</th>
-                    <th className="px-4 py-2 text-left text-xs font-semibold uppercase text-muted w-40">操作</th>
+                    <th className="w-36 px-4 py-2 text-right text-xs font-semibold uppercase text-muted">操作</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-white/5">
@@ -259,10 +269,10 @@ function SelectOptionsPage() {
                       onSave={handleSave}
                       onDelete={handleDelete}
                       onMove={(id, dir) => handleMove(type, id, dir)}
-                      moving={moving}
+                      moving={moveOption.isPending}
                     />
                   ))}
-                  <AddOptionRow type={type} maxOrder={maxOrder} onAdd={load} />
+                  <AddOptionRow type={type} maxOrder={maxOrder} onAdd={invalidateOptions} />
                 </tbody>
               </table>
             </div>

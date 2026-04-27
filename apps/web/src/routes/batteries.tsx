@@ -3,9 +3,11 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useForm } from 'react-hook-form'
 import { useState } from 'react'
 import { Plus, X, AlertTriangle, Pencil, Check, XCircle } from 'lucide-react'
+import { useToast } from '@packman/ui'
 import { batteriesApi, batteryRegulationsApi, usersApi, selectOptionsApi } from '../lib/api'
 import { getLabelFromOptions, formatApiError } from '../lib/utils'
 import { Select, SelectController } from '../lib/select'
+import { useAuth } from '../lib/auth-context'
 import type { CreateBatteryInput, UpdateBatteryInput, SelectOption } from '@packman/shared'
 
 const BATTERY_COLORS: Record<string, string> = {
@@ -113,9 +115,10 @@ function BatteryRow({
   b: NonNullable<ReturnType<typeof useQuery<any>>['data']>[number]
   users: { id: string; name: string; avatarUrl?: string | null }[] | undefined
   batteryTypeOpts: SelectOption[]
-  onDelete: (id: string) => void
+  onDelete?: (id: string) => void
 }) {
   const qc = useQueryClient()
+  const { showToast } = useToast()
   const [editing, setEditing] = useState(false)
   const { control, handleSubmit, reset, register } = useForm<UpdateBatteryInput>({
     defaultValues: {
@@ -127,7 +130,12 @@ function BatteryRow({
 
   const update = useMutation({
     mutationFn: (data: UpdateBatteryInput) => batteriesApi.update(b.id, data),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['batteries'] }); setEditing(false) },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['batteries'] })
+      setEditing(false)
+      showToast('電池已更新', 'success')
+    },
+    onError: (e: unknown) => showToast(formatApiError(e), 'error'),
   })
 
   if (editing) {
@@ -146,6 +154,7 @@ function BatteryRow({
             name="ownerId"
             control={control}
             placeholder="— 請選擇 —"
+            emptyValue="null"
             options={[
               { value: '', label: '— 無 —' },
               ...(users?.map((u) => ({ value: u.id, label: u.name })) ?? []),
@@ -201,12 +210,14 @@ function BatteryRow({
           >
             <Pencil className="h-3.5 w-3.5" />
           </button>
-          <button
-            className="text-xs font-semibold text-brand-600 hover:text-brand-700"
-            onClick={() => { if (confirm('確定刪除？')) onDelete(b.id) }}
-          >
-            刪除
-          </button>
+          {onDelete && (
+            <button
+              className="text-xs font-semibold text-brand-600 hover:text-brand-700"
+              onClick={() => { if (confirm('確定刪除？')) onDelete(b.id) }}
+            >
+              刪除
+            </button>
+          )}
         </div>
       </td>
     </tr>
@@ -217,6 +228,9 @@ function BatteriesPage() {
   const [showNew, setShowNew] = useState(false)
   const [typeFilter, setTypeFilter] = useState('')
   const qc = useQueryClient()
+  const { showToast } = useToast()
+  const { user } = useAuth()
+  const isAdmin = user?.role === 'ADMIN'
 
   const { data: batteries, isLoading } = useQuery({
     queryKey: ['batteries', typeFilter],
@@ -227,8 +241,11 @@ function BatteriesPage() {
 
   const deleteBattery = useMutation({
     mutationFn: batteriesApi.delete,
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['batteries'] }),
-    onError: (e: unknown) => alert(formatApiError(e)),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['batteries'] })
+      showToast('電池已刪除', 'success')
+    },
+    onError: (e: unknown) => showToast(formatApiError(e), 'error'),
   })
 
   return (
@@ -282,7 +299,7 @@ function BatteriesPage() {
                     b={b}
                     users={users}
                     batteryTypeOpts={batteryTypeOpts}
-                    onDelete={(id) => deleteBattery.mutate(id)}
+                    onDelete={isAdmin ? (id) => deleteBattery.mutate(id) : undefined}
                   />
                 ))
             }

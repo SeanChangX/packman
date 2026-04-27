@@ -68,7 +68,7 @@ export async function batteryRoutes(app: FastifyInstance) {
     async (request, reply) => {
       try {
         await prisma.battery.delete({ where: { id: request.params.id } })
-        return { ok: true }
+        return reply.status(204).send()
       } catch {
         reply.status(404).send({ message: 'Battery not found' })
       }

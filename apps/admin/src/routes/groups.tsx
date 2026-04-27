@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useForm } from 'react-hook-form'
 import { useState } from 'react'
 import { Plus, Pencil, Trash2, X } from 'lucide-react'
+import { useToast } from '@packman/ui'
 import { adminApi } from '../lib/api'
 
 const PRESET_COLORS = [
@@ -87,12 +88,14 @@ function GroupModal({ initial, onClose }: { initial?: { id: string; name: string
 
 function GroupsPage() {
   const qc = useQueryClient()
+  const { showToast } = useToast()
   const [modal, setModal] = useState<{ id?: string; name?: string; color?: string } | null>(null)
   const { data: groups, isLoading } = useQuery({ queryKey: ['admin-groups'], queryFn: adminApi.groups })
 
   const del = useMutation({
     mutationFn: adminApi.deleteGroup,
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['admin-groups'] }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['admin-groups'] }); showToast('組別已刪除', 'success') },
+    onError: (e: unknown) => showToast((e as Error)?.message ?? '組別刪除失敗', 'error'),
   })
 
   return (

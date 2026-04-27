@@ -88,7 +88,7 @@ export async function itemRoutes(app: FastifyInstance) {
     async (request, reply) => {
       try {
         await prisma.item.delete({ where: { id: request.params.id } })
-        return { ok: true }
+        return reply.status(204).send()
       } catch {
         reply.status(404).send({ message: 'Item not found' })
       }

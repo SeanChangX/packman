@@ -66,7 +66,7 @@ function BoxDetailPage() {
               { value: 'SMALL', label: '小 (50×30mm)' },
               { value: 'MEDIUM', label: '中 (100×50mm)' },
               { value: 'LARGE', label: '大 (150×100mm)' },
-              { value: 'A4', label: 'A4' },
+              { value: 'A4_SHEET', label: 'A4 (2×4 格)' },
             ]}
           />
         </div>

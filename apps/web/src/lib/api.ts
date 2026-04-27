@@ -40,6 +40,11 @@ async function request<T>(url: string, options?: RequestInit): Promise<T> {
   return res.json()
 }
 
+async function errorMessage(res: Response, fallback: string): Promise<string> {
+  const err = await res.json().catch(() => ({ message: fallback }))
+  return err.message ?? fallback
+}
+
 // ─── Auth ──────────────────────────────────────────────────────────
 export const authApi = {
   me: () => request<User>('/auth/me'),
@@ -122,7 +127,7 @@ export const itemsApi = {
       credentials: 'include',
       body: form,
     })
-    if (!res.ok) throw new Error('Photo upload failed')
+    if (!res.ok) throw new Error(await errorMessage(res, '照片上傳失敗'))
     return res.json() as Promise<{ photoUrl: string }>
   },
   qrUrl: (id: string) => `${BASE}/items/${id}/qr`,
@@ -161,7 +166,7 @@ export const stickersApi = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
     })
-    if (!res.ok) throw new Error('Sticker generation failed')
+    if (!res.ok) throw new Error(await errorMessage(res, '貼紙生成失敗'))
     const blob = await res.blob()
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
@@ -177,7 +182,7 @@ export const stickersApi = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
     })
-    if (!res.ok) throw new Error('Sticker generation failed')
+    if (!res.ok) throw new Error(await errorMessage(res, '貼紙生成失敗'))
     const blob = await res.blob()
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')

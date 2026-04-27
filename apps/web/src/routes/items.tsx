@@ -2,6 +2,7 @@ import { createFileRoute, Link } from '@tanstack/react-router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { Plus, Search, Trash2 } from 'lucide-react'
+import { useToast } from '@packman/ui'
 import { itemsApi, groupsApi, selectOptionsApi } from '../lib/api'
 import { STATUS_LABELS, STATUS_COLORS, getLabelFromOptions, cn, formatApiError } from '../lib/utils'
 import { Select } from '../lib/select'
@@ -11,6 +12,7 @@ import type { PackingStatus } from '@packman/shared'
 function ItemsPage() {
   const qc = useQueryClient()
   const { user } = useAuth()
+  const { showToast } = useToast()
   const isAdmin = user?.role === 'ADMIN'
 
   const [search, setSearch] = useState('')
@@ -37,7 +39,7 @@ function ItemsPage() {
     mutationFn: ({ id, status }: { id: string; status: PackingStatus }) =>
       itemsApi.update(id, { status }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['items'] }),
-    onError: (e: unknown) => alert(formatApiError(e)),
+    onError: (e: unknown) => showToast(formatApiError(e), 'error'),
   })
 
   const batchDelete = useMutation({
@@ -45,8 +47,9 @@ function ItemsPage() {
     onSuccess: () => {
       setSelected(new Set())
       qc.invalidateQueries({ queryKey: ['items'] })
+      showToast('已刪除選取物品', 'success')
     },
-    onError: (e: unknown) => alert(formatApiError(e)),
+    onError: (e: unknown) => showToast(formatApiError(e), 'error'),
   })
 
   const items = data?.data ?? []

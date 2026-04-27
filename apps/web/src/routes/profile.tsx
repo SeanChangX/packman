@@ -11,7 +11,7 @@ function ProfilePage() {
 
   const updateGroup = useMutation({
     mutationFn: (groupId: string | null) =>
-      usersApi.update(user!.id, { groupId: groupId ?? undefined }),
+      usersApi.update(user!.id, { groupId }),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['users'] }); refetch() },
   })
 

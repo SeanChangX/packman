@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useForm } from 'react-hook-form'
 import { useState } from 'react'
 import { Plus, Trash2, Pencil, Check, X } from 'lucide-react'
+import { useToast } from '@packman/ui'
 import { adminApi } from '../lib/api'
 import { Select } from '../lib/select'
 
@@ -13,6 +14,7 @@ const SHIPPING_OPTIONS = [
 
 function BoxesPage() {
   const qc = useQueryClient()
+  const { showToast } = useToast()
   const [shippingMethod, setShippingMethod] = useState('CHECKED')
   const { register, handleSubmit, reset } = useForm<{ label: string; notes?: string }>()
   const { data: boxes } = useQuery({ queryKey: ['admin-boxes'], queryFn: adminApi.boxes })
@@ -25,18 +27,20 @@ function BoxesPage() {
   const create = useMutation({
     mutationFn: (data: { label: string; notes?: string }) =>
       adminApi.createBox({ ...data, shippingMethod }),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['admin-boxes'] }); reset() },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['admin-boxes'] }); reset(); showToast('箱子已新增', 'success') },
   })
 
   const update = useMutation({
     mutationFn: ({ id, data }: { id: string; data: { label: string; shippingMethod: string; notes?: string } }) =>
       adminApi.updateBox(id, data),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['admin-boxes'] }); setEditingId(null) },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['admin-boxes'] }); setEditingId(null); showToast('箱子已更新', 'success') },
+    onError: (e: unknown) => showToast((e as Error)?.message ?? '箱子更新失敗', 'error'),
   })
 
   const del = useMutation({
     mutationFn: adminApi.deleteBox,
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['admin-boxes'] }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['admin-boxes'] }); showToast('箱子已刪除', 'success') },
+    onError: (e: unknown) => showToast((e as Error)?.message ?? '箱子刪除失敗', 'error'),
   })
 
   const startEdit = (box: { id: string; label: string; shippingMethod: string; notes?: string | null }) => {

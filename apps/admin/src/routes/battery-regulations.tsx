@@ -3,11 +3,13 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { Pencil, Plus, Trash2, X, ChevronUp, ChevronDown } from 'lucide-react'
+import { useToast } from '@packman/ui'
 import { adminApi } from '../lib/api'
 import type { BatteryRegulation } from '@packman/shared'
 
 function BatteryRegulationsPage() {
   const qc = useQueryClient()
+  const { showToast } = useToast()
   const [editing, setEditing] = useState<BatteryRegulation | null>(null)
   const { register, handleSubmit, reset } = useForm<{ title: string; content: string }>()
   const { data: regulations } = useQuery({ queryKey: ['admin-battery-regulations'], queryFn: adminApi.batteryRegulations })
@@ -20,7 +22,9 @@ function BatteryRegulationsPage() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['admin-battery-regulations'] })
       reset({ title: '', content: '' })
+      showToast('電池規定已新增', 'success')
     },
+    onError: (e: unknown) => showToast((e as Error)?.message ?? '電池規定新增失敗', 'error'),
   })
 
   const update = useMutation({
@@ -32,12 +36,15 @@ function BatteryRegulationsPage() {
       qc.invalidateQueries({ queryKey: ['admin-battery-regulations'] })
       setEditing(null)
       reset({ title: '', content: '' })
+      showToast('電池規定已更新', 'success')
     },
+    onError: (e: unknown) => showToast((e as Error)?.message ?? '電池規定更新失敗', 'error'),
   })
 
   const del = useMutation({
     mutationFn: adminApi.deleteBatteryRegulation,
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['admin-battery-regulations'] }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['admin-battery-regulations'] }); showToast('電池規定已刪除', 'success') },
+    onError: (e: unknown) => showToast((e as Error)?.message ?? '電池規定刪除失敗', 'error'),
   })
 
   const move = useMutation({
@@ -53,6 +60,7 @@ function BatteryRegulationsPage() {
       ])
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['admin-battery-regulations'] }),
+    onError: (e: unknown) => showToast((e as Error)?.message ?? '排序更新失敗', 'error'),
   })
 
   const startEdit = (regulation: BatteryRegulation) => {

@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useForm } from 'react-hook-form'
 import { useState, useRef, useEffect } from 'react'
 import { ArrowLeft, Upload, QrCode, Tag, Trash2 } from 'lucide-react'
+import { useToast } from '@packman/ui'
 import { itemsApi, groupsApi, boxesApi, usersApi, selectOptionsApi } from '../lib/api'
 import { STATUS_LABELS, STATUS_COLORS, getLabelFromOptions, optionsToSelectItems, cn, formatApiError } from '../lib/utils'
 import { SelectController } from '../lib/select'
@@ -12,6 +13,7 @@ function ItemDetailPage() {
   const { id } = Route.useParams()
   const navigate = useNavigate()
   const qc = useQueryClient()
+  const { showToast } = useToast()
   const fileRef = useRef<HTMLInputElement>(null)
   const [editing, setEditing] = useState(false)
 
@@ -35,18 +37,27 @@ function ItemDetailPage() {
 
   const update = useMutation({
     mutationFn: (data: UpdateItemInput) => itemsApi.update(id, data),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['item', id] }); setEditing(false) },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['item', id] })
+      setEditing(false)
+      showToast('物品已更新', 'success')
+    },
+    onError: (e: unknown) => showToast(formatApiError(e), 'error'),
   })
 
   const uploadPhoto = useMutation({
     mutationFn: (file: File) => itemsApi.uploadPhoto(id, file),
     onSuccess: () => refetch(),
+    onError: (e: unknown) => showToast(formatApiError(e), 'error'),
   })
 
   const deleteItem = useMutation({
     mutationFn: () => itemsApi.delete(id),
-    onSuccess: () => navigate({ to: '/items' }),
-    onError: (e: unknown) => alert(formatApiError(e)),
+    onSuccess: () => {
+      showToast('物品已刪除', 'success')
+      navigate({ to: '/items' })
+    },
+    onError: (e: unknown) => showToast(formatApiError(e), 'error'),
   })
 
   if (!item) return <div className="flex justify-center py-12"><div className="h-8 w-8 animate-spin rounded-full border-4 border-brand-500 border-t-transparent" /></div>
@@ -156,6 +167,7 @@ function ItemDetailPage() {
                     control={control}
                     className="mt-1"
                     placeholder="— 請選擇 —"
+                    emptyValue="null"
                     options={[
                       { value: '', label: '— 請選擇 —' },
                       ...(users?.map((u) => ({ value: u.id, label: u.name })) ?? []),
@@ -169,6 +181,7 @@ function ItemDetailPage() {
                     control={control}
                     className="mt-1"
                     placeholder="— 請選擇 —"
+                    emptyValue="null"
                     options={[
                       { value: '', label: '— 請選擇 —' },
                       ...(groups?.map((g) => ({ value: g.id, label: g.name })) ?? []),
@@ -182,6 +195,7 @@ function ItemDetailPage() {
                     control={control}
                     className="mt-1"
                     placeholder="— 請選擇 —"
+                    emptyValue="null"
                     options={optionsToSelectItems(shippingOpts ?? [])}
                   />
                 </div>
@@ -197,6 +211,7 @@ function ItemDetailPage() {
                       control={control}
                       className="mt-1"
                       placeholder="— 未指定 —"
+                      emptyValue="null"
                       options={[
                         { value: '', label: '— 未指定 —' },
                         ...(boxes?.map((b) => ({ value: b.id, label: b.label })) ?? []),
@@ -211,6 +226,17 @@ function ItemDetailPage() {
                 <div>
                   <label className="label">須留意之處</label>
                   <textarea className="input mt-1" rows={2} {...register('specialNotes')} />
+                </div>
+                <div>
+                  <label className="label">用途分類</label>
+                  <SelectController
+                    name="useCategory"
+                    control={control}
+                    className="mt-1"
+                    placeholder="— 請選擇 —"
+                    emptyValue="null"
+                    options={optionsToSelectItems(categoryOpts ?? [])}
+                  />
                 </div>
                 <div className="flex justify-end gap-2">
                   <button type="button" className="btn-secondary" onClick={() => setEditing(false)}>取消</button>

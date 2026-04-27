@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { Plus, X, Trash2 } from 'lucide-react'
+import { useToast } from '@packman/ui'
 import { boxesApi, usersApi } from '../lib/api'
 import { STATUS_LABELS, STATUS_COLORS, cn, formatApiError } from '../lib/utils'
 import { Select, SelectController } from '../lib/select'
@@ -77,21 +78,25 @@ function NewBoxModal({ onClose }: { onClose: () => void }) {
 function BoxesPage() {
   const qc = useQueryClient()
   const { user } = useAuth()
+  const { showToast } = useToast()
   const isAdmin = user?.role === 'ADMIN'
   const [showNew, setShowNew] = useState(false)
   const { data: boxes, isLoading } = useQuery({ queryKey: ['boxes'], queryFn: () => boxesApi.list() })
 
   const deleteBox = useMutation({
     mutationFn: (id: string) => boxesApi.delete(id),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['boxes'] }),
-    onError: (e: unknown) => alert(formatApiError(e)),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['boxes'] })
+      showToast('箱子已刪除', 'success')
+    },
+    onError: (e: unknown) => showToast(formatApiError(e), 'error'),
   })
 
   const updateBoxStatus = useMutation({
     mutationFn: ({ id, status }: { id: string; status: PackingStatus }) =>
       boxesApi.update(id, { status }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['boxes'] }),
-    onError: (e: unknown) => alert(formatApiError(e)),
+    onError: (e: unknown) => showToast(formatApiError(e), 'error'),
   })
 
   const checked = boxes?.filter((b) => b.shippingMethod === 'CHECKED') ?? []
@@ -104,7 +109,7 @@ function BoxesPage() {
         {box!.owner && (
           <p className="mt-1 text-sm text-muted">負責人: {box!.owner.name}</p>
         )}
-        <p className="mt-2 text-xs text-muted">{(box as any)._count?.items ?? 0} 件物品</p>
+        <p className="mt-2 text-xs text-muted">{box!.itemCount ?? 0} 件物品</p>
       </Link>
       <div className="flex shrink-0 flex-col items-end justify-between gap-2">
         {isAdmin

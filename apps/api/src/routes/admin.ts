@@ -54,7 +54,7 @@ export async function adminRoutes(app: FastifyInstance) {
     }
     try {
       await prisma.user.delete({ where: { id: request.params.id } })
-      return { ok: true }
+      return reply.status(204).send()
     } catch {
       reply.status(404).send({ message: 'User not found' })
     }

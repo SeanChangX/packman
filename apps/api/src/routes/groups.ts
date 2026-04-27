@@ -16,7 +16,7 @@ export async function groupRoutes(app: FastifyInstance) {
 
   app.patch<{ Params: { id: string } }>(
     '/:id',
-      { preHandler: requireAdminOrAdminSecret },
+    { preHandler: requireAdminOrAdminSecret },
     async (request, reply) => {
       const body = UpdateGroupSchema.parse(request.body)
       try {
@@ -33,11 +33,11 @@ export async function groupRoutes(app: FastifyInstance) {
 
   app.delete<{ Params: { id: string } }>(
     '/:id',
-      { preHandler: requireAdminOrAdminSecret },
+    { preHandler: requireAdminOrAdminSecret },
     async (request, reply) => {
       try {
         await prisma.group.delete({ where: { id: request.params.id } })
-        return { ok: true }
+        return reply.status(204).send()
       } catch {
         reply.status(404).send({ message: 'Group not found' })
       }

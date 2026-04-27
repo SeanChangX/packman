@@ -14,7 +14,7 @@ const boxInclude = {
 export async function boxRoutes(app: FastifyInstance) {
   app.get('/', { preHandler: requireAuthOrAdminSecret }, async (request) => {
     const query = request.query as { shippingMethod?: string }
-    return prisma.box.findMany({
+    const boxes = await prisma.box.findMany({
       where: query.shippingMethod
         ? { shippingMethod: query.shippingMethod as any }
         : undefined,
@@ -24,6 +24,10 @@ export async function boxRoutes(app: FastifyInstance) {
       },
       orderBy: { label: 'asc' },
     })
+    return boxes.map(({ _count, ...box }) => ({
+      ...box,
+      itemCount: _count.items,
+    }))
   })
 
   app.get<{ Params: { id: string } }>(
@@ -78,7 +82,7 @@ export async function boxRoutes(app: FastifyInstance) {
     async (request, reply) => {
       try {
         await prisma.box.delete({ where: { id: request.params.id } })
-        return { ok: true }
+        return reply.status(204).send()
       } catch {
         reply.status(404).send({ message: 'Box not found' })
       }

@@ -4,11 +4,14 @@ WORKDIR /app
 
 COPY package.json pnpm-workspace.yaml ./
 COPY packages/shared/package.json ./packages/shared/
+COPY packages/ui/package.json ./packages/ui/
 COPY apps/web/package.json ./apps/web/
 RUN pnpm install
 
 COPY packages/shared ./packages/shared
 RUN pnpm --filter @packman/shared build
+COPY packages/ui ./packages/ui
+RUN pnpm --filter @packman/ui build
 
 EXPOSE 3000
-CMD ["pnpm", "--filter", "web", "dev", "--host"]
+CMD ["sh", "-c", "pnpm install --offline && pnpm --filter web dev --host"]

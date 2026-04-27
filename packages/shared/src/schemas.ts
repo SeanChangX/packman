@@ -16,6 +16,7 @@ export const CreateBoxSchema = z.object({
 })
 
 export const UpdateBoxSchema = CreateBoxSchema.partial().extend({
+  ownerId: z.string().uuid().nullable().optional(),
   status: z.enum(['NOT_PACKED', 'PACKED', 'SEALED']).optional(),
 })
 
@@ -33,6 +34,13 @@ export const CreateItemSchema = z.object({
 })
 
 export const UpdateItemSchema = CreateItemSchema.partial().extend({
+  ownerId: z.string().uuid().nullable().optional(),
+  shippingMethod: z.string().nullable().optional(),
+  groupId: z.string().uuid().nullable().optional(),
+  notes: z.string().nullable().optional(),
+  boxId: z.string().uuid().nullable().optional(),
+  useCategory: z.string().nullable().optional(),
+  specialNotes: z.string().nullable().optional(),
   status: z.enum(['NOT_PACKED', 'PACKED', 'SEALED']).optional(),
 })
 
@@ -43,7 +51,9 @@ export const CreateBatterySchema = z.object({
   batteryType: z.string().min(1),
 })
 
-export const UpdateBatterySchema = CreateBatterySchema.partial()
+export const UpdateBatterySchema = CreateBatterySchema.partial().extend({
+  ownerId: z.string().uuid().nullable().optional(),
+})
 
 export const CreateBatteryRegulationSchema = z.object({
   title: z.string().min(1).max(100),

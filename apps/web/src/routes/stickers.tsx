@@ -2,6 +2,7 @@ import { createFileRoute } from '@tanstack/react-router'
 import { useQuery, useMutation } from '@tanstack/react-query'
 import { useState } from 'react'
 import { Printer, Package, Box } from 'lucide-react'
+import { useToast } from '@packman/ui'
 import { itemsApi, boxesApi, stickersApi } from '../lib/api'
 import { STATUS_LABELS, STATUS_COLORS, cn } from '../lib/utils'
 import { Select } from '../lib/select'
@@ -18,6 +19,7 @@ const SIZE_LABELS: Record<StickerSize, string> = {
 
 function StickersPage() {
   const { user } = useAuth()
+  const { showToast } = useToast()
   const [mode, setMode] = useState<'items' | 'boxes'>('items')
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [size, setSize] = useState<StickerSize>('MEDIUM')
@@ -41,6 +43,7 @@ function StickersPage() {
       if (mode === 'items') await stickersApi.downloadItems({ ids, size })
       else await stickersApi.downloadBoxes({ ids, size })
     },
+    onError: (e: unknown) => showToast((e as Error)?.message ?? '貼紙生成失敗', 'error'),
   })
 
   const toggle = (id: string) => {
@@ -112,12 +115,6 @@ function StickersPage() {
           </button>
         </div>
       </div>
-
-      {download.isError && (
-        <div className="rounded-2xl border border-red-500/15 bg-red-500/10 p-3 text-sm font-semibold text-brand-600">
-          {(download.error as Error).message}
-        </div>
-      )}
 
       <div className="card overflow-hidden">
         <div className="flex items-center gap-3 border-b border-black/10 px-4 py-3 dark:border-white/10">
