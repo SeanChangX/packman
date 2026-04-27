@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as UsersRouteImport } from './routes/users'
+import { Route as SelectOptionsRouteImport } from './routes/select-options'
 import { Route as OllamaRouteImport } from './routes/ollama'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as GroupsRouteImport } from './routes/groups'
@@ -21,6 +22,11 @@ import { Route as IndexRouteImport } from './routes/index'
 const UsersRoute = UsersRouteImport.update({
   id: '/users',
   path: '/users',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SelectOptionsRoute = SelectOptionsRouteImport.update({
+  id: '/select-options',
+  path: '/select-options',
   getParentRoute: () => rootRouteImport,
 } as any)
 const OllamaRoute = OllamaRouteImport.update({
@@ -67,6 +73,7 @@ export interface FileRoutesByFullPath {
   '/groups': typeof GroupsRoute
   '/login': typeof LoginRoute
   '/ollama': typeof OllamaRoute
+  '/select-options': typeof SelectOptionsRoute
   '/users': typeof UsersRoute
 }
 export interface FileRoutesByTo {
@@ -77,6 +84,7 @@ export interface FileRoutesByTo {
   '/groups': typeof GroupsRoute
   '/login': typeof LoginRoute
   '/ollama': typeof OllamaRoute
+  '/select-options': typeof SelectOptionsRoute
   '/users': typeof UsersRoute
 }
 export interface FileRoutesById {
@@ -88,6 +96,7 @@ export interface FileRoutesById {
   '/groups': typeof GroupsRoute
   '/login': typeof LoginRoute
   '/ollama': typeof OllamaRoute
+  '/select-options': typeof SelectOptionsRoute
   '/users': typeof UsersRoute
 }
 export interface FileRouteTypes {
@@ -100,6 +109,7 @@ export interface FileRouteTypes {
     | '/groups'
     | '/login'
     | '/ollama'
+    | '/select-options'
     | '/users'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -110,6 +120,7 @@ export interface FileRouteTypes {
     | '/groups'
     | '/login'
     | '/ollama'
+    | '/select-options'
     | '/users'
   id:
     | '__root__'
@@ -120,6 +131,7 @@ export interface FileRouteTypes {
     | '/groups'
     | '/login'
     | '/ollama'
+    | '/select-options'
     | '/users'
   fileRoutesById: FileRoutesById
 }
@@ -131,6 +143,7 @@ export interface RootRouteChildren {
   GroupsRoute: typeof GroupsRoute
   LoginRoute: typeof LoginRoute
   OllamaRoute: typeof OllamaRoute
+  SelectOptionsRoute: typeof SelectOptionsRoute
   UsersRoute: typeof UsersRoute
 }
 
@@ -141,6 +154,13 @@ declare module '@tanstack/react-router' {
       path: '/users'
       fullPath: '/users'
       preLoaderRoute: typeof UsersRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/select-options': {
+      id: '/select-options'
+      path: '/select-options'
+      fullPath: '/select-options'
+      preLoaderRoute: typeof SelectOptionsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/ollama': {
@@ -203,6 +223,7 @@ const rootRouteChildren: RootRouteChildren = {
   GroupsRoute: GroupsRoute,
   LoginRoute: LoginRoute,
   OllamaRoute: OllamaRoute,
+  SelectOptionsRoute: SelectOptionsRoute,
   UsersRoute: UsersRoute,
 }
 export const routeTree = rootRouteImport

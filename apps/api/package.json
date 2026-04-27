@@ -27,6 +27,7 @@
     "pdfkit": "^0.15.0",
     "prisma": "^5.14.0",
     "qrcode": "^1.5.4",
+    "sharp": "^0.33.4",
     "zod": "^3.23.8"
   },
   "devDependencies": {

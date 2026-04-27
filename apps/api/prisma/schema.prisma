@@ -53,7 +53,7 @@ model Item {
   owner          User?           @relation("ItemOwner", fields: [ownerId], references: [id], onDelete: SetNull)
   createdById    String?
   createdBy      User?           @relation("ItemCreator", fields: [createdById], references: [id], onDelete: SetNull)
-  shippingMethod ShippingMethod?
+  shippingMethod String?
   groupId        String?
   group          Group?          @relation(fields: [groupId], references: [id], onDelete: SetNull)
   quantity       Int             @default(1)
@@ -61,7 +61,7 @@ model Item {
   notes          String?
   boxId          String?
   box            Box?            @relation(fields: [boxId], references: [id], onDelete: SetNull)
-  useCategory    UseCategory?
+  useCategory    String?
   tags           String[]
   specialNotes   String?
   photoUrl       String?
@@ -70,13 +70,24 @@ model Item {
 }
 
 model Battery {
-  id          String      @id @default(uuid())
-  batteryId   String      @unique
+  id          String   @id @default(uuid())
+  batteryId   String   @unique
   ownerId     String?
-  owner       User?       @relation(fields: [ownerId], references: [id], onDelete: SetNull)
+  owner       User?    @relation(fields: [ownerId], references: [id], onDelete: SetNull)
   notes       String?
-  batteryType BatteryType
-  createdAt   DateTime    @default(now())
+  batteryType String
+  createdAt   DateTime @default(now())
+}
+
+model SelectOption {
+  id        String           @id @default(uuid())
+  type      SelectOptionType
+  value     String
+  label     String
+  sortOrder Int              @default(0)
+  createdAt DateTime         @default(now())
+
+  @@unique([type, value])
 }
 
 model BatteryRegulation {
@@ -103,17 +114,10 @@ enum PackingStatus {
   SEALED
 }
 
-enum UseCategory {
-  HIGH_FREQ
-  RETURN_ONLY
-  ONE_WAY
-  LOW_FREQ
-}
-
-enum BatteryType {
-  POWER_TOOL
-  BEACON_CHARGER
-  LIFEPO4
+enum SelectOptionType {
+  SHIPPING_METHOD
+  USE_CATEGORY
+  BATTERY_TYPE
 }
 
 enum AiTagStatus {

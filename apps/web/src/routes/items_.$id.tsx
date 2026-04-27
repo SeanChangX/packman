@@ -3,8 +3,9 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useForm } from 'react-hook-form'
 import { useState, useRef, useEffect } from 'react'
 import { ArrowLeft, Upload, QrCode, Tag, Trash2 } from 'lucide-react'
-import { itemsApi, groupsApi, boxesApi, usersApi } from '../lib/api'
-import { STATUS_LABELS, STATUS_COLORS, SHIPPING_LABELS, USE_CATEGORY_LABELS, cn } from '../lib/utils'
+import { itemsApi, groupsApi, boxesApi, usersApi, selectOptionsApi } from '../lib/api'
+import { STATUS_LABELS, STATUS_COLORS, getLabelFromOptions, optionsToSelectItems, cn } from '../lib/utils'
+import { SelectController } from '../lib/select'
 import type { UpdateItemInput, PackingStatus } from '@packman/shared'
 
 function ItemDetailPage() {
@@ -23,8 +24,10 @@ function ItemDetailPage() {
   const { data: groups } = useQuery({ queryKey: ['groups'], queryFn: groupsApi.list })
   const { data: boxes } = useQuery({ queryKey: ['boxes'], queryFn: boxesApi.list })
   const { data: users } = useQuery({ queryKey: ['users'], queryFn: usersApi.list })
+  const { data: shippingOpts } = useQuery({ queryKey: ['options', 'SHIPPING_METHOD'], queryFn: () => selectOptionsApi.list('SHIPPING_METHOD') })
+  const { data: categoryOpts } = useQuery({ queryKey: ['options', 'USE_CATEGORY'], queryFn: () => selectOptionsApi.list('USE_CATEGORY') })
 
-  const { register, handleSubmit, reset } = useForm<UpdateItemInput>()
+  const { register, handleSubmit, reset, control } = useForm<UpdateItemInput>()
 
   useEffect(() => {
     if (item) reset({ ...item, groupId: item.groupId ?? undefined, boxId: item.boxId ?? undefined, ownerId: item.ownerId ?? undefined })
@@ -50,8 +53,8 @@ function ItemDetailPage() {
   return (
     <div className="mx-auto max-w-3xl space-y-6">
       <div className="flex items-center gap-3">
-        <button onClick={() => navigate({ to: '/items' })} className="btn-secondary p-2">
-          <ArrowLeft className="h-4 w-4" />
+        <button onClick={() => navigate({ to: '/items' })} className="rounded-2xl p-2 text-muted transition-colors hover:bg-white/10 hover:text-app">
+          <ArrowLeft className="h-5 w-5" />
         </button>
         <div className="flex-1">
           <h1 className="page-title">{item.name}</h1>
@@ -134,33 +137,52 @@ function ItemDetailPage() {
                 </div>
                 <div>
                   <label className="label">狀態</label>
-                  <select className="input mt-1" {...register('status')}>
-                    <option value="NOT_PACKED">尚未裝箱</option>
-                    <option value="PACKED">已裝箱</option>
-                    <option value="SEALED">已封箱</option>
-                  </select>
+                  <SelectController
+                    name="status"
+                    control={control}
+                    className="mt-1"
+                    options={[
+                      { value: 'NOT_PACKED', label: '尚未裝箱' },
+                      { value: 'PACKED', label: '已裝箱' },
+                      { value: 'SEALED', label: '已封箱' },
+                    ]}
+                  />
                 </div>
                 <div>
                   <label className="label">負責人</label>
-                  <select className="input mt-1" {...register('ownerId')}>
-                    <option value="">— 請選擇 —</option>
-                    {users?.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
-                  </select>
+                  <SelectController
+                    name="ownerId"
+                    control={control}
+                    className="mt-1"
+                    placeholder="— 請選擇 —"
+                    options={[
+                      { value: '', label: '— 請選擇 —' },
+                      ...(users?.map((u) => ({ value: u.id, label: u.name })) ?? []),
+                    ]}
+                  />
                 </div>
                 <div>
                   <label className="label">組別</label>
-                  <select className="input mt-1" {...register('groupId')}>
-                    <option value="">— 請選擇 —</option>
-                    {groups?.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
-                  </select>
+                  <SelectController
+                    name="groupId"
+                    control={control}
+                    className="mt-1"
+                    placeholder="— 請選擇 —"
+                    options={[
+                      { value: '', label: '— 請選擇 —' },
+                      ...(groups?.map((g) => ({ value: g.id, label: g.name })) ?? []),
+                    ]}
+                  />
                 </div>
                 <div>
                   <label className="label">運送方式</label>
-                  <select className="input mt-1" {...register('shippingMethod')}>
-                    <option value="">— 請選擇 —</option>
-                    <option value="CHECKED">託運</option>
-                    <option value="CARRY_ON">登機</option>
-                  </select>
+                  <SelectController
+                    name="shippingMethod"
+                    control={control}
+                    className="mt-1"
+                    placeholder="— 請選擇 —"
+                    options={optionsToSelectItems(shippingOpts ?? [])}
+                  />
                 </div>
                 <div className="grid grid-cols-2 gap-2">
                   <div>
@@ -169,10 +191,16 @@ function ItemDetailPage() {
                   </div>
                   <div>
                     <label className="label">指定箱子</label>
-                    <select className="input mt-1" {...register('boxId')}>
-                      <option value="">— 未指定 —</option>
-                      {boxes?.map((b) => <option key={b.id} value={b.id}>箱 {b.label}</option>)}
-                    </select>
+                    <SelectController
+                      name="boxId"
+                      control={control}
+                      className="mt-1"
+                      placeholder="— 未指定 —"
+                      options={[
+                        { value: '', label: '— 未指定 —' },
+                        ...(boxes?.map((b) => ({ value: b.id, label: b.label })) ?? []),
+                      ]}
+                    />
                   </div>
                 </div>
                 <div>
@@ -195,9 +223,9 @@ function ItemDetailPage() {
                   ['負責人', item.owner?.name ?? '—'],
                   ['組別', item.group?.name ?? '—'],
                   ['數量', item.quantity],
-                  ['運送方式', item.shippingMethod ? SHIPPING_LABELS[item.shippingMethod] : '—'],
+                  ['運送方式', item.shippingMethod ? getLabelFromOptions(shippingOpts, item.shippingMethod) : '—'],
                   ['箱子', item.box ? `箱 ${item.box.label}` : '—'],
-                  ['用途分類', item.useCategory ? USE_CATEGORY_LABELS[item.useCategory] : '—'],
+                  ['用途分類', item.useCategory ? getLabelFromOptions(categoryOpts, item.useCategory) : '—'],
                   ['說明', item.notes ?? '—'],
                   ['須留意之處', item.specialNotes ?? '—'],
                 ].map(([label, value]) => (
@@ -218,4 +246,4 @@ function ItemDetailPage() {
   )
 }
 
-export const Route = createFileRoute('/items/$id')({ component: ItemDetailPage })
+export const Route = createFileRoute('/items_/$id')({ component: ItemDetailPage })

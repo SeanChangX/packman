@@ -2,6 +2,7 @@ import { createFileRoute } from '@tanstack/react-router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { groupsApi, usersApi } from '../lib/api'
 import { useAuth } from '../lib/auth-context'
+import { Select } from '../lib/select'
 
 function ProfilePage() {
   const { user, refetch } = useAuth()
@@ -41,17 +42,16 @@ function ProfilePage() {
         <h2 className="mb-4 font-semibold">組別設定</h2>
         <div>
           <label className="label">我的組別</label>
-          <select
-            className="input mt-1"
+          <Select
+            className="mt-1"
             value={user.groupId ?? ''}
-            onChange={(e) => updateGroup.mutate(e.target.value || null)}
-            disabled={updateGroup.isPending}
-          >
-            <option value="">— 未分組 —</option>
-            {groups?.map((g) => (
-              <option key={g.id} value={g.id}>{g.name}</option>
-            ))}
-          </select>
+            onChange={(v) => updateGroup.mutate(v || null)}
+            placeholder="— 未分組 —"
+            options={[
+              { value: '', label: '— 未分組 —' },
+              ...(groups?.map((g) => ({ value: g.id, label: g.name })) ?? []),
+            ]}
+          />
           {user.group && (
             <p className="mt-2 text-sm text-muted">
               目前組別: <span style={{ color: user.group.color }} className="font-medium">{user.group.name}</span>

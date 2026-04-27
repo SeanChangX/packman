@@ -17,9 +17,9 @@ import { Route as ItemsRouteImport } from './routes/items'
 import { Route as BoxesRouteImport } from './routes/boxes'
 import { Route as BatteriesRouteImport } from './routes/batteries'
 import { Route as IndexRouteImport } from './routes/index'
-import { Route as ItemsNewRouteImport } from './routes/items.new'
-import { Route as ItemsIdRouteImport } from './routes/items.$id'
-import { Route as BoxesIdRouteImport } from './routes/boxes.$id'
+import { Route as ItemsNewRouteImport } from './routes/items_.new'
+import { Route as ItemsIdRouteImport } from './routes/items_.$id'
+import { Route as BoxesIdRouteImport } from './routes/boxes_.$id'
 
 const StickersRoute = StickersRouteImport.update({
   id: '/stickers',
@@ -62,26 +62,26 @@ const IndexRoute = IndexRouteImport.update({
   getParentRoute: () => rootRouteImport,
 } as any)
 const ItemsNewRoute = ItemsNewRouteImport.update({
-  id: '/new',
-  path: '/new',
-  getParentRoute: () => ItemsRoute,
+  id: '/items_/new',
+  path: '/items/new',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const ItemsIdRoute = ItemsIdRouteImport.update({
-  id: '/$id',
-  path: '/$id',
-  getParentRoute: () => ItemsRoute,
+  id: '/items_/$id',
+  path: '/items/$id',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const BoxesIdRoute = BoxesIdRouteImport.update({
-  id: '/$id',
-  path: '/$id',
-  getParentRoute: () => BoxesRoute,
+  id: '/boxes_/$id',
+  path: '/boxes/$id',
+  getParentRoute: () => rootRouteImport,
 } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/batteries': typeof BatteriesRoute
-  '/boxes': typeof BoxesRouteWithChildren
-  '/items': typeof ItemsRouteWithChildren
+  '/boxes': typeof BoxesRoute
+  '/items': typeof ItemsRoute
   '/login': typeof LoginRoute
   '/profile': typeof ProfileRoute
   '/scan': typeof ScanRoute
@@ -93,8 +93,8 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/batteries': typeof BatteriesRoute
-  '/boxes': typeof BoxesRouteWithChildren
-  '/items': typeof ItemsRouteWithChildren
+  '/boxes': typeof BoxesRoute
+  '/items': typeof ItemsRoute
   '/login': typeof LoginRoute
   '/profile': typeof ProfileRoute
   '/scan': typeof ScanRoute
@@ -107,15 +107,15 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/batteries': typeof BatteriesRoute
-  '/boxes': typeof BoxesRouteWithChildren
-  '/items': typeof ItemsRouteWithChildren
+  '/boxes': typeof BoxesRoute
+  '/items': typeof ItemsRoute
   '/login': typeof LoginRoute
   '/profile': typeof ProfileRoute
   '/scan': typeof ScanRoute
   '/stickers': typeof StickersRoute
-  '/boxes/$id': typeof BoxesIdRoute
-  '/items/$id': typeof ItemsIdRoute
-  '/items/new': typeof ItemsNewRoute
+  '/boxes_/$id': typeof BoxesIdRoute
+  '/items_/$id': typeof ItemsIdRoute
+  '/items_/new': typeof ItemsNewRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -154,20 +154,23 @@ export interface FileRouteTypes {
     | '/profile'
     | '/scan'
     | '/stickers'
-    | '/boxes/$id'
-    | '/items/$id'
-    | '/items/new'
+    | '/boxes_/$id'
+    | '/items_/$id'
+    | '/items_/new'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   BatteriesRoute: typeof BatteriesRoute
-  BoxesRoute: typeof BoxesRouteWithChildren
-  ItemsRoute: typeof ItemsRouteWithChildren
+  BoxesRoute: typeof BoxesRoute
+  ItemsRoute: typeof ItemsRoute
   LoginRoute: typeof LoginRoute
   ProfileRoute: typeof ProfileRoute
   ScanRoute: typeof ScanRoute
   StickersRoute: typeof StickersRoute
+  BoxesIdRoute: typeof BoxesIdRoute
+  ItemsIdRoute: typeof ItemsIdRoute
+  ItemsNewRoute: typeof ItemsNewRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -228,61 +231,42 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/items/new': {
-      id: '/items/new'
-      path: '/new'
+    '/items_/new': {
+      id: '/items_/new'
+      path: '/items/new'
       fullPath: '/items/new'
       preLoaderRoute: typeof ItemsNewRouteImport
-      parentRoute: typeof ItemsRoute
+      parentRoute: typeof rootRouteImport
     }
-    '/items/$id': {
-      id: '/items/$id'
-      path: '/$id'
+    '/items_/$id': {
+      id: '/items_/$id'
+      path: '/items/$id'
       fullPath: '/items/$id'
       preLoaderRoute: typeof ItemsIdRouteImport
-      parentRoute: typeof ItemsRoute
+      parentRoute: typeof rootRouteImport
     }
-    '/boxes/$id': {
-      id: '/boxes/$id'
-      path: '/$id'
+    '/boxes_/$id': {
+      id: '/boxes_/$id'
+      path: '/boxes/$id'
       fullPath: '/boxes/$id'
       preLoaderRoute: typeof BoxesIdRouteImport
-      parentRoute: typeof BoxesRoute
+      parentRoute: typeof rootRouteImport
     }
   }
 }
 
-interface BoxesRouteChildren {
-  BoxesIdRoute: typeof BoxesIdRoute
-}
-
-const BoxesRouteChildren: BoxesRouteChildren = {
-  BoxesIdRoute: BoxesIdRoute,
-}
-
-const BoxesRouteWithChildren = BoxesRoute._addFileChildren(BoxesRouteChildren)
-
-interface ItemsRouteChildren {
-  ItemsIdRoute: typeof ItemsIdRoute
-  ItemsNewRoute: typeof ItemsNewRoute
-}
-
-const ItemsRouteChildren: ItemsRouteChildren = {
-  ItemsIdRoute: ItemsIdRoute,
-  ItemsNewRoute: ItemsNewRoute,
-}
-
-const ItemsRouteWithChildren = ItemsRoute._addFileChildren(ItemsRouteChildren)
-
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   BatteriesRoute: BatteriesRoute,
-  BoxesRoute: BoxesRouteWithChildren,
-  ItemsRoute: ItemsRouteWithChildren,
+  BoxesRoute: BoxesRoute,
+  ItemsRoute: ItemsRoute,
   LoginRoute: LoginRoute,
   ProfileRoute: ProfileRoute,
   ScanRoute: ScanRoute,
   StickersRoute: StickersRoute,
+  BoxesIdRoute: BoxesIdRoute,
+  ItemsIdRoute: ItemsIdRoute,
+  ItemsNewRoute: ItemsNewRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

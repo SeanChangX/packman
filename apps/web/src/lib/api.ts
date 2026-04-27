@@ -1,5 +1,5 @@
 import type {
-  User, Group, Box, Item, Battery, BatteryRegulation,
+  User, Group, Box, Item, Battery, BatteryRegulation, SelectOption,
   PaginatedResponse,
 } from '@packman/shared'
 import type {
@@ -134,6 +134,12 @@ export const batteriesApi = {
 
 export const batteryRegulationsApi = {
   list: () => request<BatteryRegulation[]>(`${BASE}/battery-regulations`),
+}
+
+// ─── Select Options ────────────────────────────────────────────────
+export const selectOptionsApi = {
+  list: (type?: string) =>
+    request<SelectOption[]>(`${BASE}/options${type ? `?type=${type}` : ''}`),
 }
 
 // ─── Stickers ──────────────────────────────────────────────────────

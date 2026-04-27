@@ -66,6 +66,25 @@ export async function seedDefaultData() {
     })
   }
 
+  const defaultSelectOptions = [
+    { type: 'SHIPPING_METHOD' as const, value: 'CHECKED',        label: '託運',       sortOrder: 0 },
+    { type: 'SHIPPING_METHOD' as const, value: 'CARRY_ON',       label: '登機',       sortOrder: 1 },
+    { type: 'USE_CATEGORY'    as const, value: 'HIGH_FREQ',      label: '高使用頻率', sortOrder: 0 },
+    { type: 'USE_CATEGORY'    as const, value: 'RETURN_ONLY',    label: '往返物品',   sortOrder: 1 },
+    { type: 'USE_CATEGORY'    as const, value: 'ONE_WAY',        label: '單程物品',   sortOrder: 2 },
+    { type: 'USE_CATEGORY'    as const, value: 'LOW_FREQ',       label: '低使用頻率', sortOrder: 3 },
+    { type: 'BATTERY_TYPE'    as const, value: 'POWER_TOOL',     label: '工具機電池', sortOrder: 0 },
+    { type: 'BATTERY_TYPE'    as const, value: 'BEACON_CHARGER', label: 'Beacon行充', sortOrder: 1 },
+    { type: 'BATTERY_TYPE'    as const, value: 'LIFEPO4',        label: '磁酸鋰鐵電池', sortOrder: 2 },
+  ]
+  for (const opt of defaultSelectOptions) {
+    await prisma.selectOption.upsert({
+      where: { type_value: { type: opt.type, value: opt.value } },
+      update: {},
+      create: opt,
+    })
+  }
+
   console.log('Seed complete.')
 }
 

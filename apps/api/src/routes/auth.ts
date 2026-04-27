@@ -113,7 +113,7 @@ export async function authRoutes(app: FastifyInstance) {
       if (username !== ADMIN_USER || password !== ADMIN_PASSWORD) {
         return reply.status(401).send({ message: '帳號或密碼錯誤' })
       }
-      const token = signToken({ userId: '__admin__', role: 'ADMIN_PANEL' })
+      const token = signToken({ userId: '__admin__', role: 'ADMIN_PANEL' }, '1d')
       reply.setCookie('packman_admin_token', token, {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',

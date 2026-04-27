@@ -72,8 +72,23 @@ function OllamaTest() {
         <div
           className={`card p-4 ${status.ok ? 'border-green-500/20 bg-green-500/5' : 'border-red-500/20 bg-red-500/5'}`}
         >
-          <p className="text-sm font-semibold text-app">
-            {status.ok ? `✓ Ollama 正常 — 使用模型: ${status.activeModel}` : `✗ ${status.message ?? 'Ollama 無法連線'}`}
+          <p className="flex items-center gap-2 text-sm font-semibold text-app">
+            {status.ok ? (
+              <>
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 shrink-0 text-green-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="20 6 9 17 4 12" />
+                </svg>
+                {`Ollama 正常 — 使用模型: ${status.activeModel}`}
+              </>
+            ) : (
+              <>
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 shrink-0 text-red-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="18" y1="6" x2="6" y2="18" />
+                  <line x1="6" y1="6" x2="18" y2="18" />
+                </svg>
+                {status.message ?? 'Ollama 無法連線'}
+              </>
+            )}
           </p>
           {status.ok && status.models.length > 0 && (
             <p className="mt-1 text-xs text-muted">可用模型: {status.models.join(', ')}</p>

@@ -22,12 +22,12 @@ export const UpdateBoxSchema = CreateBoxSchema.partial().extend({
 export const CreateItemSchema = z.object({
   name: z.string().min(1).max(200),
   ownerId: z.string().uuid().optional(),
-  shippingMethod: z.enum(['CHECKED', 'CARRY_ON']).optional(),
+  shippingMethod: z.string().optional(),
   groupId: z.string().uuid().optional(),
   quantity: z.number().int().min(1).default(1),
   notes: z.string().optional(),
   boxId: z.string().uuid().optional(),
-  useCategory: z.enum(['HIGH_FREQ', 'RETURN_ONLY', 'ONE_WAY', 'LOW_FREQ']).optional(),
+  useCategory: z.string().optional(),
   tags: z.array(z.string()).default([]),
   specialNotes: z.string().optional(),
 })
@@ -40,7 +40,7 @@ export const CreateBatterySchema = z.object({
   batteryId: z.string().min(1).max(100),
   ownerId: z.string().uuid().optional(),
   notes: z.string().optional(),
-  batteryType: z.enum(['POWER_TOOL', 'BEACON_CHARGER', 'LIFEPO4']),
+  batteryType: z.string().min(1),
 })
 
 export const UpdateBatterySchema = CreateBatterySchema.partial()
@@ -61,7 +61,7 @@ export const ItemsQuerySchema = z.object({
   groupId: z.string().uuid().optional(),
   boxId: z.string().uuid().optional(),
   status: z.enum(['NOT_PACKED', 'PACKED', 'SEALED']).optional(),
-  shippingMethod: z.enum(['CHECKED', 'CARRY_ON']).optional(),
+  shippingMethod: z.string().optional(),
   search: z.string().optional(),
   page: z.coerce.number().int().min(1).default(1),
   pageSize: z.coerce.number().int().min(1).max(100).default(50),
@@ -71,6 +71,18 @@ export const StickerRequestSchema = z.object({
   ids: z.array(z.string().uuid()).min(1).max(50),
   size: z.enum(['SMALL', 'MEDIUM', 'LARGE', 'A4_SHEET']).default('MEDIUM'),
 })
+
+export const CreateSelectOptionSchema = z.object({
+  type: z.enum(['SHIPPING_METHOD', 'USE_CATEGORY', 'BATTERY_TYPE']),
+  value: z.string().min(1).max(50),
+  label: z.string().min(1).max(50),
+  sortOrder: z.number().int().default(0),
+})
+
+export const UpdateSelectOptionSchema = CreateSelectOptionSchema.partial().omit({ type: true, value: true })
+
+export type CreateSelectOptionInput = z.infer<typeof CreateSelectOptionSchema>
+export type UpdateSelectOptionInput = z.infer<typeof UpdateSelectOptionSchema>
 
 export type CreateGroupInput = z.infer<typeof CreateGroupSchema>
 export type UpdateGroupInput = z.infer<typeof UpdateGroupSchema>

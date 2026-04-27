@@ -1,6 +1,6 @@
 import { clsx, type ClassValue } from 'clsx'
 import { twMerge } from 'tailwind-merge'
-import type { PackingStatus, ShippingMethod, UseCategory, BatteryType } from '@packman/shared'
+import type { PackingStatus, ShippingMethod, SelectOption } from '@packman/shared'
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
@@ -23,17 +23,12 @@ export const SHIPPING_LABELS: Record<ShippingMethod, string> = {
   CARRY_ON: '登機',
 }
 
-export const USE_CATEGORY_LABELS: Record<UseCategory, string> = {
-  HIGH_FREQ: '高使用頻率',
-  RETURN_ONLY: '往返物品',
-  ONE_WAY: '單程物品',
-  LOW_FREQ: '低使用頻率',
+export function optionsToSelectItems(options: SelectOption[]) {
+  return options.map((o) => ({ value: o.value, label: o.label }))
 }
 
-export const BATTERY_TYPE_LABELS: Record<BatteryType, string> = {
-  POWER_TOOL: '工具機電池',
-  BEACON_CHARGER: 'Beacon行充',
-  LIFEPO4: '磁酸鋰鐵電池',
+export function getLabelFromOptions(options: SelectOption[] | undefined, value: string): string {
+  return options?.find((o) => o.value === value)?.label ?? value
 }
 
 export function formatDate(iso: string) {

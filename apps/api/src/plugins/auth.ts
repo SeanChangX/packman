@@ -19,8 +19,8 @@ const JWT_SECRET = process.env.JWT_SECRET ?? 'dev-secret-change-me'
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN ?? '7d'
 const ADMIN_API_SECRET = process.env.ADMIN_API_SECRET ?? ''
 
-export function signToken(payload: JwtPayload): string {
-  return jwt.sign(payload, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN } as jwt.SignOptions)
+export function signToken(payload: JwtPayload, expiresIn?: string): string {
+  return jwt.sign(payload, JWT_SECRET, { expiresIn: expiresIn ?? JWT_EXPIRES_IN } as jwt.SignOptions)
 }
 
 export function verifyToken(token: string): JwtPayload {

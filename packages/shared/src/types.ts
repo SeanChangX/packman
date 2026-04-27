@@ -1,9 +1,17 @@
 export type Role = 'ADMIN' | 'MEMBER'
 export type ShippingMethod = 'CHECKED' | 'CARRY_ON'
 export type PackingStatus = 'NOT_PACKED' | 'PACKED' | 'SEALED'
-export type UseCategory = 'HIGH_FREQ' | 'RETURN_ONLY' | 'ONE_WAY' | 'LOW_FREQ'
-export type BatteryType = 'POWER_TOOL' | 'BEACON_CHARGER' | 'LIFEPO4'
 export type AiTagStatus = 'NONE' | 'PENDING' | 'DONE' | 'FAILED'
+export type SelectOptionType = 'SHIPPING_METHOD' | 'USE_CATEGORY' | 'BATTERY_TYPE'
+
+export interface SelectOption {
+  id: string
+  type: SelectOptionType
+  value: string
+  label: string
+  sortOrder: number
+  createdAt: string
+}
 
 export interface Group {
   id: string
@@ -45,7 +53,7 @@ export interface Item {
   owner?: User
   createdById?: string
   createdBy?: User
-  shippingMethod?: ShippingMethod
+  shippingMethod?: string
   groupId?: string
   group?: Group
   quantity: number
@@ -53,7 +61,7 @@ export interface Item {
   notes?: string
   boxId?: string
   box?: Box
-  useCategory?: UseCategory
+  useCategory?: string
   tags: string[]
   specialNotes?: string
   photoUrl?: string
@@ -67,7 +75,7 @@ export interface Battery {
   ownerId?: string
   owner?: User
   notes?: string
-  batteryType: BatteryType
+  batteryType: string
   createdAt: string
 }
 

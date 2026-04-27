@@ -1,7 +1,9 @@
 import { FastifyInstance } from 'fastify'
 import axios from 'axios'
+import sharp from 'sharp'
 import { prisma } from '../plugins/prisma'
 import { requireAdminOrAdminSecret } from '../plugins/auth'
+import { CreateSelectOptionSchema, UpdateSelectOptionSchema } from '@packman/shared'
 
 const OLLAMA_BASE_URL = process.env.OLLAMA_BASE_URL ?? 'http://localhost:11434'
 const OLLAMA_MODEL = process.env.OLLAMA_VISION_MODEL ?? 'llava'
@@ -102,6 +104,43 @@ export async function adminRoutes(app: FastifyInstance) {
       .send('﻿' + toCsv(headers, rows)) // BOM for Excel UTF-8
   })
 
+  app.get('/select-options', async (request) => {
+    const q = request.query as Record<string, string>
+    const where = q.type ? { type: q.type as any } : {}
+    return prisma.selectOption.findMany({
+      where,
+      orderBy: [{ type: 'asc' }, { sortOrder: 'asc' }],
+    })
+  })
+
+  app.post('/select-options', async (request, reply) => {
+    const body = CreateSelectOptionSchema.parse(request.body)
+    try {
+      const opt = await prisma.selectOption.create({ data: body })
+      return reply.status(201).send(opt)
+    } catch {
+      reply.status(409).send({ message: '該類型中已有相同 value' })
+    }
+  })
+
+  app.patch<{ Params: { id: string } }>('/select-options/:id', async (request, reply) => {
+    const body = UpdateSelectOptionSchema.parse(request.body)
+    try {
+      return await prisma.selectOption.update({ where: { id: request.params.id }, data: body })
+    } catch {
+      reply.status(404).send({ message: 'Option not found' })
+    }
+  })
+
+  app.delete<{ Params: { id: string } }>('/select-options/:id', async (request, reply) => {
+    try {
+      await prisma.selectOption.delete({ where: { id: request.params.id } })
+      return reply.status(204).send()
+    } catch {
+      reply.status(404).send({ message: 'Option not found' })
+    }
+  })
+
   app.get('/ollama-status', async (_request, reply) => {
     try {
       const res = await axios.get<{ models: { name: string }[] }>(`${OLLAMA_BASE_URL}/api/tags`, { timeout: 5000 })
@@ -116,8 +155,12 @@ export async function adminRoutes(app: FastifyInstance) {
     const data = await request.file()
     if (!data) return reply.status(400).send({ message: '請上傳圖片' })
 
-    const buffer = await data.toBuffer()
-    const base64Image = buffer.toString('base64')
+    const raw = await data.toBuffer()
+    const resized = await sharp(raw)
+      .resize(1024, 1024, { fit: 'inside', withoutEnlargement: true })
+      .jpeg({ quality: 85 })
+      .toBuffer()
+    const base64Image = resized.toString('base64')
 
     try {
       const response = await axios.post<{ response: string }>(

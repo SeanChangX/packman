@@ -1,12 +1,30 @@
 import { createRootRoute, Outlet, Link } from '@tanstack/react-router'
 import {
   Package, Box, Battery, Printer, QrCode,
-  LayoutDashboard, LogOut, Menu, X, UserCircle,
+  LayoutDashboard, LogOut, Menu, X, UserCircle, AlertTriangle, RotateCcw,
 } from 'lucide-react'
 import { useState } from 'react'
 import { useAuth } from '../lib/auth-context'
 import { authApi } from '../lib/api'
 import { cn } from '../lib/utils'
+
+function ErrorPage({ error, reset }: { error: Error; reset: () => void }) {
+  return (
+    <div className="flex min-h-[60vh] flex-col items-center justify-center gap-6 p-8 text-center">
+      <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-brand-500/10">
+        <AlertTriangle className="h-8 w-8 text-brand-500" />
+      </div>
+      <div className="space-y-2">
+        <h1 className="text-xl font-bold text-app">發生了一些問題</h1>
+        <p className="max-w-sm text-sm text-muted">{error.message}</p>
+      </div>
+      <button onClick={reset} className="btn-secondary gap-2">
+        <RotateCcw className="h-4 w-4" />
+        重試
+      </button>
+    </div>
+  )
+}
 
 const navItems = [
   { to: '/', icon: LayoutDashboard, label: '總覽' },
@@ -54,20 +72,14 @@ function Layout() {
     return <Outlet />
   }
 
-  if (loading) {
-    return (
-      <div className="app-shell flex items-center justify-center">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-brand-500 border-t-transparent" />
-      </div>
-    )
-  }
-
-  if (!user) {
+  if (!loading && !user) {
     window.location.href = '/login'
     return null
   }
 
-  const visibleNavItems = navItems.filter((item) => !item.adminOnly || user.role === 'ADMIN')
+  const visibleNavItems = loading
+    ? []
+    : navItems.filter((item) => !item.adminOnly || user!.role === 'ADMIN')
 
   const nav = (
     <nav className="flex flex-col gap-1 px-2">
@@ -92,14 +104,20 @@ function Layout() {
         </div>
         <div className="border-t border-white/10 p-4">
           <div className="flex items-center gap-2">
-            {user.avatarUrl
-              ? <img src={user.avatarUrl} className="h-8 w-8 rounded-full" alt={user.name} />
-              : <div className="flex h-8 w-8 items-center justify-center rounded-full bg-brand-500 text-xs text-white">{user.name[0]}</div>
-            }
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-semibold text-white">{user.name}</p>
-              <p className="truncate text-xs text-white/50">{user.group?.name ?? '未分組'}</p>
-            </div>
+            {user ? (
+              <>
+                {user.avatarUrl
+                  ? <img src={user.avatarUrl} className="h-8 w-8 rounded-full" alt={user.name} />
+                  : <div className="flex h-8 w-8 items-center justify-center rounded-full bg-brand-500 text-xs text-white">{user.name[0]}</div>
+                }
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-semibold text-white">{user.name}</p>
+                  <p className="truncate text-xs text-white/50">{user.group?.name ?? '未分組'}</p>
+                </div>
+              </>
+            ) : (
+              <div className="h-8 w-8 animate-pulse rounded-full bg-white/10" />
+            )}
             <button
               onClick={logout}
               className="rounded-xl p-2 text-white/50 hover:bg-white/10 hover:text-white"
@@ -139,7 +157,10 @@ function Layout() {
 
         <main className="flex-1 overflow-auto">
           <div className="page">
-            <Outlet />
+            {loading
+              ? <div className="flex min-h-[60vh] items-center justify-center"><div className="h-8 w-8 animate-spin rounded-full border-4 border-brand-500 border-t-transparent" /></div>
+              : <Outlet />
+            }
           </div>
         </main>
       </div>
@@ -154,4 +175,7 @@ function Layout() {
   )
 }
 
-export const Route = createRootRoute({ component: Layout })
+export const Route = createRootRoute({
+  component: Layout,
+  errorComponent: ({ error, reset }) => <ErrorPage error={error as Error} reset={reset} />,
+})

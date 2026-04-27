@@ -1,4 +1,4 @@
-import type { User, Group, Box, BatteryRegulation } from '@packman/shared'
+import type { User, Group, Box, BatteryRegulation, SelectOption } from '@packman/shared'
 
 async function req<T>(url: string, options?: RequestInit): Promise<T> {
   const res = await fetch(url, {
@@ -68,4 +68,12 @@ export const adminApi = {
 
   exportItems: () => window.open('/api/admin/export/items', '_blank'),
   exportBatteries: () => window.open('/api/admin/export/batteries', '_blank'),
+
+  selectOptions: () => req<SelectOption[]>('/api/admin/select-options'),
+  createSelectOption: (data: { type: string; value: string; label: string; sortOrder: number }) =>
+    req<SelectOption>('/api/admin/select-options', { method: 'POST', body: JSON.stringify(data) }),
+  updateSelectOption: (id: string, data: { label?: string; sortOrder?: number }) =>
+    req<SelectOption>(`/api/admin/select-options/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
+  deleteSelectOption: (id: string) =>
+    req<void>(`/api/admin/select-options/${id}`, { method: 'DELETE' }),
 }

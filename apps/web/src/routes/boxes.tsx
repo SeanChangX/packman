@@ -5,13 +5,14 @@ import { useForm } from 'react-hook-form'
 import { Plus, X } from 'lucide-react'
 import { boxesApi, usersApi } from '../lib/api'
 import { STATUS_LABELS, STATUS_COLORS, cn } from '../lib/utils'
+import { SelectController } from '../lib/select'
 import type { CreateBoxInput } from '@packman/shared'
 import { useAuth } from '../lib/auth-context'
 
 function NewBoxModal({ onClose }: { onClose: () => void }) {
   const qc = useQueryClient()
   const { data: users } = useQuery({ queryKey: ['users'], queryFn: usersApi.list })
-  const { register, handleSubmit } = useForm<CreateBoxInput>()
+  const { register, handleSubmit, control } = useForm<CreateBoxInput>()
 
   const create = useMutation({
     mutationFn: boxesApi.create,
@@ -32,18 +33,29 @@ function NewBoxModal({ onClose }: { onClose: () => void }) {
           </div>
           <div>
             <label className="label">運送方式 *</label>
-            <select className="input mt-1" {...register('shippingMethod', { required: true })}>
-              <option value="">— 請選擇 —</option>
-              <option value="CHECKED">託運</option>
-              <option value="CARRY_ON">登機</option>
-            </select>
+            <SelectController
+              name="shippingMethod"
+              control={control}
+              className="mt-1"
+              placeholder="— 請選擇 —"
+              options={[
+                { value: 'CHECKED', label: '託運' },
+                { value: 'CARRY_ON', label: '登機' },
+              ]}
+            />
           </div>
           <div>
             <label className="label">整箱負責人</label>
-            <select className="input mt-1" {...register('ownerId')}>
-              <option value="">— 請選擇 —</option>
-              {users?.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
-            </select>
+            <SelectController
+              name="ownerId"
+              control={control}
+              className="mt-1"
+              placeholder="— 請選擇 —"
+              options={[
+                { value: '', label: '— 請選擇 —' },
+                ...(users?.map((u) => ({ value: u.id, label: u.name })) ?? []),
+              ]}
+            />
           </div>
           <div>
             <label className="label">說明</label>
@@ -75,7 +87,7 @@ function BoxesPage() {
     >
       <div className="flex items-start justify-between">
         <div>
-          <span className="text-2xl font-bold text-app">箱 {box!.label}</span>
+          <span className="text-2xl font-bold text-app">{box!.label}</span>
           {box!.owner && (
             <p className="mt-1 text-sm text-muted">負責人: {box!.owner.name}</p>
           )}

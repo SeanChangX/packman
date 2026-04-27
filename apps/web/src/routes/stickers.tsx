@@ -124,8 +124,9 @@ function StickersPage() {
           <input
             type="checkbox"
             checked={selectedIds.size === list.length && list.length > 0}
+            ref={(el) => { if (el) el.indeterminate = selectedIds.size > 0 && selectedIds.size < list.length }}
             onChange={toggleAll}
-            className="h-4 w-4 rounded"
+            className="checkbox"
           />
           <span className="text-sm text-muted">
             已選 {selectedIds.size} / {list.length}
@@ -147,10 +148,10 @@ function StickersPage() {
                   checked={selectedIds.has(item.id)}
                   onChange={() => toggle(item.id)}
                   onClick={(e) => e.stopPropagation()}
-                  className="h-4 w-4 rounded"
+                  className="checkbox"
                 />
                 <div className="flex-1">
-                  <p className="font-medium">{isItem ? i.name : `箱 ${i.label}`}</p>
+                  <p className="font-medium">{isItem ? i.name : i.label}</p>
                   {isItem && i.owner && <p className="text-xs text-muted">{i.owner.name}</p>}
                   {!isItem && i.owner && <p className="text-xs text-muted">負責人: {i.owner.name}</p>}
                 </div>

@@ -1,5 +1,5 @@
 import { createRootRoute, Outlet, Link, redirect, useLocation } from '@tanstack/react-router'
-import { Users, Layers, Download, LayoutDashboard, Package, Box, Battery, LogOut, Cpu } from 'lucide-react'
+import { Users, Layers, Download, LayoutDashboard, Package, Box, Battery, LogOut, Cpu, List } from 'lucide-react'
 import { adminApi } from '../lib/api'
 
 const navItems = [
@@ -8,6 +8,7 @@ const navItems = [
   { to: '/boxes' as const, icon: Box, label: '箱子管理' },
   { to: '/groups' as const, icon: Layers, label: '組別管理' },
   { to: '/battery-regulations' as const, icon: Battery, label: '電池規定' },
+  { to: '/select-options' as const, icon: List, label: '選項管理' },
   { to: '/export' as const, icon: Download, label: '匯出資料' },
   { to: '/ollama' as const, icon: Cpu, label: 'Ollama 測試' },
 ]

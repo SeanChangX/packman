@@ -12,6 +12,7 @@ import { batteryRegulationRoutes } from './routes/battery-regulations'
 import { groupRoutes } from './routes/groups'
 import { userRoutes } from './routes/users'
 import { stickerRoutes } from './routes/stickers'
+import { optionRoutes } from './routes/options'
 import { adminRoutes } from './routes/admin'
 import { seedDefaultData } from './seed'
 
@@ -47,6 +48,7 @@ async function build() {
   await app.register(groupRoutes, { prefix: '/api/groups' })
   await app.register(userRoutes, { prefix: '/api/users' })
   await app.register(stickerRoutes, { prefix: '/api/stickers' })
+  await app.register(optionRoutes, { prefix: '/api/options' })
   await app.register(adminRoutes, { prefix: '/api/admin' })
 
   return app

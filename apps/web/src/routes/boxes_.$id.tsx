@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { ArrowLeft, Download, QrCode, CheckSquare, Square } from 'lucide-react'
 import { boxesApi, itemsApi } from '../lib/api'
 import { STATUS_LABELS, STATUS_COLORS, SHIPPING_LABELS, cn } from '../lib/utils'
+import { Select } from '../lib/select'
 import type { PackingStatus } from '@packman/shared'
 
 function BoxDetailPage() {
@@ -37,8 +38,8 @@ function BoxDetailPage() {
   return (
     <div className="mx-auto max-w-2xl space-y-6">
       <div className="flex items-center gap-3">
-        <button onClick={() => navigate({ to: '/boxes' })} className="btn-secondary p-2">
-          <ArrowLeft className="h-4 w-4" />
+        <button onClick={() => navigate({ to: '/boxes' })} className="rounded-2xl p-2 text-muted transition-colors hover:bg-white/10 hover:text-app">
+          <ArrowLeft className="h-5 w-5" />
         </button>
         <div className="flex-1">
           <div className="flex items-center gap-2">
@@ -54,12 +55,17 @@ function BoxDetailPage() {
       <div className="card flex flex-col gap-3 p-4 lg:flex-row lg:flex-wrap lg:items-center">
         <div className="flex items-center gap-2">
           <label className="label">貼紙尺寸:</label>
-          <select className="input w-full sm:w-44" value={stickerSize} onChange={(e) => setStickerSize(e.target.value as any)}>
-            <option value="SMALL">小 (50×30mm)</option>
-            <option value="MEDIUM">中 (100×50mm)</option>
-            <option value="LARGE">大 (150×100mm)</option>
-            <option value="A4_SHEET">A4 紙張</option>
-          </select>
+          <Select
+            className="w-full sm:w-44"
+            value={stickerSize}
+            onChange={(v) => setStickerSize(v as typeof stickerSize)}
+            options={[
+              { value: 'SMALL', label: '小 (50×30mm)' },
+              { value: 'MEDIUM', label: '中 (100×50mm)' },
+              { value: 'LARGE', label: '大 (150×100mm)' },
+              { value: 'A4', label: 'A4' },
+            ]}
+          />
         </div>
         <a
           href={boxesApi.stickerUrl(id, stickerSize)}
@@ -74,15 +80,16 @@ function BoxDetailPage() {
 
         <div className="ml-auto flex items-center gap-2">
           <span className="text-sm text-muted">{packedCount} / {items.length} 已打包</span>
-          <select
-            className={cn('badge cursor-pointer border-0', STATUS_COLORS[box.status])}
+          <Select
             value={box.status}
-            onChange={(e) => updateBox.mutate(e.target.value as PackingStatus)}
-          >
-            <option value="NOT_PACKED">尚未裝箱</option>
-            <option value="PACKED">已裝箱</option>
-            <option value="SEALED">已封箱</option>
-          </select>
+            onChange={(v) => updateBox.mutate(v as PackingStatus)}
+            triggerClassName={cn('badge cursor-pointer border-0', STATUS_COLORS[box.status])}
+            options={[
+              { value: 'NOT_PACKED', label: '尚未裝箱' },
+              { value: 'PACKED', label: '已裝箱' },
+              { value: 'SEALED', label: '已封箱' },
+            ]}
+          />
         </div>
       </div>
 
@@ -143,4 +150,4 @@ function BoxDetailPage() {
   )
 }
 
-export const Route = createFileRoute('/boxes/$id')({ component: BoxDetailPage })
+export const Route = createFileRoute('/boxes_/$id')({ component: BoxDetailPage })

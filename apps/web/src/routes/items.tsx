@@ -2,16 +2,16 @@ import { createFileRoute, Link } from '@tanstack/react-router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { Plus, Search, Filter } from 'lucide-react'
-import { itemsApi, groupsApi, boxesApi } from '../lib/api'
-import { STATUS_LABELS, STATUS_COLORS, SHIPPING_LABELS, cn } from '../lib/utils'
+import { itemsApi, groupsApi, selectOptionsApi } from '../lib/api'
+import { STATUS_LABELS, STATUS_COLORS, getLabelFromOptions, cn } from '../lib/utils'
 import { Select } from '../lib/select'
-import type { PackingStatus, ShippingMethod } from '@packman/shared'
+import type { PackingStatus } from '@packman/shared'
 
 function ItemsPage() {
   const qc = useQueryClient()
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState<PackingStatus | ''>('')
-  const [shippingFilter, setShippingFilter] = useState<ShippingMethod | ''>('')
+  const [shippingFilter, setShippingFilter] = useState('')
   const [groupFilter, setGroupFilter] = useState('')
 
   const { data, isLoading } = useQuery({
@@ -26,6 +26,7 @@ function ItemsPage() {
   })
 
   const { data: groups } = useQuery({ queryKey: ['groups'], queryFn: groupsApi.list })
+  const { data: shippingOpts = [] } = useQuery({ queryKey: ['options', 'SHIPPING_METHOD'], queryFn: () => selectOptionsApi.list('SHIPPING_METHOD') })
 
   const updateStatus = useMutation({
     mutationFn: ({ id, status }: { id: string; status: PackingStatus }) =>
@@ -70,11 +71,10 @@ function ItemsPage() {
         <Select
           className="w-full lg:w-40"
           value={shippingFilter}
-          onChange={(value) => setShippingFilter(value as ShippingMethod | '')}
+          onChange={setShippingFilter}
           options={[
             { value: '', label: '全部運送' },
-            { value: 'CHECKED', label: '託運' },
-            { value: 'CARRY_ON', label: '登機' },
+            ...shippingOpts.map((o) => ({ value: o.value, label: o.label })),
           ]}
         />
         <Select
@@ -102,7 +102,7 @@ function ItemsPage() {
                     <tr key={i}>
                       {Array.from({ length: 8 }).map((_, j) => (
                         <td key={j} className="px-4 py-3">
-                          <div className="h-4 animate-pulse rounded bg-gray-200" />
+                          <div className="h-4 animate-pulse rounded bg-white/10" />
                         </td>
                       ))}
                     </tr>
@@ -139,22 +139,23 @@ function ItemsPage() {
                           : '—'}
                       </td>
                       <td className="px-4 py-3 text-muted">
-                        {item.shippingMethod ? SHIPPING_LABELS[item.shippingMethod] : '—'}
+                        {item.shippingMethod ? getLabelFromOptions(shippingOpts, item.shippingMethod) : '—'}
                       </td>
                       <td className="px-4 py-3 text-muted">{item.quantity}</td>
                       <td className="px-4 py-3 text-muted">
                         {item.box ? `箱 ${item.box.label}` : '—'}
                       </td>
                       <td className="px-4 py-3">
-                        <select
-                          className={cn('badge cursor-pointer border-0', STATUS_COLORS[item.status])}
+                        <Select
                           value={item.status}
-                          onChange={(e) => updateStatus.mutate({ id: item.id, status: e.target.value as PackingStatus })}
-                        >
-                          <option value="NOT_PACKED">尚未裝箱</option>
-                          <option value="PACKED">已裝箱</option>
-                          <option value="SEALED">已封箱</option>
-                        </select>
+                          onChange={(v) => updateStatus.mutate({ id: item.id, status: v as PackingStatus })}
+                          triggerClassName={cn('badge cursor-pointer border-0', STATUS_COLORS[item.status])}
+                          options={[
+                            { value: 'NOT_PACKED', label: '尚未裝箱' },
+                            { value: 'PACKED', label: '已裝箱' },
+                            { value: 'SEALED', label: '已封箱' },
+                          ]}
+                        />
                       </td>
                       <td className="px-4 py-3">
                         <Link
