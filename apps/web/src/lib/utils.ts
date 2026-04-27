@@ -36,3 +36,14 @@ export function formatDate(iso: string) {
     year: 'numeric', month: '2-digit', day: '2-digit',
   })
 }
+
+export function formatApiError(error: unknown): string {
+  const msg = (error as Error)?.message ?? '操作失敗'
+  try {
+    const parsed = JSON.parse(msg)
+    if (Array.isArray(parsed) && parsed[0]?.code) {
+      return '請確認所有必填欄位已正確填寫'
+    }
+  } catch {}
+  return msg
+}

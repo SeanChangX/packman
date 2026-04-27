@@ -74,7 +74,7 @@ export async function seedDefaultData() {
     { type: 'USE_CATEGORY'    as const, value: 'ONE_WAY',        label: '單程物品',   sortOrder: 2 },
     { type: 'USE_CATEGORY'    as const, value: 'LOW_FREQ',       label: '低使用頻率', sortOrder: 3 },
     { type: 'BATTERY_TYPE'    as const, value: 'POWER_TOOL',     label: '工具機電池', sortOrder: 0 },
-    { type: 'BATTERY_TYPE'    as const, value: 'BEACON_CHARGER', label: 'Beacon行充', sortOrder: 1 },
+    { type: 'BATTERY_TYPE'    as const, value: 'POWER_BANK', label: '行動電源', sortOrder: 1 },
     { type: 'BATTERY_TYPE'    as const, value: 'LIFEPO4',        label: '磁酸鋰鐵電池', sortOrder: 2 },
   ]
   for (const opt of defaultSelectOptions) {

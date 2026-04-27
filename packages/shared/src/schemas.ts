@@ -74,7 +74,7 @@ export const StickerRequestSchema = z.object({
 
 export const CreateSelectOptionSchema = z.object({
   type: z.enum(['SHIPPING_METHOD', 'USE_CATEGORY', 'BATTERY_TYPE']),
-  value: z.string().min(1).max(50),
+  value: z.string().min(1).max(50).optional(),
   label: z.string().min(1).max(50),
   sortOrder: z.number().int().default(0),
 })

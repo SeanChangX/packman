@@ -70,7 +70,7 @@ export const adminApi = {
   exportBatteries: () => window.open('/api/admin/export/batteries', '_blank'),
 
   selectOptions: () => req<SelectOption[]>('/api/admin/select-options'),
-  createSelectOption: (data: { type: string; value: string; label: string; sortOrder: number }) =>
+  createSelectOption: (data: { type: string; label: string; sortOrder: number }) =>
     req<SelectOption>('/api/admin/select-options', { method: 'POST', body: JSON.stringify(data) }),
   updateSelectOption: (id: string, data: { label?: string; sortOrder?: number }) =>
     req<SelectOption>(`/api/admin/select-options/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),

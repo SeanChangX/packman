@@ -104,6 +104,8 @@ export const itemsApi = {
     request<Item>(`${BASE}/items/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
   delete: (id: string) =>
     request<void>(`${BASE}/items/${id}`, { method: 'DELETE' }),
+  batchDelete: (ids: string[]) =>
+    request<void>(`${BASE}/items/batch-delete`, { method: 'POST', body: JSON.stringify({ ids }) }),
   uploadPhoto: async (id: string, file: File) => {
     const form = new FormData()
     form.append('file', file)

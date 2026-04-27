@@ -4,13 +4,13 @@ import { useForm } from 'react-hook-form'
 import { useState } from 'react'
 import { Plus, X, AlertTriangle, Pencil, Check, XCircle } from 'lucide-react'
 import { batteriesApi, batteryRegulationsApi, usersApi, selectOptionsApi } from '../lib/api'
-import { getLabelFromOptions } from '../lib/utils'
+import { getLabelFromOptions, formatApiError } from '../lib/utils'
 import { Select, SelectController } from '../lib/select'
 import type { CreateBatteryInput, UpdateBatteryInput, SelectOption } from '@packman/shared'
 
 const BATTERY_COLORS: Record<string, string> = {
   POWER_TOOL: 'bg-red-500/10 text-brand-600 ring-1 ring-red-500/15',
-  BEACON_CHARGER: 'bg-black/10 text-zinc-900 ring-1 ring-black/10 dark:bg-white/10 dark:text-white',
+  POWER_BANK: 'bg-black/10 text-zinc-900 ring-1 ring-black/10 dark:bg-white/10 dark:text-white',
   LIFEPO4: 'bg-black text-white dark:bg-white dark:text-black',
 }
 
@@ -91,6 +91,9 @@ function NewBatteryModal({ onClose, batteryTypeOpts }: { onClose: () => void; ba
             <label className="label">說明</label>
             <input className="input mt-1" {...register('notes')} />
           </div>
+          {create.isError && (
+            <p className="text-sm text-red-500">{formatApiError(create.error)}</p>
+          )}
           <div className="flex justify-end gap-2">
             <button type="button" className="btn-secondary" onClick={onClose}>取消</button>
             <button type="submit" className="btn-primary" disabled={create.isPending}>新增</button>
@@ -225,6 +228,7 @@ function BatteriesPage() {
   const deleteBattery = useMutation({
     mutationFn: batteriesApi.delete,
     onSuccess: () => qc.invalidateQueries({ queryKey: ['batteries'] }),
+    onError: (e: unknown) => alert(formatApiError(e)),
   })
 
   return (

@@ -4,7 +4,7 @@ import { useForm } from 'react-hook-form'
 import { useState, useRef, useEffect } from 'react'
 import { ArrowLeft, Upload, QrCode, Tag, Trash2 } from 'lucide-react'
 import { itemsApi, groupsApi, boxesApi, usersApi, selectOptionsApi } from '../lib/api'
-import { STATUS_LABELS, STATUS_COLORS, getLabelFromOptions, optionsToSelectItems, cn } from '../lib/utils'
+import { STATUS_LABELS, STATUS_COLORS, getLabelFromOptions, optionsToSelectItems, cn, formatApiError } from '../lib/utils'
 import { SelectController } from '../lib/select'
 import type { UpdateItemInput, PackingStatus } from '@packman/shared'
 
@@ -46,6 +46,7 @@ function ItemDetailPage() {
   const deleteItem = useMutation({
     mutationFn: () => itemsApi.delete(id),
     onSuccess: () => navigate({ to: '/items' }),
+    onError: (e: unknown) => alert(formatApiError(e)),
   })
 
   if (!item) return <div className="flex justify-center py-12"><div className="h-8 w-8 animate-spin rounded-full border-4 border-brand-500 border-t-transparent" /></div>
@@ -60,11 +61,15 @@ function ItemDetailPage() {
           <h1 className="page-title">{item.name}</h1>
           <div className="mt-1 flex gap-2">
             <span className={cn('badge', STATUS_COLORS[item.status])}>{STATUS_LABELS[item.status]}</span>
-            {item.shippingMethod && <span className="badge bg-black/10 text-app dark:bg-white/10">{SHIPPING_LABELS[item.shippingMethod]}</span>}
+            {item.shippingMethod && <span className="badge bg-black/10 text-app dark:bg-white/10">{getLabelFromOptions(shippingOpts, item.shippingMethod)}</span>}
           </div>
         </div>
-        <button onClick={() => deleteItem.mutate()} className="btn-danger p-2" title="刪除">
-          <Trash2 className="h-4 w-4" />
+        <button
+          onClick={() => { if (confirm(`確定刪除「${item.name}」？`)) deleteItem.mutate() }}
+          className="rounded-2xl p-2 text-brand-500 transition-colors hover:bg-brand-500/10"
+          title="刪除"
+        >
+          <Trash2 className="h-5 w-5" />
         </button>
       </div>
 
@@ -80,16 +85,13 @@ function ItemDetailPage() {
 
           <div className="flex gap-2">
             <button
-              className="btn-secondary flex-1 gap-1"
+              className="btn-secondary w-full gap-1"
               onClick={() => fileRef.current?.click()}
               disabled={uploadPhoto.isPending}
             >
               <Upload className="h-4 w-4" />
               {uploadPhoto.isPending ? '上傳中...' : '上傳照片'}
             </button>
-            <a href={itemsApi.qrUrl(id)} download className="btn-secondary gap-1">
-              <QrCode className="h-4 w-4" /> QR
-            </a>
           </div>
           <input
             ref={fileRef}
@@ -144,7 +146,6 @@ function ItemDetailPage() {
                     options={[
                       { value: 'NOT_PACKED', label: '尚未裝箱' },
                       { value: 'PACKED', label: '已裝箱' },
-                      { value: 'SEALED', label: '已封箱' },
                     ]}
                   />
                 </div>
@@ -224,7 +225,7 @@ function ItemDetailPage() {
                   ['組別', item.group?.name ?? '—'],
                   ['數量', item.quantity],
                   ['運送方式', item.shippingMethod ? getLabelFromOptions(shippingOpts, item.shippingMethod) : '—'],
-                  ['箱子', item.box ? `箱 ${item.box.label}` : '—'],
+                  ['箱子', item.box?.label ?? '—'],
                   ['用途分類', item.useCategory ? getLabelFromOptions(categoryOpts, item.useCategory) : '—'],
                   ['說明', item.notes ?? '—'],
                   ['須留意之處', item.specialNotes ?? '—'],

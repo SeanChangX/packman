@@ -1,6 +1,6 @@
 import { createRootRoute, Outlet, Link } from '@tanstack/react-router'
 import {
-  Package, Box, Battery, Printer, QrCode,
+  Package, ClipboardList, Battery, Printer, QrCode,
   LayoutDashboard, LogOut, Menu, X, UserCircle, AlertTriangle, RotateCcw,
 } from 'lucide-react'
 import { useState } from 'react'
@@ -28,10 +28,10 @@ function ErrorPage({ error, reset }: { error: Error; reset: () => void }) {
 
 const navItems = [
   { to: '/', icon: LayoutDashboard, label: '總覽' },
-  { to: '/items', icon: Package, label: '物品' },
-  { to: '/boxes', icon: Box, label: '箱子', adminOnly: true },
-  { to: '/batteries', icon: Battery, label: '電池' },
-  { to: '/stickers', icon: Printer, label: '貼紙', adminOnly: true },
+  { to: '/items', icon: ClipboardList, label: '物品清單' },
+  { to: '/boxes', icon: Package, label: '箱子清單' },
+  { to: '/batteries', icon: Battery, label: '電池分配' },
+  { to: '/stickers', icon: Printer, label: '貼紙列印', adminOnly: true },
   { to: '/profile', icon: UserCircle, label: '我的' },
 ]
 

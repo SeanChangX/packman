@@ -1,4 +1,5 @@
 import { FastifyInstance } from 'fastify'
+import { randomBytes } from 'crypto'
 import axios from 'axios'
 import sharp from 'sharp'
 import { prisma } from '../plugins/prisma'
@@ -115,8 +116,9 @@ export async function adminRoutes(app: FastifyInstance) {
 
   app.post('/select-options', async (request, reply) => {
     const body = CreateSelectOptionSchema.parse(request.body)
+    const value = body.value ?? randomBytes(4).toString('hex').toUpperCase()
     try {
-      const opt = await prisma.selectOption.create({ data: body })
+      const opt = await prisma.selectOption.create({ data: { ...body, value } })
       return reply.status(201).send(opt)
     } catch {
       reply.status(409).send({ message: '該類型中已有相同 value' })

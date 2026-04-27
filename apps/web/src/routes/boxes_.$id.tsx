@@ -5,12 +5,15 @@ import { ArrowLeft, Download, QrCode, CheckSquare, Square } from 'lucide-react'
 import { boxesApi, itemsApi } from '../lib/api'
 import { STATUS_LABELS, STATUS_COLORS, SHIPPING_LABELS, cn } from '../lib/utils'
 import { Select } from '../lib/select'
+import { useAuth } from '../lib/auth-context'
 import type { PackingStatus } from '@packman/shared'
 
 function BoxDetailPage() {
   const { id } = Route.useParams()
   const navigate = useNavigate()
   const qc = useQueryClient()
+  const { user } = useAuth()
+  const isAdmin = user?.role === 'ADMIN'
   const [stickerSize, setStickerSize] = useState<'SMALL' | 'MEDIUM' | 'LARGE' | 'A4_SHEET'>('MEDIUM')
 
   const { data: box, isLoading } = useQuery({
@@ -43,7 +46,7 @@ function BoxDetailPage() {
         </button>
         <div className="flex-1">
           <div className="flex items-center gap-2">
-            <h1 className="page-title">箱 {box.label}</h1>
+            <h1 className="page-title">{box.label}</h1>
             <span className="badge bg-black/10 text-app dark:bg-white/10">{SHIPPING_LABELS[box.shippingMethod]}</span>
           </div>
           {box.owner && <p className="text-sm text-muted">整箱負責人: {box.owner.name}</p>}
@@ -80,16 +83,19 @@ function BoxDetailPage() {
 
         <div className="ml-auto flex items-center gap-2">
           <span className="text-sm text-muted">{packedCount} / {items.length} 已打包</span>
-          <Select
-            value={box.status}
-            onChange={(v) => updateBox.mutate(v as PackingStatus)}
-            triggerClassName={cn('badge cursor-pointer border-0', STATUS_COLORS[box.status])}
-            options={[
-              { value: 'NOT_PACKED', label: '尚未裝箱' },
-              { value: 'PACKED', label: '已裝箱' },
-              { value: 'SEALED', label: '已封箱' },
-            ]}
-          />
+          {isAdmin
+            ? <Select
+                value={box.status}
+                onChange={(v) => updateBox.mutate(v as PackingStatus)}
+                triggerClassName={cn('badge cursor-pointer border-0', STATUS_COLORS[box.status])}
+                options={[
+                  { value: 'NOT_PACKED', label: '尚未裝箱' },
+                  { value: 'PACKED', label: '已裝箱' },
+                  { value: 'SEALED', label: '已封箱' },
+                ]}
+              />
+            : <span className={cn('badge', STATUS_COLORS[box.status])}>{STATUS_LABELS[box.status]}</span>
+          }
         </div>
       </div>
 

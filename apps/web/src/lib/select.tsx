@@ -59,7 +59,7 @@ export function Select<T extends string>({
       {open && rect && createPortal(
         <div
           ref={dropdownRef}
-          style={{ position: 'fixed', top: rect.bottom + 8, left: rect.left, width: rect.width, zIndex: 9999 }}
+          style={{ position: 'fixed', top: rect.bottom + 8, left: rect.left, minWidth: Math.max(rect.width, 140), zIndex: 9999 }}
           className="overflow-hidden rounded-2xl border border-black/10 bg-[#151517] p-1 shadow-2xl dark:border-white/10"
         >
           {options.map((option) => (

@@ -1,18 +1,23 @@
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
-import { Plus, Search, Filter } from 'lucide-react'
+import { Plus, Search, Trash2 } from 'lucide-react'
 import { itemsApi, groupsApi, selectOptionsApi } from '../lib/api'
-import { STATUS_LABELS, STATUS_COLORS, getLabelFromOptions, cn } from '../lib/utils'
+import { STATUS_LABELS, STATUS_COLORS, getLabelFromOptions, cn, formatApiError } from '../lib/utils'
 import { Select } from '../lib/select'
+import { useAuth } from '../lib/auth-context'
 import type { PackingStatus } from '@packman/shared'
 
 function ItemsPage() {
   const qc = useQueryClient()
+  const { user } = useAuth()
+  const isAdmin = user?.role === 'ADMIN'
+
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState<PackingStatus | ''>('')
   const [shippingFilter, setShippingFilter] = useState('')
   const [groupFilter, setGroupFilter] = useState('')
+  const [selected, setSelected] = useState<Set<string>>(new Set())
 
   const { data, isLoading } = useQuery({
     queryKey: ['items', search, statusFilter, shippingFilter, groupFilter],
@@ -32,7 +37,38 @@ function ItemsPage() {
     mutationFn: ({ id, status }: { id: string; status: PackingStatus }) =>
       itemsApi.update(id, { status }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['items'] }),
+    onError: (e: unknown) => alert(formatApiError(e)),
   })
+
+  const batchDelete = useMutation({
+    mutationFn: (ids: string[]) => itemsApi.batchDelete(ids),
+    onSuccess: () => {
+      setSelected(new Set())
+      qc.invalidateQueries({ queryKey: ['items'] })
+    },
+    onError: (e: unknown) => alert(formatApiError(e)),
+  })
+
+  const items = data?.data ?? []
+  const allChecked = items.length > 0 && selected.size === items.length
+  const someChecked = selected.size > 0 && selected.size < items.length
+
+  const toggleAll = () => {
+    setSelected(allChecked ? new Set() : new Set(items.map((i) => i.id)))
+  }
+
+  const toggle = (id: string) => {
+    setSelected((prev) => {
+      const next = new Set(prev)
+      next.has(id) ? next.delete(id) : next.add(id)
+      return next
+    })
+  }
+
+  const handleBatchDelete = () => {
+    if (!confirm(`確定刪除選取的 ${selected.size} 件物品？此操作無法復原。`)) return
+    batchDelete.mutate([...selected])
+  }
 
   return (
     <div className="space-y-4">
@@ -41,9 +77,20 @@ function ItemsPage() {
           <h1 className="page-title">物品清單</h1>
           <p className="page-subtitle">共 {data?.total ?? 0} 件物品</p>
         </div>
-        <Link to="/items/new" className="btn-primary gap-1">
-          <Plus className="h-4 w-4" /> 新增物品
-        </Link>
+        <div className="flex gap-2">
+          {isAdmin && selected.size > 0 && (
+            <button
+              onClick={handleBatchDelete}
+              disabled={batchDelete.isPending}
+              className="btn-primary gap-1 bg-brand-600 hover:bg-brand-700"
+            >
+              <Trash2 className="h-4 w-4" /> 刪除 {selected.size} 件
+            </button>
+          )}
+          <Link to="/items/new" className="btn-primary gap-1">
+            <Plus className="h-4 w-4" /> 新增物品
+          </Link>
+        </div>
       </div>
 
       {/* Filters */}
@@ -65,7 +112,6 @@ function ItemsPage() {
             { value: '', label: '全部狀態' },
             { value: 'NOT_PACKED', label: '尚未裝箱' },
             { value: 'PACKED', label: '已裝箱' },
-            { value: 'SEALED', label: '已封箱' },
           ]}
         />
         <Select
@@ -91,6 +137,17 @@ function ItemsPage() {
           <table className="w-full text-sm">
             <thead className="border-b border-black/10 bg-black/5 dark:border-white/10 dark:bg-white/5">
               <tr>
+                {isAdmin && (
+                  <th className="px-4 py-3 w-10">
+                    <input
+                      type="checkbox"
+                      checked={allChecked}
+                      ref={(el) => { if (el) el.indeterminate = someChecked }}
+                      onChange={toggleAll}
+                      className="h-4 w-4 cursor-pointer accent-brand-500"
+                    />
+                  </th>
+                )}
                 {['品項', '負責人', '組別', '運送方式', '數量', '箱子', '狀態', ''].map((h) => (
                   <th key={h} className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted">{h}</th>
                 ))}
@@ -100,20 +157,35 @@ function ItemsPage() {
               {isLoading
                 ? Array.from({ length: 5 }).map((_, i) => (
                     <tr key={i}>
-                      {Array.from({ length: 8 }).map((_, j) => (
+                      {Array.from({ length: isAdmin ? 9 : 8 }).map((_, j) => (
                         <td key={j} className="px-4 py-3">
                           <div className="h-4 animate-pulse rounded bg-white/10" />
                         </td>
                       ))}
                     </tr>
                   ))
-                : data?.data.map((item) => (
-                    <tr key={item.id} className="hover:bg-black/5 dark:hover:bg-white/5">
+                : items.map((item) => (
+                    <tr
+                      key={item.id}
+                      className={cn(isAdmin && selected.has(item.id) ? 'bg-brand-500/5' : 'hover:bg-black/5 dark:hover:bg-white/5')}
+                      onClick={isAdmin ? () => toggle(item.id) : undefined}
+                    >
+                      {isAdmin && (
+                        <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                          <input
+                            type="checkbox"
+                            checked={selected.has(item.id)}
+                            onChange={() => toggle(item.id)}
+                            className="h-4 w-4 cursor-pointer accent-brand-500"
+                          />
+                        </td>
+                      )}
                       <td className="px-4 py-3">
                         <Link
                           to="/items/$id"
                           params={{ id: item.id }}
                           className="font-semibold text-brand-600 hover:underline"
+                          onClick={(e) => e.stopPropagation()}
                         >
                           {item.name}
                         </Link>
@@ -143,9 +215,9 @@ function ItemsPage() {
                       </td>
                       <td className="px-4 py-3 text-muted">{item.quantity}</td>
                       <td className="px-4 py-3 text-muted">
-                        {item.box ? `箱 ${item.box.label}` : '—'}
+                        {item.box?.label ?? '—'}
                       </td>
-                      <td className="px-4 py-3">
+                      <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
                         <Select
                           value={item.status}
                           onChange={(v) => updateStatus.mutate({ id: item.id, status: v as PackingStatus })}
@@ -153,11 +225,10 @@ function ItemsPage() {
                           options={[
                             { value: 'NOT_PACKED', label: '尚未裝箱' },
                             { value: 'PACKED', label: '已裝箱' },
-                            { value: 'SEALED', label: '已封箱' },
                           ]}
                         />
                       </td>
-                      <td className="px-4 py-3">
+                      <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
                         <Link
                           to="/items/$id"
                           params={{ id: item.id }}

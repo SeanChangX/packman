@@ -69,6 +69,9 @@ function BoxesPage() {
         <button className="btn-primary" disabled={create.isPending}>
           <Plus className="h-4 w-4" /> 新增
         </button>
+        {create.isError && (
+          <p className="col-span-full text-sm text-red-500">{(create.error as Error).message}</p>
+        )}
       </form>
 
       <div className="card table-shell">

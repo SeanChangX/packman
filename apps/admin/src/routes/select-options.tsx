@@ -1,6 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { useState } from 'react'
-import { Plus, Pencil, Trash2, Check, X } from 'lucide-react'
+import { Plus, Pencil, Trash2, Check, X, ChevronUp, ChevronDown } from 'lucide-react'
 import { adminApi } from '../lib/api'
 import type { SelectOption, SelectOptionType } from '@packman/shared'
 
@@ -14,49 +14,46 @@ const TYPES: SelectOptionType[] = ['SHIPPING_METHOD', 'USE_CATEGORY', 'BATTERY_T
 
 function OptionRow({
   opt,
+  idx,
+  total,
   onSave,
   onDelete,
+  onMove,
+  moving,
 }: {
   opt: SelectOption
-  onSave: (id: string, label: string, sortOrder: number) => Promise<void>
+  idx: number
+  total: number
+  onSave: (id: string, label: string) => Promise<void>
   onDelete: (id: string) => Promise<void>
+  onMove: (id: string, direction: 'up' | 'down') => Promise<void>
+  moving: boolean
 }) {
   const [editing, setEditing] = useState(false)
   const [label, setLabel] = useState(opt.label)
-  const [sortOrder, setSortOrder] = useState(opt.sortOrder)
   const [saving, setSaving] = useState(false)
 
   const handleSave = async () => {
     setSaving(true)
-    await onSave(opt.id, label, sortOrder)
+    await onSave(opt.id, label)
     setSaving(false)
     setEditing(false)
   }
 
   const handleCancel = () => {
     setLabel(opt.label)
-    setSortOrder(opt.sortOrder)
     setEditing(false)
   }
 
   if (editing) {
     return (
       <tr className="bg-white/5">
-        <td className="px-4 py-2 font-mono text-sm text-muted">{opt.value}</td>
         <td className="px-4 py-2">
           <input
             className="input py-1.5 text-sm"
             value={label}
             onChange={(e) => setLabel(e.target.value)}
             autoFocus
-          />
-        </td>
-        <td className="px-4 py-2 w-24">
-          <input
-            type="number"
-            className="input py-1.5 text-sm"
-            value={sortOrder}
-            onChange={(e) => setSortOrder(Number(e.target.value))}
           />
         </td>
         <td className="px-4 py-2">
@@ -75,11 +72,23 @@ function OptionRow({
 
   return (
     <tr className="hover:bg-white/5">
-      <td className="px-4 py-3 font-mono text-sm text-muted">{opt.value}</td>
       <td className="px-4 py-3 font-medium">{opt.label}</td>
-      <td className="px-4 py-3 text-muted">{opt.sortOrder}</td>
       <td className="px-4 py-3">
-        <div className="flex gap-3">
+        <div className="flex items-center gap-3">
+          <button
+            disabled={idx === 0 || moving}
+            onClick={() => onMove(opt.id, 'up')}
+            className="text-muted hover:text-app disabled:opacity-30 disabled:pointer-events-none"
+          >
+            <ChevronUp className="h-4 w-4" />
+          </button>
+          <button
+            disabled={idx === total - 1 || moving}
+            onClick={() => onMove(opt.id, 'down')}
+            className="text-muted hover:text-app disabled:opacity-30 disabled:pointer-events-none"
+          >
+            <ChevronDown className="h-4 w-4" />
+          </button>
           <button onClick={() => setEditing(true)} className="text-muted hover:text-app">
             <Pencil className="h-3.5 w-3.5" />
           </button>
@@ -97,25 +106,25 @@ function OptionRow({
 
 function AddOptionRow({
   type,
+  maxOrder,
   onAdd,
 }: {
   type: SelectOptionType
+  maxOrder: number
   onAdd: () => void
 }) {
   const [open, setOpen] = useState(false)
-  const [value, setValue] = useState('')
   const [label, setLabel] = useState('')
-  const [sortOrder, setSortOrder] = useState(0)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
 
   const handleAdd = async () => {
-    if (!value.trim() || !label.trim()) { setError('value 與顯示名稱為必填'); return }
+    if (!label.trim()) { setError('顯示名稱為必填'); return }
     setSaving(true)
     setError('')
     try {
-      await adminApi.createSelectOption({ type, value: value.trim(), label: label.trim(), sortOrder })
-      setValue(''); setLabel(''); setSortOrder(0)
+      await adminApi.createSelectOption({ type, label: label.trim(), sortOrder: maxOrder + 1 })
+      setLabel('')
       setOpen(false)
       onAdd()
     } catch (e: any) {
@@ -128,7 +137,7 @@ function AddOptionRow({
   if (!open) {
     return (
       <tr>
-        <td colSpan={4} className="px-4 py-2">
+        <td colSpan={2} className="px-4 py-2">
           <button onClick={() => setOpen(true)} className="flex items-center gap-1.5 text-sm font-semibold text-brand-600 hover:text-brand-700">
             <Plus className="h-4 w-4" /> 新增選項
           </button>
@@ -140,25 +149,24 @@ function AddOptionRow({
   return (
     <tr className="bg-brand-500/5">
       <td className="px-4 py-2">
-        <input className="input py-1.5 text-sm font-mono" placeholder="VALUE_KEY" value={value} onChange={(e) => setValue(e.target.value)} autoFocus />
+        <input
+          className="input py-1.5 text-sm"
+          placeholder="顯示名稱"
+          value={label}
+          onChange={(e) => setLabel(e.target.value)}
+          autoFocus
+          onKeyDown={(e) => e.key === 'Enter' && handleAdd()}
+        />
+        {error && <p className="mt-1 text-xs text-brand-600">{error}</p>}
       </td>
       <td className="px-4 py-2">
-        <input className="input py-1.5 text-sm" placeholder="顯示名稱" value={label} onChange={(e) => setLabel(e.target.value)} />
-      </td>
-      <td className="px-4 py-2 w-24">
-        <input type="number" className="input py-1.5 text-sm" value={sortOrder} onChange={(e) => setSortOrder(Number(e.target.value))} />
-      </td>
-      <td className="px-4 py-2">
-        <div className="flex flex-col gap-1">
-          <div className="flex gap-2">
-            <button onClick={handleAdd} disabled={saving} className="btn-primary px-3 py-1.5 text-xs">
-              <Check className="h-3.5 w-3.5" />
-            </button>
-            <button onClick={() => setOpen(false)} className="btn-secondary px-3 py-1.5 text-xs">
-              <X className="h-3.5 w-3.5" />
-            </button>
-          </div>
-          {error && <p className="text-xs text-brand-600">{error}</p>}
+        <div className="flex gap-2">
+          <button onClick={handleAdd} disabled={saving} className="btn-primary px-3 py-1.5 text-xs">
+            <Check className="h-3.5 w-3.5" />
+          </button>
+          <button onClick={() => { setOpen(false); setLabel('') }} className="btn-secondary px-3 py-1.5 text-xs">
+            <X className="h-3.5 w-3.5" />
+          </button>
         </div>
       </td>
     </tr>
@@ -168,6 +176,7 @@ function AddOptionRow({
 function SelectOptionsPage() {
   const [options, setOptions] = useState<SelectOption[]>([])
   const [loading, setLoading] = useState(true)
+  const [moving, setMoving] = useState(false)
 
   const load = async () => {
     setLoading(true)
@@ -181,14 +190,32 @@ function SelectOptionsPage() {
 
   useState(() => { load() })
 
-  const handleSave = async (id: string, label: string, sortOrder: number) => {
-    await adminApi.updateSelectOption(id, { label, sortOrder })
+  const handleSave = async (id: string, label: string) => {
+    await adminApi.updateSelectOption(id, { label })
     await load()
   }
 
   const handleDelete = async (id: string) => {
     await adminApi.deleteSelectOption(id)
     await load()
+  }
+
+  const handleMove = async (type: SelectOptionType, id: string, direction: 'up' | 'down') => {
+    const sorted = options.filter((o) => o.type === type).sort((a, b) => a.sortOrder - b.sortOrder)
+    const idx = sorted.findIndex((o) => o.id === id)
+    const swapIdx = direction === 'up' ? idx - 1 : idx + 1
+    if (swapIdx < 0 || swapIdx >= sorted.length) return
+    const a = sorted[idx], b = sorted[swapIdx]
+    setMoving(true)
+    try {
+      await Promise.all([
+        adminApi.updateSelectOption(a.id, { sortOrder: b.sortOrder }),
+        adminApi.updateSelectOption(b.id, { sortOrder: a.sortOrder }),
+      ])
+      await load()
+    } finally {
+      setMoving(false)
+    }
   }
 
   return (
@@ -206,7 +233,10 @@ function SelectOptionsPage() {
         </div>
       ) : (
         TYPES.map((type) => {
-          const typeOptions = options.filter((o) => o.type === type)
+          const typeOptions = options
+            .filter((o) => o.type === type)
+            .sort((a, b) => a.sortOrder - b.sortOrder)
+          const maxOrder = typeOptions.reduce((m, o) => Math.max(m, o.sortOrder), -1)
           return (
             <div key={type} className="card overflow-hidden">
               <div className="border-b border-white/10 px-5 py-3">
@@ -215,16 +245,24 @@ function SelectOptionsPage() {
               <table className="w-full text-sm">
                 <thead className="border-b border-white/10 bg-white/5">
                   <tr>
-                    {['Value (程式碼)', '顯示名稱', '排序', ''].map((h) => (
-                      <th key={h} className="px-4 py-2 text-left text-xs font-semibold uppercase text-muted">{h}</th>
-                    ))}
+                    <th className="px-4 py-2 text-left text-xs font-semibold uppercase text-muted">顯示名稱</th>
+                    <th className="px-4 py-2 text-left text-xs font-semibold uppercase text-muted w-40">操作</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-white/5">
-                  {typeOptions.map((opt) => (
-                    <OptionRow key={opt.id} opt={opt} onSave={handleSave} onDelete={handleDelete} />
+                  {typeOptions.map((opt, idx) => (
+                    <OptionRow
+                      key={opt.id}
+                      opt={opt}
+                      idx={idx}
+                      total={typeOptions.length}
+                      onSave={handleSave}
+                      onDelete={handleDelete}
+                      onMove={(id, dir) => handleMove(type, id, dir)}
+                      moving={moving}
+                    />
                   ))}
-                  <AddOptionRow type={type} onAdd={load} />
+                  <AddOptionRow type={type} maxOrder={maxOrder} onAdd={load} />
                 </tbody>
               </table>
             </div>

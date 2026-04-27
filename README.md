@@ -129,7 +129,7 @@ docker compose exec api node dist/seed.js
 ## Battery Regulations
 
 The battery management page includes built-in reminders for:
-- 🇹🇼 Taiwan CAA carry-on rules (工具機電池, Beacon行充, 磁酸鋰鐵電池)
+- 🇹🇼 Taiwan CAA carry-on rules (工具機電池, 行動電源, 磁酸鋰鐵電池)
 - 🇫🇷 French DGAC / IATA rules for international flights
 
 ## QR Code Workflow

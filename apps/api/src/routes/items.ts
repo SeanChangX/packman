@@ -84,7 +84,7 @@ export async function itemRoutes(app: FastifyInstance) {
 
   app.delete<{ Params: { id: string } }>(
     '/:id',
-    { preHandler: requireAdmin },
+    { preHandler: requireAuth },
     async (request, reply) => {
       try {
         await prisma.item.delete({ where: { id: request.params.id } })
@@ -125,6 +125,17 @@ export async function itemRoutes(app: FastifyInstance) {
       )
 
       return { photoUrl }
+    }
+  )
+
+  app.post(
+    '/batch-delete',
+    { preHandler: requireAdmin },
+    async (request, reply) => {
+      const { ids } = request.body as { ids: string[] }
+      if (!ids?.length) return reply.status(400).send({ message: 'No ids provided' })
+      await prisma.item.deleteMany({ where: { id: { in: ids } } })
+      return reply.status(204).send()
     }
   )
 

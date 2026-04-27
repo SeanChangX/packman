@@ -72,6 +72,9 @@ function GroupModal({ initial, onClose }: { initial?: { id: string; name: string
               />
             </div>
           </div>
+          {save.isError && (
+            <p className="text-sm text-red-500">{(save.error as Error).message}</p>
+          )}
           <div className="flex justify-end gap-2">
             <button type="button" className="btn-secondary" onClick={onClose}>取消</button>
             <button type="submit" className="btn-primary" disabled={save.isPending}>儲存</button>
