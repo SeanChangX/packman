@@ -6,6 +6,7 @@ import { CreateBoxSchema, UpdateBoxSchema } from '@packman/shared'
 import { generateBoxStickerPdf } from '../services/pdf'
 import { getAppConfig, getBrandConfig, getBrandLogoBuffer } from '../services/runtime-config'
 import { getObjectBuffer } from '../services/minio'
+import { getActiveEventId } from '../services/events'
 
 const boxInclude = {
   owner: { select: { id: true, name: true, avatarUrl: true } },
@@ -14,10 +15,9 @@ const boxInclude = {
 export async function boxRoutes(app: FastifyInstance) {
   app.get('/', { preHandler: requireAuthOrAdminSecret }, async (request) => {
     const query = request.query as { shippingMethod?: string }
+    const eventId = await getActiveEventId()
     const boxes = await prisma.box.findMany({
-      where: query.shippingMethod
-        ? { shippingMethod: query.shippingMethod as any }
-        : undefined,
+      where: { eventId, ...(query.shippingMethod ? { shippingMethod: query.shippingMethod as any } : {}) },
       include: {
         ...boxInclude,
         _count: { select: { items: true } },
@@ -56,7 +56,8 @@ export async function boxRoutes(app: FastifyInstance) {
 
   app.post('/', { preHandler: requireAdminOrAdminSecret }, async (request, reply) => {
     const body = CreateBoxSchema.parse(request.body)
-    const box = await prisma.box.create({ data: body, include: boxInclude })
+    const eventId = await getActiveEventId()
+    const box = await prisma.box.create({ data: { ...body, eventId }, include: boxInclude })
     return reply.status(201).send(box)
   })
 

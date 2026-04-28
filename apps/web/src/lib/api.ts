@@ -1,6 +1,6 @@
 import type {
   User, Group, Box, Item, Battery, BatteryRegulation, SelectOption,
-  PaginatedResponse,
+  PaginatedResponse, Event,
 } from '@packman/shared'
 import type {
   CreateGroupInput, UpdateGroupInput,
@@ -194,4 +194,8 @@ export const stickersApi = {
     a.click()
     URL.revokeObjectURL(url)
   },
+}
+
+export const eventsApi = {
+  active: () => request<Event | null>(`${BASE}/events/active`),
 }

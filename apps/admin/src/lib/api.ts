@@ -1,5 +1,6 @@
 import type {
   AdminAuthStatus,
+  Event,
   User,
   Group,
   Box,
@@ -106,8 +107,26 @@ export const adminApi = {
   deleteBatteryRegulation: (id: string) =>
     req<void>(`/api/battery-regulations/${id}`, { method: 'DELETE' }),
 
+  events: () => req<Event[]>('/api/events'),
+  createEvent: (data: { name: string }) =>
+    req<Event>('/api/events', { method: 'POST', body: JSON.stringify(data) }),
+  updateEvent: (id: string, data: { name: string }) =>
+    req<Event>(`/api/events/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
+  activateEvent: (id: string) =>
+    req<{ activeEventId: string }>(`/api/events/${id}/activate`, { method: 'POST' }),
+  deleteEvent: (id: string) =>
+    req<void>(`/api/events/${id}`, { method: 'DELETE' }),
+
   exportItems: () => window.open('/api/admin/export/items', '_blank'),
   exportBatteries: () => window.open('/api/admin/export/batteries', '_blank'),
+  exportBackup: () => window.open('/api/admin/export/backup', '_blank'),
+  importBackup: async (file: File): Promise<{ ok: boolean; photoOk: number; photoFail: number }> => {
+    const form = new FormData()
+    form.append('file', file)
+    const res = await fetch('/api/admin/import/backup', { method: 'POST', credentials: 'include', body: form })
+    if (!res.ok) throw new Error(await responseError(res, '備份還原失敗'))
+    return res.json()
+  },
 
   selectOptions: () => req<SelectOption[]>('/api/admin/select-options'),
   createSelectOption: (data: { type: string; label: string; sortOrder: number }) =>

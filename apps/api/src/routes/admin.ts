@@ -30,8 +30,10 @@ import {
   setBrandLogoData,
   setBrandLogoObjectName,
 } from '../services/runtime-config'
-import { deleteObject, getObjectBuffer } from '../services/minio'
+import { deleteObject, getObjectBuffer, listAllObjectNames, uploadToMinio } from '../services/minio'
+import AdmZip from 'adm-zip'
 import sharp from 'sharp'
+import { getActiveEventId } from '../services/events'
 
 function toCsvRow(row: Record<string, unknown>): string {
   return Object.values(row)
@@ -200,20 +202,24 @@ export async function adminRoutes(app: FastifyInstance) {
   })
 
   app.get('/stats', async () => {
+    const eventId = await getActiveEventId().catch(() => null)
+    const scopedWhere = eventId ? { eventId } : {}
     const [users, groups, boxes, items, batteries, packedItems, sealedBoxes] = await Promise.all([
       prisma.user.count(),
       prisma.group.count(),
-      prisma.box.count(),
-      prisma.item.count(),
-      prisma.battery.count(),
-      prisma.item.count({ where: { status: { in: ['PACKED', 'SEALED'] } } }),
-      prisma.box.count({ where: { status: 'SEALED' } }),
+      prisma.box.count({ where: scopedWhere }),
+      prisma.item.count({ where: scopedWhere }),
+      prisma.battery.count({ where: scopedWhere }),
+      prisma.item.count({ where: { ...scopedWhere, status: { in: ['PACKED', 'SEALED'] } } }),
+      prisma.box.count({ where: { ...scopedWhere, status: 'SEALED' } }),
     ])
     return { users, groups, boxes, items, batteries, packedItems, sealedBoxes }
   })
 
   app.get('/export/items', async (request, reply) => {
+    const eventId = await getActiveEventId()
     const items = await prisma.item.findMany({
+      where: { eventId },
       include: {
         owner: { select: { name: true } },
         group: { select: { name: true } },
@@ -350,7 +356,9 @@ export async function adminRoutes(app: FastifyInstance) {
   })
 
   app.get('/export/batteries', async (request, reply) => {
+    const eventId = await getActiveEventId()
     const batteries = await prisma.battery.findMany({
+      where: { eventId },
       include: { owner: { select: { name: true } } },
       orderBy: { batteryId: 'asc' },
     })
@@ -368,5 +376,159 @@ export async function adminRoutes(app: FastifyInstance) {
       .header('Content-Type', 'text/csv; charset=utf-8')
       .header('Content-Disposition', 'attachment; filename="batteries.csv"')
       .send('﻿' + toCsv(headers, rows))
+  })
+
+  app.get('/export/backup', async (request, reply) => {
+    void request
+    const [events, activeEventId, items, boxes, batteries, groups, users, selectOptions, batteryRegulations, systemSettings, ollamaEndpoints] = await Promise.all([
+      prisma.event.findMany({ orderBy: { createdAt: 'asc' } }),
+      getActiveEventId().catch(() => null),
+      prisma.item.findMany({ orderBy: { createdAt: 'asc' } }),
+      prisma.box.findMany({ orderBy: { label: 'asc' } }),
+      prisma.battery.findMany({ orderBy: { batteryId: 'asc' } }),
+      prisma.group.findMany({ orderBy: { name: 'asc' } }),
+      prisma.user.findMany({ orderBy: { name: 'asc' } }),
+      prisma.selectOption.findMany({ orderBy: [{ type: 'asc' }, { sortOrder: 'asc' }] }),
+      prisma.batteryRegulation.findMany({ orderBy: { sortOrder: 'asc' } }),
+      prisma.systemSetting.findMany(),
+      prisma.ollamaEndpoint.findMany({ orderBy: { createdAt: 'asc' } }),
+    ])
+
+    const zip = new AdmZip()
+    const data = { exportedAt: new Date().toISOString(), version: '1.2', activeEventId, events, items, boxes, batteries, groups, users, selectOptions, batteryRegulations, systemSettings, ollamaEndpoints }
+    zip.addFile('data.json', Buffer.from(JSON.stringify(data, null, 2), 'utf-8'))
+
+    const objectNames = await listAllObjectNames().catch(() => [] as string[])
+    for (const name of objectNames) {
+      try {
+        const buf = await getObjectBuffer(name)
+        zip.addFile(`photos/${name}`, buf)
+      } catch (err) {
+        request.log.warn({ err, name }, 'Backup: skipped unreadable object')
+      }
+    }
+
+    const date = new Date().toISOString().slice(0, 10)
+    reply
+      .header('Content-Type', 'application/zip')
+      .header('Content-Disposition', `attachment; filename="packman-backup-${date}.zip"`)
+      .send(zip.toBuffer())
+  })
+
+  app.post('/import/backup', async (request, reply) => {
+    const data = await request.file()
+    if (!data) return reply.status(400).send({ message: '請上傳備份檔' })
+
+    const filename = data.filename ?? ''
+    if (!filename.toLowerCase().endsWith('.zip') && data.mimetype !== 'application/zip' && data.mimetype !== 'application/x-zip-compressed') {
+      return reply.status(400).send({ message: '請上傳 .zip 備份檔' })
+    }
+
+    const buf = await data.toBuffer()
+    if (buf.length < 4 || buf[0] !== 0x50 || buf[1] !== 0x4b) {
+      return reply.status(400).send({ message: '檔案不是有效的 ZIP 格式' })
+    }
+
+    let zip: AdmZip
+    try { zip = new AdmZip(buf) } catch { return reply.status(400).send({ message: '無法讀取 ZIP 檔' }) }
+
+    const dataEntry = zip.getEntry('data.json')
+    if (!dataEntry) return reply.status(400).send({ message: '備份檔缺少 data.json' })
+
+    let payload: any
+    try { payload = JSON.parse(dataEntry.getData().toString('utf-8')) }
+    catch { return reply.status(400).send({ message: 'data.json 格式錯誤' }) }
+
+    if (!payload || typeof payload !== 'object') {
+      return reply.status(400).send({ message: 'data.json 內容無效' })
+    }
+    if (typeof payload.version !== 'string' || !/^1\./.test(payload.version)) {
+      return reply.status(400).send({ message: `不支援的備份版本：${payload.version ?? '未知'}（需 1.x）` })
+    }
+    const requiredArrays = ['events', 'users', 'groups', 'boxes', 'items', 'batteries', 'selectOptions', 'batteryRegulations', 'systemSettings']
+    for (const key of requiredArrays) {
+      if (!Array.isArray(payload[key])) {
+        return reply.status(400).send({ message: `data.json 缺少欄位或格式錯誤：${key}` })
+      }
+    }
+    if (payload.events.length === 0) {
+      return reply.status(400).send({ message: '備份至少需包含一個 Event' })
+    }
+
+    const ALLOWED_PHOTO_EXT = new Set(['jpg', 'jpeg', 'png', 'webp', 'gif', 'heic', 'heif'])
+    const photoEntries = zip.getEntries().filter((e) => {
+      if (e.isDirectory) return false
+      const name = e.entryName
+      if (!name.startsWith('photos/')) return false
+      if (name.includes('..') || name.startsWith('/')) return false
+      const ext = name.split('.').pop()?.toLowerCase() ?? ''
+      return ALLOWED_PHOTO_EXT.has(ext)
+    })
+
+    try {
+      await prisma.$transaction(async (tx) => {
+        await tx.aiTagJob.deleteMany({})
+        await tx.item.deleteMany({})
+        await tx.box.deleteMany({})
+        await tx.battery.deleteMany({})
+        await tx.batteryRegulation.deleteMany({})
+        await tx.selectOption.deleteMany({})
+        await tx.ollamaEndpoint.deleteMany({})
+        await tx.user.deleteMany({})
+        await tx.group.deleteMany({})
+        await tx.event.deleteMany({})
+
+        if (Array.isArray(payload.events)) await tx.event.createMany({ data: payload.events, skipDuplicates: true })
+        if (Array.isArray(payload.groups)) await tx.group.createMany({ data: payload.groups, skipDuplicates: true })
+        if (Array.isArray(payload.users)) await tx.user.createMany({ data: payload.users, skipDuplicates: true })
+        if (Array.isArray(payload.boxes)) await tx.box.createMany({ data: payload.boxes, skipDuplicates: true })
+        if (Array.isArray(payload.items)) await tx.item.createMany({ data: payload.items, skipDuplicates: true })
+        if (Array.isArray(payload.batteries)) await tx.battery.createMany({ data: payload.batteries, skipDuplicates: true })
+        if (Array.isArray(payload.selectOptions)) await tx.selectOption.createMany({ data: payload.selectOptions, skipDuplicates: true })
+        if (Array.isArray(payload.batteryRegulations)) await tx.batteryRegulation.createMany({ data: payload.batteryRegulations, skipDuplicates: true })
+        if (Array.isArray(payload.ollamaEndpoints)) await tx.ollamaEndpoint.createMany({ data: payload.ollamaEndpoints, skipDuplicates: true })
+
+        if (Array.isArray(payload.systemSettings)) {
+          for (const s of payload.systemSettings) {
+            await tx.systemSetting.upsert({
+              where: { key: s.key },
+              update: { value: s.value },
+              create: { key: s.key, value: s.value },
+            })
+          }
+        }
+        if (payload.activeEventId) {
+          await tx.systemSetting.upsert({
+            where: { key: 'activeEventId' },
+            update: { value: payload.activeEventId },
+            create: { key: 'activeEventId', value: payload.activeEventId },
+          })
+        }
+      })
+    } catch (err: any) {
+      return reply.status(500).send({ message: `資料還原失敗：${err?.message ?? '未知錯誤'}` })
+    }
+
+    let photoOk = 0
+    let photoFail = 0
+    for (const entry of photoEntries) {
+      const objectName = entry.entryName.slice('photos/'.length)
+      const ext = objectName.split('.').pop()?.toLowerCase()
+      const contentType = ext === 'png' ? 'image/png'
+        : ext === 'webp' ? 'image/webp'
+        : ext === 'gif' ? 'image/gif'
+        : ext === 'heic' ? 'image/heic'
+        : ext === 'heif' ? 'image/heif'
+        : 'image/jpeg'
+      try {
+        await uploadToMinio(objectName, entry.getData(), contentType)
+        photoOk++
+      } catch (err) {
+        photoFail++
+        request.log.warn({ err, objectName }, 'Restore: photo upload failed')
+      }
+    }
+
+    return { ok: true, photoOk, photoFail }
   })
 }

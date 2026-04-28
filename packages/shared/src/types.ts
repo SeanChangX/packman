@@ -1,3 +1,14 @@
+export interface Event {
+  id: string
+  name: string
+  createdAt: string
+  updatedAt: string
+  isActive?: boolean
+  itemCount?: number
+  boxCount?: number
+  batteryCount?: number
+}
+
 export type Role = 'ADMIN' | 'MEMBER'
 export type ShippingMethod = 'CHECKED' | 'CARRY_ON'
 export type PackingStatus = 'NOT_PACKED' | 'PACKED' | 'SEALED'

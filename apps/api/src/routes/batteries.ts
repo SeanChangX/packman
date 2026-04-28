@@ -2,6 +2,7 @@ import { FastifyInstance } from 'fastify'
 import { prisma } from '../plugins/prisma'
 import { requireAuth, requireAdmin } from '../plugins/auth'
 import { CreateBatterySchema, UpdateBatterySchema } from '@packman/shared'
+import { getActiveEventId } from '../services/events'
 
 const batteryInclude = {
   owner: { select: { id: true, name: true, avatarUrl: true } },
@@ -10,7 +11,8 @@ const batteryInclude = {
 export async function batteryRoutes(app: FastifyInstance) {
   app.get('/', { preHandler: requireAuth }, async (request) => {
     const q = request.query as Record<string, string>
-    const where: Record<string, any> = {}
+    const eventId = await getActiveEventId()
+    const where: Record<string, any> = { eventId }
     if (q.batteryType) where.batteryType = q.batteryType
     if (q.ownerId) where.ownerId = q.ownerId
 
@@ -36,8 +38,9 @@ export async function batteryRoutes(app: FastifyInstance) {
 
   app.post('/', { preHandler: requireAuth }, async (request, reply) => {
     const body = CreateBatterySchema.parse(request.body)
+    const eventId = await getActiveEventId()
     try {
-      const battery = await prisma.battery.create({ data: body, include: batteryInclude })
+      const battery = await prisma.battery.create({ data: { ...body, eventId }, include: batteryInclude })
       return reply.status(201).send(battery)
     } catch {
       reply.status(409).send({ message: 'Battery ID already exists' })

@@ -1,5 +1,6 @@
 import { prisma } from './plugins/prisma'
 import { DEFAULT_TAG_PROMPT } from './services/ollama'
+import { getActiveEventId } from './services/events'
 
 const LEGACY_DEFAULT_BOX_LABELS = [
   '1', '2', '3', '4', '5', '6', '7', '8', '9',
@@ -13,12 +14,28 @@ function defaultOllamaBaseUrls() {
     .filter(Boolean)
 }
 
-async function ensureExampleBox() {
-  const boxCount = await prisma.box.count()
+async function ensureDefaultEvent(): Promise<string> {
+  const DEFAULT_EVENT_ID = 'e1e2e3e4-0000-0000-0000-e1e2e3e4e5e6'
+  await prisma.event.upsert({
+    where: { id: DEFAULT_EVENT_ID },
+    update: {},
+    create: { id: DEFAULT_EVENT_ID, name: 'Default' },
+  })
+  await prisma.systemSetting.upsert({
+    where: { key: 'activeEventId' },
+    update: {},
+    create: { key: 'activeEventId', value: DEFAULT_EVENT_ID },
+  })
+  return getActiveEventId()
+}
+
+async function ensureExampleBox(eventId: string) {
+  const boxCount = await prisma.box.count({ where: { eventId } })
 
   if (boxCount > 0) {
     const legacyEmptyBoxes = await prisma.box.findMany({
       where: {
+        eventId,
         label: { in: LEGACY_DEFAULT_BOX_LABELS },
         ownerId: null,
         notes: null,
@@ -42,6 +59,7 @@ async function ensureExampleBox() {
       label: '範例箱',
       shippingMethod: 'CHECKED',
       notes: '可由管理員改名或刪除',
+      eventId,
     },
   })
 }
@@ -49,12 +67,14 @@ async function ensureExampleBox() {
 export async function seedDefaultData() {
   console.log('Seeding database...')
 
+  const eventId = await ensureDefaultEvent()
+
   const groupCount = await prisma.group.count()
   if (groupCount === 0) {
     await prisma.group.create({ data: { name: '範例組別', color: '#6366F1' } })
   }
 
-  await ensureExampleBox()
+  await ensureExampleBox(eventId)
 
   const regulationCount = await prisma.batteryRegulation.count()
   if (regulationCount === 0) {

@@ -33,9 +33,20 @@ model Group {
   createdAt DateTime @default(now())
 }
 
+model Event {
+  id        String   @id @default(uuid())
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  items     Item[]
+  boxes     Box[]
+  batteries Battery[]
+}
+
 model Box {
   id             String         @id @default(uuid())
-  label          String         @unique
+  label          String
   shippingMethod ShippingMethod
   ownerId        String?
   owner          User?          @relation(fields: [ownerId], references: [id], onDelete: SetNull)
@@ -43,7 +54,11 @@ model Box {
   notes          String?
   priority       Int?
   items          Item[]
+  eventId        String
+  event          Event          @relation(fields: [eventId], references: [id])
   createdAt      DateTime       @default(now())
+
+  @@unique([label, eventId])
 }
 
 model Item {
@@ -67,6 +82,8 @@ model Item {
   photoUrl       String?
   weightG        Int?
   aiTagStatus    AiTagStatus     @default(NONE)
+  eventId        String
+  event          Event           @relation(fields: [eventId], references: [id])
   createdAt      DateTime        @default(now())
   aiTagJobs       AiTagJob[]
 }
@@ -78,6 +95,8 @@ model Battery {
   owner       User?    @relation(fields: [ownerId], references: [id], onDelete: SetNull)
   notes       String?
   batteryType String
+  eventId     String
+  event       Event    @relation(fields: [eventId], references: [id])
   createdAt   DateTime @default(now())
 }
 

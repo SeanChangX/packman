@@ -16,6 +16,7 @@ import { Route as OllamaRouteImport } from './routes/ollama'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as GroupsRouteImport } from './routes/groups'
 import { Route as ExportRouteImport } from './routes/export'
+import { Route as EventsRouteImport } from './routes/events'
 import { Route as BoxesRouteImport } from './routes/boxes'
 import { Route as BatteryRegulationsRouteImport } from './routes/battery-regulations'
 import { Route as IndexRouteImport } from './routes/index'
@@ -55,6 +56,11 @@ const ExportRoute = ExportRouteImport.update({
   path: '/export',
   getParentRoute: () => rootRouteImport,
 } as any)
+const EventsRoute = EventsRouteImport.update({
+  id: '/events',
+  path: '/events',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const BoxesRoute = BoxesRouteImport.update({
   id: '/boxes',
   path: '/boxes',
@@ -75,6 +81,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/battery-regulations': typeof BatteryRegulationsRoute
   '/boxes': typeof BoxesRoute
+  '/events': typeof EventsRoute
   '/export': typeof ExportRoute
   '/groups': typeof GroupsRoute
   '/login': typeof LoginRoute
@@ -87,6 +94,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/battery-regulations': typeof BatteryRegulationsRoute
   '/boxes': typeof BoxesRoute
+  '/events': typeof EventsRoute
   '/export': typeof ExportRoute
   '/groups': typeof GroupsRoute
   '/login': typeof LoginRoute
@@ -100,6 +108,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/battery-regulations': typeof BatteryRegulationsRoute
   '/boxes': typeof BoxesRoute
+  '/events': typeof EventsRoute
   '/export': typeof ExportRoute
   '/groups': typeof GroupsRoute
   '/login': typeof LoginRoute
@@ -114,6 +123,7 @@ export interface FileRouteTypes {
     | '/'
     | '/battery-regulations'
     | '/boxes'
+    | '/events'
     | '/export'
     | '/groups'
     | '/login'
@@ -126,6 +136,7 @@ export interface FileRouteTypes {
     | '/'
     | '/battery-regulations'
     | '/boxes'
+    | '/events'
     | '/export'
     | '/groups'
     | '/login'
@@ -138,6 +149,7 @@ export interface FileRouteTypes {
     | '/'
     | '/battery-regulations'
     | '/boxes'
+    | '/events'
     | '/export'
     | '/groups'
     | '/login'
@@ -151,6 +163,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   BatteryRegulationsRoute: typeof BatteryRegulationsRoute
   BoxesRoute: typeof BoxesRoute
+  EventsRoute: typeof EventsRoute
   ExportRoute: typeof ExportRoute
   GroupsRoute: typeof GroupsRoute
   LoginRoute: typeof LoginRoute
@@ -211,6 +224,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ExportRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/events': {
+      id: '/events'
+      path: '/events'
+      fullPath: '/events'
+      preLoaderRoute: typeof EventsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/boxes': {
       id: '/boxes'
       path: '/boxes'
@@ -239,6 +259,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   BatteryRegulationsRoute: BatteryRegulationsRoute,
   BoxesRoute: BoxesRoute,
+  EventsRoute: EventsRoute,
   ExportRoute: ExportRoute,
   GroupsRoute: GroupsRoute,
   LoginRoute: LoginRoute,

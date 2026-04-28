@@ -6,6 +6,7 @@ import { CreateItemSchema, UpdateItemSchema } from '@packman/shared'
 import { uploadToMinio, getPresignedUrl, deleteObject, getObjectBuffer, objectNameFromUrl } from '../services/minio'
 import { enqueueAiTagJob } from '../services/ai-tag-queue'
 import { getAppConfig } from '../services/runtime-config'
+import { getActiveEventId } from '../services/events'
 
 const itemInclude = {
   owner: { select: { id: true, name: true, avatarUrl: true } },
@@ -34,20 +35,22 @@ export async function itemRoutes(app: FastifyInstance) {
     const page = parseInt(q.page ?? '1', 10)
     const pageSize = Math.min(parseInt(q.pageSize ?? '50', 10), 100)
     const search = q.search?.trim()
+    const eventId = await getActiveEventId()
     const tagMatchedIds = search
       ? await prisma.$queryRaw<Array<{ id: string }>>`
           SELECT "id"
           FROM "Item"
-          WHERE EXISTS (
-            SELECT 1
-            FROM unnest("tags") AS tag
-            WHERE tag ILIKE ${`%${search}%`}
-          )
+          WHERE "eventId" = ${eventId}
+            AND EXISTS (
+              SELECT 1
+              FROM unnest("tags") AS tag
+              WHERE tag ILIKE ${`%${search}%`}
+            )
           LIMIT 1000
         `
       : []
 
-    const where: Record<string, any> = {}
+    const where: Record<string, any> = { eventId }
     if (q.groupId) where.groupId = q.groupId
     if (q.boxId) where.boxId = q.boxId
     if (q.status) where.status = q.status
@@ -106,8 +109,9 @@ export async function itemRoutes(app: FastifyInstance) {
 
   app.post('/', { preHandler: requireAuth }, async (request, reply) => {
     const body = CreateItemSchema.parse(request.body)
+    const eventId = await getActiveEventId()
     const item = await prisma.item.create({
-      data: { ...body, createdById: request.userId },
+      data: { ...body, createdById: request.userId, eventId },
       include: itemInclude,
     })
     return reply.status(201).send(item)
@@ -135,12 +139,18 @@ export async function itemRoutes(app: FastifyInstance) {
     '/:id',
     { preHandler: requireAuth },
     async (request, reply) => {
-      try {
-        await prisma.item.delete({ where: { id: request.params.id } })
-        return reply.status(204).send()
-      } catch {
-        reply.status(404).send({ message: 'Item not found' })
+      const item = await prisma.item.findUnique({ where: { id: request.params.id } })
+      if (!item) return reply.status(404).send({ message: 'Item not found' })
+
+      const objectName = objectNameFromUrl(item.photoUrl)
+      await prisma.item.delete({ where: { id: item.id } })
+
+      if (objectName) {
+        deleteObject(objectName).catch((err) =>
+          app.log.warn({ err, itemId: item.id, objectName }, 'Item photo cleanup failed on delete')
+        )
       }
+      return reply.status(204).send()
     }
   )
 
@@ -205,7 +215,22 @@ export async function itemRoutes(app: FastifyInstance) {
     async (request, reply) => {
       const { ids } = request.body as { ids: string[] }
       if (!ids?.length) return reply.status(400).send({ message: 'No ids provided' })
+
+      const items = await prisma.item.findMany({
+        where: { id: { in: ids } },
+        select: { id: true, photoUrl: true },
+      })
+      const objectNames = items
+        .map((i) => objectNameFromUrl(i.photoUrl))
+        .filter((n): n is string => Boolean(n))
+
       await prisma.item.deleteMany({ where: { id: { in: ids } } })
+
+      for (const objectName of objectNames) {
+        deleteObject(objectName).catch((err) =>
+          app.log.warn({ err, objectName }, 'Item photo cleanup failed on batch delete')
+        )
+      }
       return reply.status(204).send()
     }
   )

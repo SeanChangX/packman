@@ -76,3 +76,17 @@ export async function getObjectBuffer(objectName: string): Promise<Buffer> {
 export async function deleteObject(objectName: string): Promise<void> {
   await minioClient.removeObject(BUCKET, objectName)
 }
+
+export async function listAllObjectNames(prefix = ''): Promise<string[]> {
+  return new Promise((resolve, reject) => {
+    const names: string[] = []
+    const stream = minioClient.listObjectsV2(BUCKET, prefix, true)
+    stream.on('data', (obj) => { if (obj.name) names.push(obj.name) })
+    stream.on('end', () => resolve(names))
+    stream.on('error', reject)
+  })
+}
+
+export function bucketName() {
+  return BUCKET
+}

@@ -16,6 +16,7 @@ import { userRoutes } from './routes/users'
 import { stickerRoutes } from './routes/stickers'
 import { optionRoutes } from './routes/options'
 import { adminRoutes } from './routes/admin'
+import { eventRoutes } from './routes/events'
 import { seedDefaultData } from './seed'
 import { startAiTagQueueWorker } from './services/ai-tag-queue'
 import { getAppConfig, initRuntimeSecrets } from './services/runtime-config'
@@ -72,7 +73,7 @@ async function build() {
   })
 
   await app.register(multipart, {
-    limits: { fileSize: 20 * 1024 * 1024 }, // 20 MB
+    limits: { fileSize: 2 * 1024 * 1024 * 1024 }, // 2 GB (backup ZIPs may contain many photos)
   })
 
   await app.register(authPlugin)
@@ -89,6 +90,7 @@ async function build() {
   await app.register(stickerRoutes, { prefix: '/api/stickers' })
   await app.register(optionRoutes, { prefix: '/api/options' })
   await app.register(adminRoutes, { prefix: '/api/admin' })
+  await app.register(eventRoutes, { prefix: '/api/events' })
 
   return app
 }

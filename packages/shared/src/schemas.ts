@@ -57,6 +57,14 @@ export const UpdateBatterySchema = CreateBatterySchema.partial().extend({
   ownerId: z.string().uuid().nullable().optional(),
 })
 
+export const CreateEventSchema = z.object({
+  name: z.string().min(1).max(100),
+})
+
+export const UpdateEventSchema = z.object({
+  name: z.string().min(1).max(100),
+})
+
 export const CreateBatteryRegulationSchema = z.object({
   title: z.string().min(1).max(100),
   content: z.string().min(1).max(2000),

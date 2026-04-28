@@ -39,4 +39,4 @@ ENV NODE_ENV=production
 
 EXPOSE 8080
 
-CMD ["sh", "-c", "pnpm exec prisma migrate deploy && node dist/index.js"]
+CMD ["sh", "-c", "pnpm exec prisma migrate resolve --rolled-back 20260429000001_events 2>/dev/null || true && pnpm exec prisma migrate deploy && node dist/index.js"]
