@@ -171,6 +171,8 @@ function drawTagPills(
   let rows = 1
 
   doc.font(BOLD).fontSize(fs)
+  const lineH = doc.currentLineHeight(true)
+
   for (const tag of visibleTags) {
     const availTextW = Math.max(1, maxWidth - pH * 2)
     const label = fitSingleLineText(doc, tag, availTextW)
@@ -187,17 +189,15 @@ function drawTagPills(
 
     if (cursorY + pillH > maxY) break
 
-    const textH = doc.heightOfString(label, { width: textW, lineBreak: false, lineGap: 0 })
-    const textY = cursorY + (pillH - textH) / 2 - fs * 0.08
+    const textY = cursorY + (pillH - lineH) / 2 - fs * 0.08
 
     doc.roundedRect(cursorX, cursorY, pillW, pillH, pillH / 2).fill('#8b95a1')
+    doc.save()
+    doc.rect(cursorX, cursorY, pillW, pillH).clip()
     doc.fillColor('#ffffff')
-      .text(label, cursorX + pH, textY, {
-        width: textW,
-        lineBreak: false,
-        lineGap: 0,
-        ellipsis: true,
-      })
+      .text(label, cursorX + pH, textY, { lineBreak: false, lineGap: 0 })
+    doc.restore()
+    doc.font(BOLD).fontSize(fs)
     cursorX += pillW + gap
   }
 
