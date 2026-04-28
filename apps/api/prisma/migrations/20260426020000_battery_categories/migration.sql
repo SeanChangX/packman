@@ -1,2 +1,0 @@
--- This migration is intentionally empty.
--- BatteryType enum and Battery table were included in the initial migration.

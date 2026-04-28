@@ -1,8 +1,17 @@
 node_modules/
 dist/
+build/
 .env
 .env.local
+.env.*.local
 *.tsbuildinfo
+*.log
+
+# Vite
+.vite/
+
+# Prisma generated client (should be regenerated on each install)
+apps/api/src/generated/
 
 # MinIO data
 minio-data/
@@ -12,8 +21,14 @@ postgres-data/
 
 # pnpm
 .pnpm-store/
+pnpm-lock.yaml
 
 # IDE
 .vscode/
 .idea/
 *.swp
+.DS_Store
+Thumbs.db
+
+# OS
+*.local

@@ -36,10 +36,8 @@ services:
 
   api:
     container_name: packman-api
-    image: seanchangx/packman-api:latest
-    build:
-      context: .
-      dockerfile: apps/api/Dockerfile
+    image: ghcr.io/seanchangx/packman-api:${IMAGE_TAG:-latest}
+    pull_policy: always
     restart: unless-stopped
     ports:
       - "8080:8080"
@@ -62,10 +60,8 @@ services:
 
   web:
     container_name: packman-web
-    image: seanchangx/packman-web:latest
-    build:
-      context: .
-      dockerfile: apps/web/Dockerfile
+    image: ghcr.io/seanchangx/packman-web:${IMAGE_TAG:-latest}
+    pull_policy: always
     restart: unless-stopped
     ports:
       - "3000:80"
@@ -75,10 +71,8 @@ services:
 
   admin:
     container_name: packman-admin
-    image: seanchangx/packman-admin:latest
-    build:
-      context: .
-      dockerfile: apps/admin/Dockerfile
+    image: ghcr.io/seanchangx/packman-admin:${IMAGE_TAG:-latest}
+    pull_policy: always
     restart: unless-stopped
     ports:
       - "3001:80"

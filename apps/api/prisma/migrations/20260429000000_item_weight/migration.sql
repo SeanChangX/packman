@@ -1,1 +1,0 @@
-ALTER TABLE "Item" ADD COLUMN "weightG" INTEGER;
