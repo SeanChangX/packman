@@ -88,13 +88,22 @@ export async function requireAdminOrAdminSecret(request: FastifyRequest, reply: 
   await requireAdmin(request, reply)
 }
 
+function cookieSecure(): boolean {
+  // Off by default — most deployments are LAN over plain HTTP. Opt in to
+  // Secure cookies only when you actually have TLS (e.g. behind a reverse
+  // proxy with HTTPS) by setting COOKIE_SECURE=true.
+  return process.env.COOKIE_SECURE === 'true'
+}
+
 export async function setAuthCookie(reply: FastifyReply, userId: string, role: string) {
   const token = signToken({ userId, role })
   reply.setCookie('packman_token', token, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
+    secure: cookieSecure(),
     sameSite: 'lax',
     path: '/',
     maxAge: 60 * 60 * 24 * 7, // 7 days
   })
 }
+
+export { cookieSecure }
