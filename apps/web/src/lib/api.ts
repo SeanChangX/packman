@@ -130,6 +130,8 @@ export const itemsApi = {
     if (!res.ok) throw new Error(await errorMessage(res, '照片上傳失敗'))
     return res.json() as Promise<{ photoUrl: string }>
   },
+  reanalyzePhoto: (id: string) =>
+    request<{ ok: boolean }>(`${BASE}/items/${id}/retag`, { method: 'POST' }),
   qrUrl: (id: string) => `${BASE}/items/${id}/qr`,
 }
 

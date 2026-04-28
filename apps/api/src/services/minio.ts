@@ -56,6 +56,14 @@ export async function getPresignedUrl(objectName: string): Promise<string> {
   return `${baseUrl}/${BUCKET}/${objectName}`
 }
 
+export function objectNameFromUrl(url?: string | null): string | null {
+  if (!url) return null
+  const marker = `/${BUCKET}/`
+  const index = url.indexOf(marker)
+  if (index === -1) return null
+  return decodeURIComponent(url.slice(index + marker.length))
+}
+
 export async function getObjectBuffer(objectName: string): Promise<Buffer> {
   const stream = await minioClient.getObject(BUCKET, objectName)
   const chunks: Buffer[] = []

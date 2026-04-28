@@ -2,6 +2,7 @@ export type Role = 'ADMIN' | 'MEMBER'
 export type ShippingMethod = 'CHECKED' | 'CARRY_ON'
 export type PackingStatus = 'NOT_PACKED' | 'PACKED' | 'SEALED'
 export type AiTagStatus = 'NONE' | 'PENDING' | 'DONE' | 'FAILED'
+export type AiTagJobStatus = 'QUEUED' | 'RUNNING' | 'DONE' | 'FAILED' | 'CANCELLED'
 export type SelectOptionType = 'SHIPPING_METHOD' | 'USE_CATEGORY' | 'BATTERY_TYPE'
 
 export interface SelectOption {
@@ -66,7 +67,24 @@ export interface Item {
   specialNotes?: string
   photoUrl?: string
   aiTagStatus: AiTagStatus
+  aiTagJobs?: AiTagJob[]
   createdAt: string
+}
+
+export interface AiTagJob {
+  id: string
+  itemId: string
+  objectName: string
+  status: AiTagJobStatus
+  attempts: number
+  maxAttempts: number
+  nextRunAt: string
+  lockedAt?: string | null
+  lockedBy?: string | null
+  lastError?: string | null
+  completedAt?: string | null
+  createdAt: string
+  updatedAt: string
 }
 
 export interface Battery {

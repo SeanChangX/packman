@@ -1,7 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState, useRef } from 'react'
-import { Upload, Zap, RefreshCw, Plus, Trash2 } from 'lucide-react'
+import { Check, Pencil, Upload, Zap, RefreshCw, Plus, Trash2, X } from 'lucide-react'
 import { useToast } from '@packman/ui'
 import { adminApi } from '../lib/api'
 import { Select } from '../lib/select'
@@ -28,6 +28,8 @@ function OllamaTest() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [baseUrl, setBaseUrl] = useState('')
+  const [editingEndpointId, setEditingEndpointId] = useState<string | null>(null)
+  const [editingBaseUrl, setEditingBaseUrl] = useState('')
   const inputRef = useRef<HTMLInputElement>(null)
 
   const { data: config, isFetching, refetch } = useQuery({
@@ -57,9 +59,13 @@ function OllamaTest() {
   })
 
   const updateEndpoint = useMutation({
-    mutationFn: ({ id, enabled }: { id: string; enabled: boolean }) =>
-      adminApi.updateOllamaEndpoint(id, { enabled }),
-    onSuccess: refreshConfig,
+    mutationFn: ({ id, data }: { id: string; data: { enabled?: boolean; baseUrl?: string } }) =>
+      adminApi.updateOllamaEndpoint(id, data),
+    onSuccess: () => {
+      setEditingEndpointId(null)
+      setEditingBaseUrl('')
+      refreshConfig()
+    },
     onError: (e: unknown) => showToast((e as Error)?.message ?? 'URL 更新失敗', 'error'),
   })
 
@@ -192,41 +198,92 @@ function OllamaTest() {
             </div>
 
             <div className="divide-y divide-white/10">
-              {config?.endpoints.map((endpoint) => (
-                <div key={endpoint.id} className="grid gap-3 px-5 py-4 md:grid-cols-[minmax(0,1fr)_auto] md:items-center">
-                  <div className="min-w-0">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className={`h-2.5 w-2.5 rounded-full ${endpoint.ok ? 'bg-emerald-500' : 'bg-brand-500'}`} />
-                      <p className="truncate text-sm font-semibold text-app">{endpoint.baseUrl}</p>
-                      {!endpoint.enabled && <span className="badge bg-white/10 text-muted">停用</span>}
+              {config?.endpoints.map((endpoint) => {
+                const editing = editingEndpointId === endpoint.id
+                return (
+                  <div key={endpoint.id} className="grid gap-3 px-5 py-4 md:grid-cols-[minmax(0,1fr)_auto] md:items-center">
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className={`h-2.5 w-2.5 rounded-full ${endpoint.ok ? 'bg-emerald-500' : 'bg-brand-500'}`} />
+                        {editing ? (
+                          <input
+                            className="input min-h-9 flex-1 py-1.5 text-sm"
+                            value={editingBaseUrl}
+                            onChange={(e) => setEditingBaseUrl(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' && editingBaseUrl.trim()) {
+                                updateEndpoint.mutate({ id: endpoint.id, data: { baseUrl: editingBaseUrl.trim() } })
+                              }
+                              if (e.key === 'Escape') {
+                                setEditingEndpointId(null)
+                                setEditingBaseUrl('')
+                              }
+                            }}
+                            autoFocus
+                          />
+                        ) : (
+                          <p className="truncate text-sm font-semibold text-app">{endpoint.baseUrl}</p>
+                        )}
+                        {!endpoint.enabled && <span className="badge bg-white/10 text-muted">停用</span>}
+                      </div>
+                      <p className="mt-1 text-xs text-muted">
+                        辨識平均 {formatLatency(endpoint.avgLatencyMs)} · 上次 {formatLatency(endpoint.lastLatencyMs)} · 失敗率 {failureRate(endpoint)}
+                      </p>
+                      <p className="mt-1 text-xs text-muted">
+                        健康檢查 {formatLatency(endpoint.healthAvgLatencyMs)} · 上次 {formatLatency(endpoint.healthLastLatencyMs)}
+                      </p>
+                      {endpoint.message && <p className="mt-1 text-xs text-brand-600">{endpoint.message}</p>}
+                      {endpoint.models.length > 0 && (
+                        <p className="mt-1 truncate text-xs text-muted">模型：{endpoint.models.join(', ')}</p>
+                      )}
                     </div>
-                    <p className="mt-1 text-xs text-muted">
-                      辨識平均 {formatLatency(endpoint.avgLatencyMs)} · 上次 {formatLatency(endpoint.lastLatencyMs)} · 失敗率 {failureRate(endpoint)}
-                    </p>
-                    <p className="mt-1 text-xs text-muted">
-                      健康檢查 {formatLatency(endpoint.healthAvgLatencyMs)} · 上次 {formatLatency(endpoint.healthLastLatencyMs)}
-                    </p>
-                    {endpoint.message && <p className="mt-1 text-xs text-brand-600">{endpoint.message}</p>}
-                    {endpoint.models.length > 0 && (
-                      <p className="mt-1 truncate text-xs text-muted">模型：{endpoint.models.join(', ')}</p>
+                    {editing ? (
+                      <div className="flex justify-end gap-2">
+                        <button
+                          className="btn-primary px-3 py-1.5 text-xs"
+                          disabled={!editingBaseUrl.trim() || updateEndpoint.isPending}
+                          onClick={() => updateEndpoint.mutate({ id: endpoint.id, data: { baseUrl: editingBaseUrl.trim() } })}
+                        >
+                          <Check className="h-3.5 w-3.5" />
+                        </button>
+                        <button
+                          className="btn-secondary px-3 py-1.5 text-xs"
+                          onClick={() => {
+                            setEditingEndpointId(null)
+                            setEditingBaseUrl('')
+                          }}
+                        >
+                          <X className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="flex justify-end gap-2">
+                        <button
+                          className="btn-secondary px-3 py-1.5 text-xs"
+                          onClick={() => {
+                            setEditingEndpointId(endpoint.id)
+                            setEditingBaseUrl(endpoint.baseUrl)
+                          }}
+                        >
+                          <Pencil className="h-3.5 w-3.5" />
+                        </button>
+                        <button
+                          className="btn-secondary px-3 py-1.5 text-xs"
+                          onClick={() => updateEndpoint.mutate({ id: endpoint.id, data: { enabled: !endpoint.enabled } })}
+                        >
+                          {endpoint.enabled ? '停用' : '啟用'}
+                        </button>
+                        <button
+                          className="btn-danger px-3 py-1.5 text-xs"
+                          onClick={() => { if (confirm(`刪除 ${endpoint.baseUrl}？`)) deleteEndpoint.mutate(endpoint.id) }}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
                     )}
                   </div>
-                  <div className="flex justify-end gap-2">
-                    <button
-                      className="btn-secondary px-3 py-1.5 text-xs"
-                      onClick={() => updateEndpoint.mutate({ id: endpoint.id, enabled: !endpoint.enabled })}
-                    >
-                      {endpoint.enabled ? '停用' : '啟用'}
-                    </button>
-                    <button
-                      className="btn-danger px-3 py-1.5 text-xs"
-                      onClick={() => { if (confirm(`刪除 ${endpoint.baseUrl}？`)) deleteEndpoint.mutate(endpoint.id) }}
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </button>
-                  </div>
-                </div>
-              ))}
+                )
+              })}
             </div>
 
             <div className="grid gap-2 border-t border-white/10 p-5 sm:grid-cols-[minmax(0,1fr)_auto]">

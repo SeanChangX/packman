@@ -25,6 +25,8 @@ type EndpointCandidate = {
   requestCount: number
   failureCount: number
   healthAvgLatencyMs?: number | null
+  healthCheckCount?: number
+  healthFailureCount?: number
 }
 
 export type OllamaAnalysisResult = {
@@ -173,7 +175,17 @@ async function recordGenerateResult(endpoint: EndpointCandidate, latencyMs: numb
 }
 
 async function recordHealthResult(endpoint: EndpointCandidate, latencyMs: number, error?: unknown) {
-  if (endpoint.id.startsWith('env-')) return
+  if (endpoint.id.startsWith('env-')) {
+    return {
+      healthAvgLatencyMs: latencyMs,
+      healthLastLatencyMs: latencyMs,
+      healthCheckCount: 1,
+      healthFailureCount: error ? 1 : 0,
+      healthLastSuccessAt: error ? null : new Date(),
+      healthLastErrorAt: error ? new Date() : null,
+      healthLastError: error instanceof Error ? error.message : error ? String(error) : null,
+    }
+  }
 
   const isFailure = Boolean(error)
   const currentAvg = 'healthAvgLatencyMs' in endpoint && typeof endpoint.healthAvgLatencyMs === 'number'
@@ -200,6 +212,16 @@ async function recordHealthResult(endpoint: EndpointCandidate, latencyMs: number
           }),
     },
   })
+
+  return {
+    healthAvgLatencyMs,
+    healthLastLatencyMs: latencyMs,
+    healthCheckCount: (endpoint.healthCheckCount ?? 0) + 1,
+    healthFailureCount: (endpoint.healthFailureCount ?? 0) + (isFailure ? 1 : 0),
+    healthLastSuccessAt: isFailure ? null : new Date(),
+    healthLastErrorAt: isFailure ? new Date() : null,
+    healthLastError: isFailure ? message?.slice(0, 500) ?? 'Health check failed' : null,
+  }
 }
 
 function parseEnglishTags(rawText: string): string[] {
@@ -291,16 +313,18 @@ export async function listOllamaModelStatus() {
         )
         const models = res.data.models?.map((model) => model.name) ?? []
         modelCache.set(normalizeBaseUrl(endpoint.baseUrl), { models, expiresAt: Date.now() + 60_000 })
-        await recordHealthResult(endpoint, Date.now() - startedAt)
+        const healthMetrics = await recordHealthResult(endpoint, Date.now() - startedAt)
         return {
           ...endpoint,
+          ...healthMetrics,
           ok: true,
           models,
         }
       } catch (error) {
-        await recordHealthResult(endpoint, Date.now() - startedAt, error)
+        const healthMetrics = await recordHealthResult(endpoint, Date.now() - startedAt, error)
         return {
           ...endpoint,
+          ...healthMetrics,
           ok: false,
           models: [],
           message: error instanceof Error ? error.message : 'Ollama 無法連線',

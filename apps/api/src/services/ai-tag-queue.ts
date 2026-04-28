@@ -7,7 +7,6 @@ import { analyzeImageWithOllama } from './ollama'
 const WORKER_ID = `ai-tag-${process.pid}-${randomUUID()}`
 const POLL_INTERVAL_MS = 2000
 const LOCK_TIMEOUT_MS = 10 * 60 * 1000
-const MAX_CONCURRENCY = Math.max(1, parseInt(process.env.AI_TAG_CONCURRENCY ?? '2', 10))
 const MAX_ATTEMPTS = Math.max(1, parseInt(process.env.AI_TAG_MAX_ATTEMPTS ?? '3', 10))
 
 type ClaimedJob = {
@@ -20,6 +19,11 @@ type ClaimedJob = {
 
 function retryDelayMs(attempts: number) {
   return Math.min(15 * 60 * 1000, 30_000 * 2 ** Math.max(0, attempts - 1))
+}
+
+async function concurrencyLimit() {
+  const enabledEndpoints = await prisma.ollamaEndpoint.count({ where: { enabled: true } })
+  return Math.max(1, enabledEndpoints)
 }
 
 async function cancelOpenJobs(itemId: string) {
@@ -198,7 +202,8 @@ export function startAiTagQueueWorker(app: FastifyInstance) {
     try {
       await reclaimStaleJobs()
       await syncFailedItems()
-      while (active < MAX_CONCURRENCY) {
+      const limit = await concurrencyLimit()
+      while (active < limit) {
         const job = await claimNextJob()
         if (!job) break
         active += 1

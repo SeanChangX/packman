@@ -2,7 +2,7 @@ import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useForm } from 'react-hook-form'
 import { useState, useRef, useEffect } from 'react'
-import { ArrowLeft, Upload, QrCode, Tag, Trash2 } from 'lucide-react'
+import { ArrowLeft, RefreshCw, Tag, Trash2, Upload, X } from 'lucide-react'
 import { useToast } from '@packman/ui'
 import { itemsApi, groupsApi, boxesApi, usersApi, selectOptionsApi } from '../lib/api'
 import { STATUS_LABELS, STATUS_COLORS, getLabelFromOptions, optionsToSelectItems, cn, formatApiError } from '../lib/utils'
@@ -16,7 +16,8 @@ function ItemDetailPage() {
   const { showToast } = useToast()
   const fileRef = useRef<HTMLInputElement>(null)
   const [editing, setEditing] = useState(false)
-  const [tagsText, setTagsText] = useState('')
+  const [tags, setTags] = useState<string[]>([])
+  const [tagDraft, setTagDraft] = useState('')
 
   const { data: item, refetch } = useQuery({
     queryKey: ['item', id],
@@ -35,17 +36,24 @@ function ItemDetailPage() {
   useEffect(() => {
     if (item) {
       reset({ ...item, groupId: item.groupId ?? undefined, boxId: item.boxId ?? undefined, ownerId: item.ownerId ?? undefined })
-      setTagsText(item.tags.join(', '))
+      setTags(item.tags)
+      setTagDraft('')
     }
   }, [item, reset])
 
-  const parseTags = (value: string) =>
-    [...new Set(
-      value
-        .split(/[,，、;\n]/)
-        .map((tag) => tag.trim().toLowerCase().replace(/\s+/g, ' '))
-        .filter((tag) => tag.length > 0 && tag.length <= 30)
-    )].slice(0, 20)
+  const normalizeTag = (value: string) =>
+    value.trim().toLowerCase().replace(/\s+/g, ' ').slice(0, 30)
+
+  const addTag = (value: string) => {
+    const tag = normalizeTag(value)
+    if (!tag) return
+    setTags((current) => current.includes(tag) ? current : [...current, tag].slice(0, 20))
+    setTagDraft('')
+  }
+
+  const removeTag = (tag: string) => {
+    setTags((current) => current.filter((item) => item !== tag))
+  }
 
   const update = useMutation({
     mutationFn: (data: UpdateItemInput) => itemsApi.update(id, data),
@@ -63,6 +71,15 @@ function ItemDetailPage() {
     onError: (e: unknown) => showToast(formatApiError(e), 'error'),
   })
 
+  const reanalyzePhoto = useMutation({
+    mutationFn: () => itemsApi.reanalyzePhoto(id),
+    onSuccess: () => {
+      refetch()
+      showToast('已加入辨識佇列', 'success')
+    },
+    onError: (e: unknown) => showToast(formatApiError(e), 'error'),
+  })
+
   const deleteItem = useMutation({
     mutationFn: () => itemsApi.delete(id),
     onSuccess: () => {
@@ -73,6 +90,18 @@ function ItemDetailPage() {
   })
 
   if (!item) return <div className="flex justify-center py-12"><div className="h-8 w-8 animate-spin rounded-full border-4 border-brand-500 border-t-transparent" /></div>
+
+  const latestJob = item.aiTagJobs?.[0]
+  const aiStatusLabel = (() => {
+    if (item.aiTagStatus === 'PENDING') {
+      if (latestJob?.status === 'RUNNING') return '辨識中...'
+      if (latestJob?.status === 'QUEUED' && latestJob.attempts > 0) return `等待重試 (${latestJob.attempts}/${latestJob.maxAttempts})`
+      return '等待辨識...'
+    }
+    if (item.aiTagStatus === 'FAILED') return '辨識失敗'
+    if (item.aiTagStatus === 'DONE') return '已辨識'
+    return ''
+  })()
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
@@ -115,6 +144,14 @@ function ItemDetailPage() {
               <Upload className="h-4 w-4" />
               {uploadPhoto.isPending ? '上傳中...' : '上傳照片'}
             </button>
+            <button
+              className="btn-secondary w-full gap-1"
+              onClick={() => reanalyzePhoto.mutate()}
+              disabled={!item.photoUrl || reanalyzePhoto.isPending}
+            >
+              <RefreshCw className={cn('h-4 w-4', reanalyzePhoto.isPending && 'animate-spin')} />
+              重新辨識
+            </button>
           </div>
           <input
             ref={fileRef}
@@ -132,11 +169,15 @@ function ItemDetailPage() {
             <div className="flex items-center gap-1 text-sm font-semibold text-app">
               <Tag className="h-4 w-4" />
               <span>搜尋標籤</span>
-              {item.aiTagStatus === 'PENDING' && (
-                <span className="ml-1 animate-pulse text-xs text-brand-600">辨識中...</span>
-              )}
-              {item.aiTagStatus === 'FAILED' && (
-                <span className="ml-1 text-xs text-red-500">辨識失敗</span>
+              {aiStatusLabel && (
+                <span className={cn(
+                  'ml-1 text-xs',
+                  item.aiTagStatus === 'PENDING' && 'animate-pulse text-brand-600',
+                  item.aiTagStatus === 'FAILED' && 'text-red-500',
+                  item.aiTagStatus === 'DONE' && 'text-muted',
+                )}>
+                  {aiStatusLabel}
+                </span>
               )}
             </div>
             {item.tags.length > 0
@@ -155,7 +196,7 @@ function ItemDetailPage() {
         <div className="card p-4">
           {editing
             ? (
-              <form className="space-y-3" onSubmit={handleSubmit((data) => update.mutate({ ...data, tags: parseTags(tagsText) }))}>
+              <form className="space-y-3" onSubmit={handleSubmit((data) => update.mutate({ ...data, tags }))}>
                 <div>
                   <label className="label">品項名稱</label>
                   <input className="input mt-1" {...register('name')} />
@@ -252,13 +293,38 @@ function ItemDetailPage() {
                 </div>
                 <div>
                   <label className="label">搜尋標籤</label>
-                  <textarea
-                    className="input mt-1"
-                    rows={2}
-                    value={tagsText}
-                    onChange={(e) => setTagsText(e.target.value)}
-                    placeholder="blue, metal, hex key, tool"
-                  />
+                  <div className="mt-1 flex flex-wrap gap-1.5 rounded-xl border border-white/10 bg-black/5 p-2 dark:bg-white/5">
+                    {tags.map((tag) => (
+                      <button
+                        key={tag}
+                        type="button"
+                        className="badge gap-1 bg-black/5 text-muted hover:bg-brand-500/10 hover:text-brand-600 dark:bg-white/10"
+                        onClick={() => removeTag(tag)}
+                      >
+                        {tag}
+                        <X className="h-3 w-3" />
+                      </button>
+                    ))}
+                    <input
+                      className="min-h-8 min-w-32 flex-1 bg-transparent px-2 text-sm text-app outline-none"
+                      value={tagDraft}
+                      onChange={(e) => setTagDraft(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ',') {
+                          e.preventDefault()
+                          addTag(tagDraft)
+                        }
+                        if (e.key === 'Backspace' && !tagDraft && tags.length > 0) {
+                          removeTag(tags[tags.length - 1])
+                        }
+                      }}
+                      onBlur={() => addTag(tagDraft)}
+                      placeholder="blue, metal, hex key"
+                    />
+                  </div>
+                  <p className="mt-1 text-xs text-muted">
+                    Enter 或逗號新增，點 tag 可刪除。
+                  </p>
                 </div>
                 <div className="flex justify-end gap-2">
                   <button type="button" className="btn-secondary" onClick={() => setEditing(false)}>取消</button>
