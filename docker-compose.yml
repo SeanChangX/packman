@@ -25,8 +25,10 @@ services:
       MINIO_ROOT_USER: ${MINIO_ACCESS_KEY:-packman}
       MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY:-packman_secret_change_me}
     ports:
-      - "9000:9000"
-      - "9001:9001"
+      # MinIO S3 API only reachable inside the docker network (API container
+      # uses minio:9000). Uncomment if you need direct external access.
+      # - "9000:9000"
+      - "127.0.0.1:9001:9001"   # Web console — bind to localhost only
     volumes:
       - minio-data:/data
     healthcheck:
@@ -40,8 +42,10 @@ services:
     image: ghcr.io/seanchangx/packman-api:${IMAGE_TAG:-latest}
     pull_policy: always
     restart: unless-stopped
-    ports:
-      - "8080:8080"
+    # No ports published — API is only reachable through the web/admin nginx
+    # containers via the internal docker network (api:8080).
+    expose:
+      - "8080"
     env_file: .env
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER:-packman}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-packman}?connection_limit=20&pool_timeout=20
