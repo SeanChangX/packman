@@ -30,14 +30,14 @@ const SIZES: Record<StickerSize, StickerDimensions> = {
   },
   LARGE: {
     width: 425, height: 284,
-    fontSize: { title: 20, body: 13, small: 10 },
-    qrSize: 150, padding: 12, headerH: 32,
+    fontSize: { title: 23, body: 15, small: 12 },
+    qrSize: 168, padding: 12, headerH: 46,
     columns: 1, rows: 1,
   },
   A4_SHEET: {
     width: 595, height: 842,
-    fontSize: { title: 12, body: 8, small: 6.5 },
-    qrSize: 80, padding: 7, headerH: 18,
+    fontSize: { title: 15, body: 10, small: 8 },
+    qrSize: 92, padding: 7, headerH: 28,
     columns: 2, rows: 4,
   },
 }
@@ -63,6 +63,18 @@ function registerFonts(doc: PDFKit.PDFDocument) {
   if (CJK_BOLD) doc.registerFont('CJKBold', CJK_BOLD, 'NotoSansCJKtc-Bold')
 }
 
+function formatPrintDate(date = new Date()) {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'Asia/Taipei',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(date)
+
+  const value = (type: string) => parts.find((part) => part.type === type)?.value ?? ''
+  return `${value('year')}-${value('month')}-${value('day')}`
+}
+
 async function qrBuffer(url: string, size: number): Promise<Buffer> {
   // Generate at 4× for crisp rendering when PDF viewer scales the page
   return QRCode.toBuffer(url, { width: size * 4, margin: 2 })
@@ -70,16 +82,24 @@ async function qrBuffer(url: string, size: number): Promise<Buffer> {
 
 function drawIdPill(doc: PDFKit.PDFDocument, id: string, x: number, y: number, fontSize: number) {
   const shortId = id.replace(/-/g, '').slice(0, 8).toUpperCase()
-  const fs = fontSize * 0.8
-  const pH = 3, pV = 1
-  doc.font(REGULAR).fontSize(fs)
+  const fs = fontSize * 1.05
+  const pH = fs * 0.55
+  const pV = fs * 0.28
+  doc.font(BOLD).fontSize(fs)
   const tw = doc.widthOfString(shortId)
   const pillW = tw + pH * 2
   const pillH = fs + pV * 2
   const r = pillH / 2
+  const textH = doc.heightOfString(shortId, { width: tw, lineBreak: false, lineGap: 0 })
+  const textY = y + (pillH - textH) / 2 - fs * 0.08
   doc.roundedRect(x, y, pillW, pillH, r).fill('#DE272C')
-  doc.font(BOLD).fillColor('#ffffff').text(shortId, x + pH, y - pV * 0.5, { width: tw, lineBreak: false, lineGap: 0 })
+  doc.fillColor('#ffffff').text(shortId, x + pH, textY, { width: tw, lineBreak: false, lineGap: 0 })
   doc.fillColor('#000000')
+}
+
+function idPillHeight(fontSize: number) {
+  const fs = fontSize * 1.05
+  return fs + fs * 0.28 * 2
 }
 
 // Shrink font until text fits in maxWidth; returns chosen size
@@ -93,6 +113,79 @@ function fitFontSize(doc: PDFKit.PDFDocument, text: string, maxWidth: number, st
   return size
 }
 
+function fitSingleLineText(doc: PDFKit.PDFDocument, text: string, maxWidth: number) {
+  let label = text.trim().slice(0, 24)
+  if (doc.widthOfString(label) <= maxWidth) return label
+
+  while (label.length > 0 && doc.widthOfString(`${label}...`) > maxWidth) {
+    label = label.slice(0, -1)
+  }
+  return label ? `${label}...` : ''
+}
+
+function labelLayout(x: number, dim: StickerDimensions) {
+  const { padding, qrSize } = dim
+  const sideInset = dim.width >= 400
+    ? padding * 2
+    : dim.columns > 1
+      ? padding * 2
+      : padding
+  const gap = padding
+  const textX = x + sideInset
+  const qrX = x + dim.width - qrSize - sideInset
+  const textW = Math.max(qrX - textX - gap, dim.width * 0.35)
+  return { textX, qrX, textW }
+}
+
+function drawTagPills(
+  doc: PDFKit.PDFDocument,
+  tags: string[],
+  x: number,
+  y: number,
+  maxWidth: number,
+  fontSize: number,
+) {
+  const visibleTags = tags.slice(0, 5)
+  const fs = fontSize * 0.8
+  const pH = fs * 0.45
+  const pV = fs * 0.22
+  const pillH = fs + pV * 2
+  const gap = fs * 0.45
+  let cursorX = x
+  let cursorY = y
+  let rows = 1
+
+  doc.font(BOLD).fontSize(fs)
+  for (const tag of visibleTags) {
+    const label = fitSingleLineText(doc, tag, Math.max(1, maxWidth - pH * 2))
+    if (!label) continue
+    const textW = doc.widthOfString(label)
+    const pillW = textW + pH * 2
+
+    if (cursorX > x && cursorX + pillW > x + maxWidth) {
+      if (rows >= 2) break
+      rows += 1
+      cursorX = x
+      cursorY += pillH + gap
+    }
+
+    const availableTextW = Math.max(1, pillW - pH * 2)
+    const textH = doc.heightOfString(label, { width: availableTextW, lineBreak: false, lineGap: 0 })
+    const textY = cursorY + (pillH - textH) / 2 - fs * 0.08
+
+    doc.roundedRect(cursorX, cursorY, pillW, pillH, pillH / 2).fill('#8b95a1')
+    doc.fillColor('#ffffff')
+      .text(label, cursorX + pH, textY, {
+        width: availableTextW,
+        lineBreak: false,
+        lineGap: 0,
+      })
+    cursorX += pillW + gap
+  }
+
+  doc.fillColor('#000000')
+}
+
 // ─── Header bar ───────────────────────────────────────────────────────────────
 function drawHeader(
   doc: PDFKit.PDFDocument,
@@ -100,38 +193,55 @@ function drawHeader(
   brandName: string,
   logoBuffer: Buffer | null,
   dim: StickerDimensions,
+  printDate: string,
 ) {
   // Background
   doc.save()
   doc.rect(x, y, w, h).fill('#DE272C')
   doc.restore()
 
-  const logoMaxH = h * 0.65
-  const logoMaxW = h * 2.2
-  let logoEndX = x + dim.padding
+  const leftX = x + dim.padding
+  const rightX = x + w - dim.padding
 
+  const headerFontSize = Math.min(h * 0.52, dim.fontSize.small * 1.45)
+  doc.font(BOLD).fontSize(headerFontSize)
+  const dateW = doc.widthOfString(printDate)
+  const dateTextH = doc.heightOfString(printDate, { width: dateW, lineBreak: false, lineGap: 0 })
+  const dateY = y + (h - dateTextH) / 2 - headerFontSize * 0.08
+  doc.fillColor('#ffffff').text(printDate, rightX - dateW, dateY, {
+    width: dateW,
+    lineBreak: false,
+    lineGap: 0,
+  })
+
+  let brandX = leftX
   if (logoBuffer) {
+    const logoH = h * 0.78
+    const logoW = h * 0.75
     try {
-      doc.image(logoBuffer, x + dim.padding, y + (h - logoMaxH) / 2, {
-        fit: [logoMaxW, logoMaxH],
+      doc.image(logoBuffer, leftX, y + (h - logoH) / 2, {
+        fit: [logoW, logoH],
       })
-      // Estimate logo width after fit; use logoMaxW as upper bound
-      logoEndX = x + dim.padding + logoMaxW + dim.padding * 0.5
+      brandX = leftX + logoW + dim.padding * 0.45
     } catch {
-      // ignore broken logo
+      brandX = leftX
     }
   }
 
   if (brandName) {
-    const textY = y + (h - dim.fontSize.small) / 2 - 1
+    const textW = Math.max(1, rightX - dateW - dim.padding - brandX)
     doc
       .font(BOLD)
-      .fontSize(dim.fontSize.small)
+      .fontSize(headerFontSize)
       .fillColor('#ffffff')
-      .text(brandName, logoEndX, textY, {
-        width: w - (logoEndX - x) - dim.padding,
+    const textH = doc.heightOfString(brandName, { width: textW, lineBreak: false, lineGap: 0 })
+    const textY = y + (h - textH) / 2 - headerFontSize * 0.08
+    doc
+      .text(brandName, brandX, textY, {
+        width: textW,
         lineBreak: false,
         ellipsis: true,
+        lineGap: 0,
       })
   }
 
@@ -147,18 +257,18 @@ async function drawBoxLabel(
   dim: StickerDimensions,
   logoBuffer: Buffer | null,
   brandName: string,
+  printDate: string,
 ) {
   const { padding, fontSize, qrSize, headerH } = dim
   const contentY = y + headerH
   const contentH = dim.height - headerH
-  const qrX = x + dim.width - qrSize - padding
-  const textW = dim.width - qrSize - padding * 3
+  const { textX, qrX, textW } = labelLayout(x, dim)
 
   // Border
   doc.rect(x, y, dim.width, dim.height).stroke('#d1d5db')
 
   // Header
-  drawHeader(doc, x, y, dim.width, headerH, brandName, logoBuffer, dim)
+  drawHeader(doc, x, y, dim.width, headerH, brandName, logoBuffer, dim, printDate)
 
   // QR code
   const qrUrl = `${appUrl}/boxes/${box.id}`
@@ -169,23 +279,26 @@ async function drawBoxLabel(
   // Label — auto-shrink
   const labelText = box.label
   doc.font(BOLD)
-  const titleSize = fitFontSize(doc, labelText, textW, fontSize.title * 1.8, fontSize.body)
-  doc.text(labelText, x + padding, contentY + padding, {
+  fitFontSize(doc, labelText, textW, fontSize.title * 1.8, fontSize.body)
+  doc.text(labelText, textX, contentY + padding, {
     width: textW,
     lineBreak: false,
+    ellipsis: true,
   })
+  const titleH = doc.heightOfString(labelText, { width: textW, lineBreak: false, lineGap: 0 })
 
-  let lineY = contentY + padding + titleSize + padding * 0.6
+  let lineY = contentY + padding + titleH + padding * 0.75
 
   // Owner
   if (box.owner) {
     doc.font(REGULAR).fontSize(fontSize.body).fillColor('#374151')
-      .text(`負責人  ${box.owner.name}`, x + padding, lineY, { width: textW, lineBreak: false, ellipsis: true })
-    lineY += fontSize.body + 3
+      .text(`負責人  ${box.owner.name}`, textX, lineY, { width: textW, lineBreak: false, ellipsis: true })
+    const ownerH = doc.heightOfString(`負責人  ${box.owner.name}`, { width: textW, lineBreak: false, lineGap: 0 })
+    lineY += ownerH + padding * 0.5
   }
 
   // ID pill
-  drawIdPill(doc, box.id, x + padding, y + dim.height - padding - fontSize.small * 1.6, fontSize.small)
+  drawIdPill(doc, box.id, x + padding, y + dim.height - padding - idPillHeight(fontSize.small), fontSize.small)
 
   doc.fillColor('#000000')
 }
@@ -205,15 +318,15 @@ async function drawItemLabel(
   dim: StickerDimensions,
   logoBuffer: Buffer | null,
   brandName: string,
+  printDate: string,
 ) {
   const { padding, fontSize, qrSize, headerH } = dim
   const contentY = y + headerH
   const contentH = dim.height - headerH
-  const qrX = x + dim.width - qrSize - padding
-  const textW = dim.width - qrSize - padding * 3
+  const { textX, qrX, textW } = labelLayout(x, dim)
 
   doc.rect(x, y, dim.width, dim.height).stroke('#d1d5db')
-  drawHeader(doc, x, y, dim.width, headerH, brandName, logoBuffer, dim)
+  drawHeader(doc, x, y, dim.width, headerH, brandName, logoBuffer, dim, printDate)
 
   const qrUrl = `${appUrl}/items/${item.id}`
   const qr = await qrBuffer(qrUrl, qrSize)
@@ -222,36 +335,41 @@ async function drawItemLabel(
 
   // Item name — auto-shrink
   doc.font(BOLD)
-  const titleSize = fitFontSize(doc, item.name, textW, fontSize.title * 1.5, fontSize.body)
-  doc.text(item.name, x + padding, contentY + padding, { width: textW, lineBreak: false, ellipsis: true })
+  fitFontSize(doc, item.name, textW, fontSize.title * 1.5, fontSize.body)
+  doc.text(item.name, textX, contentY + padding, { width: textW, lineBreak: false, ellipsis: true })
+  const titleH = doc.heightOfString(item.name, { width: textW, lineBreak: false, lineGap: 0 })
 
-  let lineY = contentY + padding + titleSize + padding * 0.6
+  let lineY = contentY + padding + titleH + padding * 0.65
 
   // Owner
   if (item.owner) {
     doc.font(REGULAR).fontSize(fontSize.body).fillColor('#374151')
-      .text(`負責人  ${item.owner.name}`, x + padding, lineY, { width: textW, lineBreak: false, ellipsis: true })
-    lineY += fontSize.body + 3
+      .text(`負責人  ${item.owner.name}`, textX, lineY, { width: textW, lineBreak: false, ellipsis: true })
+    const ownerH = doc.heightOfString(`負責人  ${item.owner.name}`, { width: textW, lineBreak: false, lineGap: 0 })
+    lineY += ownerH + padding * 0.45
   }
 
   // Group + Box
   const meta: string[] = []
   if (item.group) meta.push(item.group.name)
-  if (item.box) meta.push(`箱 ${item.box.label}`)
+  if (item.box) meta.push(item.box.label)
   if (meta.length > 0) {
     doc.font(REGULAR).fontSize(fontSize.small).fillColor('#6b7280')
-      .text(meta.join('  ·  '), x + padding, lineY, { width: textW, lineBreak: false, ellipsis: true })
-    lineY += fontSize.small + 2
+      .text(meta.join('  ·  '), textX, lineY, { width: textW, lineBreak: false, ellipsis: true })
+    const metaText = meta.join('  ·  ')
+    const metaH = doc.heightOfString(metaText, { width: textW, lineBreak: false, lineGap: 0 })
+    lineY += metaH + padding * 0.35
+  } else {
+    lineY += padding * 0.2
   }
 
   // Tags
   if (item.tags.length > 0) {
-    doc.font(REGULAR).fontSize(fontSize.small).fillColor('#9ca3af')
-      .text(item.tags.slice(0, 5).join('  ·  '), x + padding, lineY, { width: textW, lineBreak: false, ellipsis: true })
+    drawTagPills(doc, item.tags, textX, lineY, textW, fontSize.small)
   }
 
   // ID pill
-  drawIdPill(doc, item.id, x + padding, y + dim.height - padding - fontSize.small * 1.6, fontSize.small)
+  drawIdPill(doc, item.id, x + padding, y + dim.height - padding - idPillHeight(fontSize.small), fontSize.small)
 
   doc.fillColor('#000000')
 }
@@ -266,6 +384,7 @@ export async function generateBoxStickerPdf(
 ): Promise<Buffer> {
   const dim = SIZES[size]
   const isA4 = size === 'A4_SHEET'
+  const printDate = formatPrintDate()
 
   return new Promise((resolve, reject) => {
     const chunks: Buffer[] = []
@@ -290,13 +409,13 @@ export async function generateBoxStickerPdf(
           for (let j = 0; j < page.length; j++) {
             const col = j % dim.columns
             const row = Math.floor(j / dim.columns)
-            await drawBoxLabel(doc, page[j], appUrl, col * cellW, row * cellH, { ...dim, width: cellW, height: cellH }, logoBuffer, brandName)
+            await drawBoxLabel(doc, page[j], appUrl, col * cellW, row * cellH, { ...dim, width: cellW, height: cellH }, logoBuffer, brandName, printDate)
           }
         }
       } else {
         for (const box of boxes) {
           doc.addPage()
-          await drawBoxLabel(doc, box, appUrl, 0, 0, dim, logoBuffer, brandName)
+          await drawBoxLabel(doc, box, appUrl, 0, 0, dim, logoBuffer, brandName, printDate)
         }
       }
       doc.end()
@@ -314,6 +433,7 @@ export async function generateItemStickerPdf(
 ): Promise<Buffer> {
   const dim = SIZES[size]
   const isA4 = size === 'A4_SHEET'
+  const printDate = formatPrintDate()
 
   return new Promise((resolve, reject) => {
     const chunks: Buffer[] = []
@@ -338,13 +458,13 @@ export async function generateItemStickerPdf(
           for (let j = 0; j < page.length; j++) {
             const col = j % dim.columns
             const row = Math.floor(j / dim.columns)
-            await drawItemLabel(doc, page[j], appUrl, col * cellW, row * cellH, { ...dim, width: cellW, height: cellH }, logoBuffer, brandName)
+            await drawItemLabel(doc, page[j], appUrl, col * cellW, row * cellH, { ...dim, width: cellW, height: cellH }, logoBuffer, brandName, printDate)
           }
         }
       } else {
         for (const item of items) {
           doc.addPage()
-          await drawItemLabel(doc, item, appUrl, 0, 0, dim, logoBuffer, brandName)
+          await drawItemLabel(doc, item, appUrl, 0, 0, dim, logoBuffer, brandName, printDate)
         }
       }
       doc.end()

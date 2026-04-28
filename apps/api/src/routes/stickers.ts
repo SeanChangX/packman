@@ -3,7 +3,7 @@ import { prisma } from '../plugins/prisma'
 import { requireAdminOrAdminSecret } from '../plugins/auth'
 import { StickerRequestSchema } from '@packman/shared'
 import { generateItemStickerPdf, generateBoxStickerPdf } from '../services/pdf'
-import { getAppConfig, getBrandConfig } from '../services/runtime-config'
+import { getAppConfig, getBrandConfig, getBrandLogoBuffer } from '../services/runtime-config'
 import { getObjectBuffer } from '../services/minio'
 
 export async function stickerRoutes(app: FastifyInstance) {
@@ -21,7 +21,8 @@ export async function stickerRoutes(app: FastifyInstance) {
     })
 
     const [{ appUrl }, brand] = await Promise.all([getAppConfig(), getBrandConfig()])
-    const logoBuffer = brand.logoObjectName ? await getObjectBuffer(brand.logoObjectName).catch(() => null) : null
+    const logoBuffer = await getBrandLogoBuffer()
+      ?? (brand.logoObjectName ? await getObjectBuffer(brand.logoObjectName).catch(() => null) : null)
     const pdfBuffer = await generateItemStickerPdf(items, appUrl, body.size, logoBuffer, brand.name)
 
     reply
@@ -43,7 +44,8 @@ export async function stickerRoutes(app: FastifyInstance) {
     })
 
     const [{ appUrl }, brand] = await Promise.all([getAppConfig(), getBrandConfig()])
-    const logoBuffer = brand.logoObjectName ? await getObjectBuffer(brand.logoObjectName).catch(() => null) : null
+    const logoBuffer = await getBrandLogoBuffer()
+      ?? (brand.logoObjectName ? await getObjectBuffer(brand.logoObjectName).catch(() => null) : null)
     const pdfBuffer = await generateBoxStickerPdf(boxes, appUrl, body.size, logoBuffer, brand.name)
 
     reply

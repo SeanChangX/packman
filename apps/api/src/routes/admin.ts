@@ -25,10 +25,12 @@ import {
   updateAppConfig,
   updateSlackConfig,
   getBrandConfig,
+  getBrandLogoBuffer,
   updateBrandName,
+  setBrandLogoData,
   setBrandLogoObjectName,
 } from '../services/runtime-config'
-import { deleteObject, getPresignedUrl, uploadToMinio } from '../services/minio'
+import { deleteObject, getObjectBuffer } from '../services/minio'
 import sharp from 'sharp'
 
 function toCsvRow(row: Record<string, unknown>): string {
@@ -56,6 +58,15 @@ async function ollamaConfigWithJobStats() {
   }
 }
 
+const brandLogoUrl = '/api/admin/settings/brand/logo'
+
+function brandPayload(brand: { name: string; logoObjectName: string | null; logoData: string | null }) {
+  return {
+    name: brand.name,
+    logoUrl: brand.logoData || brand.logoObjectName ? brandLogoUrl : null,
+  }
+}
+
 export async function adminRoutes(app: FastifyInstance) {
   app.addHook('preHandler', requireAdminOrAdminSecret)
 
@@ -75,10 +86,7 @@ export async function adminRoutes(app: FastifyInstance) {
         redirectUri: slack.redirectUri,
       },
       admin,
-      brand: {
-        name: brand.name,
-        logoUrl: brand.logoObjectName ? await getPresignedUrl(brand.logoObjectName) : null,
-      },
+      brand: brandPayload(brand),
     }
   })
 
@@ -86,10 +94,19 @@ export async function adminRoutes(app: FastifyInstance) {
     const body = request.body as { name?: string }
     await updateBrandName(body.name ?? '')
     const brand = await getBrandConfig()
-    return {
-      name: brand.name,
-      logoUrl: brand.logoObjectName ? await getPresignedUrl(brand.logoObjectName) : null,
-    }
+    return brandPayload(brand)
+  })
+
+  app.get('/settings/brand/logo', async (request, reply) => {
+    const brand = await getBrandConfig()
+    const buffer = await getBrandLogoBuffer()
+      ?? (brand.logoObjectName ? await getObjectBuffer(brand.logoObjectName).catch(() => null) : null)
+    if (!buffer) return reply.status(404).send({ message: 'Logo not found' })
+
+    return reply
+      .header('Cache-Control', 'private, max-age=300')
+      .type('image/png')
+      .send(buffer)
   })
 
   app.post('/settings/brand/logo', async (request, reply) => {
@@ -104,24 +121,24 @@ export async function adminRoutes(app: FastifyInstance) {
     const raw = await data.toBuffer()
     const png = await sharp(raw).resize({ width: 400, height: 200, fit: 'inside', withoutEnlargement: true }).png().toBuffer()
 
-    const objectName = `brand/logo.png`
-    await uploadToMinio(objectName, png, 'image/png')
-
     const prev = await getBrandConfig()
-    if (prev.logoObjectName && prev.logoObjectName !== objectName) {
+    if (prev.logoObjectName) {
       await deleteObject(prev.logoObjectName).catch(() => {})
     }
 
-    await setBrandLogoObjectName(objectName)
-    return { logoUrl: await getPresignedUrl(objectName) }
+    await setBrandLogoData(png)
+    await setBrandLogoObjectName(null)
+    const brand = await getBrandConfig()
+    return brandPayload(brand)
   })
 
   app.delete('/settings/brand/logo', async (request, reply) => {
     const brand = await getBrandConfig()
     if (brand.logoObjectName) {
       await deleteObject(brand.logoObjectName).catch(() => {})
-      await setBrandLogoObjectName(null)
     }
+    await setBrandLogoData(null)
+    await setBrandLogoObjectName(null)
     return reply.status(204).send()
   })
 

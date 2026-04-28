@@ -134,8 +134,116 @@ function ItemsPage() {
         />
       </div>
 
+      {/* Mobile list */}
+      <div className="card overflow-hidden md:hidden">
+        {isLoading
+          ? (
+              <div className="divide-y divide-black/5 dark:divide-white/10">
+                {Array.from({ length: 5 }).map((_, i) => (
+                  <div key={i} className="space-y-3 p-4">
+                    <div className="h-5 w-2/3 animate-pulse rounded bg-black/10 dark:bg-white/10" />
+                    <div className="h-4 w-full animate-pulse rounded bg-black/10 dark:bg-white/10" />
+                    <div className="h-4 w-1/2 animate-pulse rounded bg-black/10 dark:bg-white/10" />
+                  </div>
+                ))}
+              </div>
+            )
+          : items.length === 0
+            ? <div className="p-6 text-center text-sm text-muted">沒有符合條件的物品</div>
+            : (
+                <div className="divide-y divide-black/5 dark:divide-white/10">
+                  {items.map((item) => (
+                    <div
+                      key={item.id}
+                      className={cn(
+                        'p-4 transition-colors active:bg-black/5 dark:active:bg-white/5',
+                        isAdmin && selected.has(item.id) && 'bg-brand-500/5',
+                      )}
+                      onClick={isAdmin ? () => toggle(item.id) : undefined}
+                    >
+                      <div className="flex items-start gap-3">
+                        {isAdmin && (
+                          <input
+                            type="checkbox"
+                            checked={selected.has(item.id)}
+                            onChange={() => toggle(item.id)}
+                            onClick={(e) => e.stopPropagation()}
+                            className="mt-1 h-5 w-5 shrink-0 cursor-pointer accent-brand-500"
+                          />
+                        )}
+                        <div className="min-w-0 flex-1">
+                          <div className="flex min-w-0 items-start justify-between gap-3">
+                            <Link
+                              to="/items/$id"
+                              params={{ id: item.id }}
+                              className="min-w-0 flex-1 truncate text-base font-semibold text-brand-600 hover:underline"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              {item.name}
+                            </Link>
+                            <div className="shrink-0" onClick={(e) => e.stopPropagation()}>
+                              <Select
+                                value={item.status}
+                                onChange={(v) => updateStatus.mutate({ id: item.id, status: v as PackingStatus })}
+                                triggerClassName={cn('badge cursor-pointer border-0', STATUS_COLORS[item.status])}
+                                options={[
+                                  { value: 'NOT_PACKED', label: '尚未裝箱' },
+                                  { value: 'PACKED', label: '已裝箱' },
+                                ]}
+                              />
+                            </div>
+                          </div>
+
+                          {item.tags.length > 0 && (
+                            <div className="mt-2 flex flex-wrap gap-1.5">
+                              {item.tags.slice(0, 4).map((t) => (
+                                <span key={t} className="badge max-w-[8rem] truncate bg-black/5 text-muted dark:bg-white/10">{t}</span>
+                              ))}
+                              {item.tags.length > 4 && (
+                                <span className="badge bg-black/5 text-muted dark:bg-white/10">+{item.tags.length - 4}</span>
+                              )}
+                            </div>
+                          )}
+
+                          <div className="mt-3 grid grid-cols-2 gap-x-3 gap-y-2 text-sm">
+                            <div className="min-w-0">
+                              <p className="text-xs font-semibold text-muted">負責人</p>
+                              {item.owner
+                                ? (
+                                    <div className="mt-1 flex min-w-0 items-center gap-1.5 text-app">
+                                      {item.owner.avatarUrl && <img src={item.owner.avatarUrl} className="h-5 w-5 shrink-0 rounded-full" alt="" />}
+                                      <span className="truncate">{item.owner.name}</span>
+                                    </div>
+                                  )
+                                : <p className="mt-1 text-muted">—</p>}
+                            </div>
+                            <div className="min-w-0">
+                              <p className="text-xs font-semibold text-muted">組別</p>
+                              <div className="mt-1">
+                                {item.group
+                                  ? <span className="badge max-w-full truncate" style={{ backgroundColor: item.group.color + '20', color: item.group.color }}>{item.group.name}</span>
+                                  : <span className="text-muted">—</span>}
+                              </div>
+                            </div>
+                            <div className="min-w-0">
+                              <p className="text-xs font-semibold text-muted">運送</p>
+                              <p className="mt-1 truncate text-app">{item.shippingMethod ? getLabelFromOptions(shippingOpts, item.shippingMethod) : '—'}</p>
+                            </div>
+                            <div className="min-w-0">
+                              <p className="text-xs font-semibold text-muted">數量 / 箱子</p>
+                              <p className="mt-1 truncate text-app">{item.quantity} / {item.box?.label ?? '—'}</p>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+      </div>
+
       {/* Table */}
-      <div className="card table-shell">
+      <div className="card table-shell hidden md:block">
         <div className="table-scroll">
           <table className="w-full text-sm">
             <thead className="border-b border-black/10 bg-black/5 dark:border-white/10 dark:bg-white/5">

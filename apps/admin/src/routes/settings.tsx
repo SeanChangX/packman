@@ -253,16 +253,18 @@ function SettingsPage() {
           {/* Logo upload */}
           <div className="flex flex-col gap-3">
             <span className="label">品牌 Logo</span>
-            <div className="flex items-center gap-4">
+            <div className="flex items-start gap-3">
               {brandLogoUrl ? (
-                <img src={brandLogoUrl} alt="Brand logo" className="h-14 max-w-[140px] rounded-lg border border-black/10 object-contain dark:border-white/10" />
+                <div className="flex h-24 w-24 items-center justify-center overflow-hidden rounded-lg border border-black/10 bg-black/5 dark:border-white/10 dark:bg-white/5">
+                  <img src={brandLogoUrl} alt="Brand logo" className="h-full w-full object-contain" />
+                </div>
               ) : (
-                <div className="flex h-14 w-32 items-center justify-center rounded-lg border border-dashed border-black/20 text-xs text-muted dark:border-white/20">
+                <div className="flex h-24 w-24 items-center justify-center rounded-lg border border-dashed border-black/20 text-xs text-muted dark:border-white/20">
                   尚未上傳
                 </div>
               )}
-              <div className="flex flex-col gap-2">
-                <label className={`btn-secondary cursor-pointer gap-1 text-sm ${logoUploading ? 'pointer-events-none opacity-50' : ''}`}>
+              <div className="flex min-w-36 flex-col items-stretch gap-2">
+                <label className={`btn-secondary w-full cursor-pointer justify-center gap-1 text-sm ${logoUploading ? 'pointer-events-none opacity-50' : ''}`}>
                   <ImagePlus className="h-4 w-4" />
                   {logoUploading ? '上傳中...' : '上傳 Logo'}
                   <input
@@ -276,7 +278,7 @@ function SettingsPage() {
                   <button
                     onClick={() => deleteLogo.mutate()}
                     disabled={deleteLogo.isPending}
-                    className="btn-ghost gap-1 text-sm text-red-500 hover:text-red-600"
+                    className="btn-secondary w-full justify-center gap-1 border-red-500/20 bg-red-500/10 text-sm text-red-500 hover:bg-red-500/15 hover:text-red-500"
                   >
                     <Trash2 className="h-4 w-4" />
                     移除

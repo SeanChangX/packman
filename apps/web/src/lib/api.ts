@@ -132,6 +132,7 @@ export const itemsApi = {
   },
   reanalyzePhoto: (id: string) =>
     request<{ ok: boolean }>(`${BASE}/items/${id}/retag`, { method: 'POST' }),
+  photoUrl: (id: string) => `${BASE}/items/${id}/photo`,
   qrUrl: (id: string) => `${BASE}/items/${id}/qr`,
 }
 

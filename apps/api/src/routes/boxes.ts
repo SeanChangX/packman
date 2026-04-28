@@ -4,7 +4,7 @@ import { prisma } from '../plugins/prisma'
 import { requireAuth, requireAdminOrAdminSecret, requireAuthOrAdminSecret } from '../plugins/auth'
 import { CreateBoxSchema, UpdateBoxSchema } from '@packman/shared'
 import { generateBoxStickerPdf } from '../services/pdf'
-import { getAppConfig, getBrandConfig } from '../services/runtime-config'
+import { getAppConfig, getBrandConfig, getBrandLogoBuffer } from '../services/runtime-config'
 import { getObjectBuffer } from '../services/minio'
 
 const boxInclude = {
@@ -117,7 +117,8 @@ export async function boxRoutes(app: FastifyInstance) {
 
       const size = (request.query.size as any) ?? 'MEDIUM'
       const [{ appUrl }, brand] = await Promise.all([getAppConfig(), getBrandConfig()])
-      const logoBuffer = brand.logoObjectName ? await getObjectBuffer(brand.logoObjectName).catch(() => null) : null
+      const logoBuffer = await getBrandLogoBuffer()
+        ?? (brand.logoObjectName ? await getObjectBuffer(brand.logoObjectName).catch(() => null) : null)
       const pdfBuffer = await generateBoxStickerPdf([box], appUrl, size, logoBuffer, brand.name)
 
       reply

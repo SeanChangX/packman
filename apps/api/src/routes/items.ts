@@ -3,7 +3,7 @@ import QRCode from 'qrcode'
 import { prisma } from '../plugins/prisma'
 import { requireAuth, requireAdmin } from '../plugins/auth'
 import { CreateItemSchema, UpdateItemSchema } from '@packman/shared'
-import { uploadToMinio, getPresignedUrl, deleteObject, objectNameFromUrl } from '../services/minio'
+import { uploadToMinio, getPresignedUrl, deleteObject, getObjectBuffer, objectNameFromUrl } from '../services/minio'
 import { enqueueAiTagJob } from '../services/ai-tag-queue'
 import { getAppConfig } from '../services/runtime-config'
 
@@ -16,6 +16,16 @@ const itemInclude = {
     orderBy: { createdAt: 'desc' as const },
     take: 1,
   },
+}
+
+function imageContentType(objectName: string) {
+  const ext = objectName.split('.').pop()?.toLowerCase()
+  if (ext === 'png') return 'image/png'
+  if (ext === 'webp') return 'image/webp'
+  if (ext === 'gif') return 'image/gif'
+  if (ext === 'heic') return 'image/heic'
+  if (ext === 'heif') return 'image/heif'
+  return 'image/jpeg'
 }
 
 export async function itemRoutes(app: FastifyInstance) {
@@ -62,6 +72,24 @@ export async function itemRoutes(app: FastifyInstance) {
 
     return { data, total, page, pageSize }
   })
+
+  app.get<{ Params: { id: string } }>(
+    '/:id/photo',
+    { preHandler: requireAuth },
+    async (request, reply) => {
+      const item = await prisma.item.findUnique({ where: { id: request.params.id } })
+      if (!item) return reply.status(404).send({ message: 'Item not found' })
+
+      const objectName = objectNameFromUrl(item.photoUrl)
+      if (!objectName) return reply.status(404).send({ message: 'Photo not found' })
+
+      const buffer = await getObjectBuffer(objectName)
+      return reply
+        .header('Cache-Control', 'private, max-age=300')
+        .type(imageContentType(objectName))
+        .send(buffer)
+    }
+  )
 
   app.get<{ Params: { id: string } }>(
     '/:id',

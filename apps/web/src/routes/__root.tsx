@@ -1,4 +1,4 @@
-import { createRootRoute, Outlet, Link } from '@tanstack/react-router'
+import { createRootRoute, Outlet, Link, useLocation } from '@tanstack/react-router'
 import {
   Package, ClipboardList, Battery, Printer, QrCode,
   LayoutDashboard, LogOut, Menu, X, UserCircle, AlertTriangle, RotateCcw,
@@ -32,7 +32,7 @@ const navItems = [
   { to: '/boxes', icon: Package, label: '箱子清單' },
   { to: '/batteries', icon: Battery, label: '電池分配' },
   { to: '/stickers', icon: Printer, label: '貼紙列印', adminOnly: true },
-  { to: '/profile', icon: UserCircle, label: '我的' },
+  { to: '/profile', icon: UserCircle, label: '關於我' },
 ]
 
 function NavLink({ to, icon: Icon, label, compact = false, onClick }: {
@@ -59,7 +59,9 @@ function NavLink({ to, icon: Icon, label, compact = false, onClick }: {
 
 function Layout() {
   const { user, loading } = useAuth()
+  const location = useLocation()
   const [mobileOpen, setMobileOpen] = useState(false)
+  const isScanPage = location.pathname === '/scan'
 
   const logout = async () => {
     try {
@@ -171,13 +173,15 @@ function Layout() {
           </div>
         </main>
       </div>
-      <Link
-        to="/scan"
-        className="fixed bottom-5 right-5 z-50 flex h-14 w-14 items-center justify-center rounded-2xl bg-brand-500 text-white shadow-2xl shadow-red-500/30 transition-transform hover:scale-105 active:scale-95 md:bottom-6 md:right-6"
-        title="掃描 QR Code"
-      >
-        <QrCode className="h-6 w-6" />
-      </Link>
+      {!isScanPage && (
+        <Link
+          to="/scan"
+          className="fixed bottom-5 right-5 z-50 flex h-14 w-14 items-center justify-center rounded-2xl bg-brand-500 text-white shadow-2xl shadow-red-500/30 transition-transform hover:scale-105 active:scale-95 md:bottom-6 md:right-6"
+          title="掃描 QR Code"
+        >
+          <QrCode className="h-6 w-6" />
+        </Link>
+      )}
     </div>
   )
 }

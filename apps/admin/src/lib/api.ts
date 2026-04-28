@@ -36,6 +36,11 @@ async function req<T>(url: string, options?: RequestInit): Promise<T> {
   return res.json()
 }
 
+async function responseError(res: Response, fallback: string): Promise<string> {
+  const err = await res.json().catch(() => ({ message: fallback }))
+  return err.message ?? fallback
+}
+
 export const adminApi = {
   adminStatus: async () => {
     const res = await fetch('/auth/admin-status', { credentials: 'include' })
@@ -134,8 +139,8 @@ export const adminApi = {
   uploadBrandLogo: async (file: File): Promise<SystemSettings['brand']> => {
     const form = new FormData()
     form.append('file', file)
-    const res = await fetch('/api/admin/settings/brand/logo', { method: 'POST', body: form })
-    if (!res.ok) throw new Error(await res.text())
+    const res = await fetch('/api/admin/settings/brand/logo', { method: 'POST', credentials: 'include', body: form })
+    if (!res.ok) throw new Error(await responseError(res, 'Logo 上傳失敗'))
     return res.json()
   },
   deleteBrandLogo: () => req<void>('/api/admin/settings/brand/logo', { method: 'DELETE' }),

@@ -25,7 +25,7 @@ export const CreateItemSchema = z.object({
   ownerId: z.string().uuid().optional(),
   shippingMethod: z.string().optional(),
   groupId: z.string().uuid().optional(),
-  quantity: z.number().int().min(1).default(1),
+  quantity: z.number().int().min(1).max(9999).default(1),
   notes: z.string().optional(),
   boxId: z.string().uuid().optional(),
   useCategory: z.string().optional(),

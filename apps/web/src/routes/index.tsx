@@ -5,8 +5,8 @@ import { itemsApi, boxesApi, batteriesApi } from '../lib/api'
 import { STATUS_LABELS, STATUS_COLORS, cn } from '../lib/utils'
 import type { PackingStatus } from '@packman/shared'
 
-function StatCard({ icon: Icon, label, value, color, to }: {
-  icon: React.ElementType; label: string; value: number; color: string; to: string
+function StatCard({ icon: Icon, label, value, color, iconColor = 'text-white', to }: {
+  icon: React.ElementType; label: string; value: number; color: string; iconColor?: string; to: string
 }) {
   return (
     <Link to={to} className="metric-card block transition-all hover:-translate-y-0.5 hover:border-brand-500/30 hover:shadow-2xl active:scale-[0.98]">
@@ -16,11 +16,17 @@ function StatCard({ icon: Icon, label, value, color, to }: {
           <p className="mt-1 text-3xl font-bold text-app">{value}</p>
         </div>
         <div className={cn('rounded-full p-3', color)}>
-          <Icon className="h-6 w-6 text-white" />
+          <Icon className={cn('h-6 w-6', iconColor)} />
         </div>
       </div>
     </Link>
   )
+}
+
+const BOX_STATUS_CARD_COLORS: Record<PackingStatus, string> = {
+  NOT_PACKED: 'border-red-500/25 bg-red-500/10 text-brand-600 dark:border-red-500/25 dark:bg-red-500/10 dark:text-red-300',
+  PACKED: 'border-black/10 bg-black/5 text-zinc-900 dark:border-white/10 dark:bg-white/10 dark:text-white',
+  SEALED: 'border-emerald-200 bg-emerald-50 text-emerald-800 shadow-sm dark:border-emerald-400/20 dark:bg-emerald-500/15 dark:text-emerald-200',
 }
 
 function Dashboard() {
@@ -60,8 +66,15 @@ function Dashboard() {
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
         <StatCard icon={Package} label="物品總數" value={totalItems} color="bg-brand-500" to="/items" />
         <StatCard icon={CheckCircle2} label="已打包" value={packedItems} color="bg-black" to="/items" />
-        <StatCard icon={Box} label="已封箱" value={sealedBoxes} color="bg-zinc-700" to="/boxes" />
-        <StatCard icon={Battery} label="電池數" value={batteries?.length ?? 0} color="bg-red-950" to="/batteries" />
+        <StatCard icon={Box} label="已封箱" value={sealedBoxes} color="bg-emerald-700 dark:bg-emerald-500/80" to="/boxes" />
+        <StatCard
+          icon={Battery}
+          label="電池數"
+          value={batteries?.length ?? 0}
+          color="bg-white ring-1 ring-black/10 dark:ring-white/10"
+          iconColor="text-black"
+          to="/batteries"
+        />
       </div>
 
       {/* Packing progress */}
@@ -80,7 +93,7 @@ function Dashboard() {
                     className={cn(
                       'h-full rounded-full transition-all',
                       s === 'NOT_PACKED' ? 'bg-brand-500'
-                        : s === 'PACKED' ? 'bg-zinc-900 dark:bg-white' : 'bg-black dark:bg-zinc-300'
+                        : s === 'PACKED' ? 'bg-zinc-900 dark:bg-white' : 'bg-emerald-600 dark:bg-emerald-400'
                     )}
                     style={{ width: `${totalItems ? (statusGroups[s] / totalItems) * 100 : 0}%` }}
                   />
@@ -102,8 +115,7 @@ function Dashboard() {
               params={{ id: box.id }}
               className={cn(
                 'flex min-h-24 flex-col items-center justify-center rounded-[22px] border p-3 text-center transition-transform hover:-translate-y-0.5',
-                box.status === 'SEALED' ? 'border-black bg-black text-white dark:border-white dark:bg-white dark:text-black'
-                  : box.status === 'PACKED' ? 'border-brand-500 bg-brand-500/10' : 'border-black/10 bg-white/45 dark:border-white/10 dark:bg-white/5'
+                BOX_STATUS_CARD_COLORS[box.status]
               )}
             >
               <span className="text-lg font-bold">{box.label}</span>

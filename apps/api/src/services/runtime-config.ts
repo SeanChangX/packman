@@ -23,6 +23,7 @@ const SETTINGS = {
   jwtSecret: 'security.jwtSecret',
   cookieSecret: 'security.cookieSecret',
   brandLogoObjectName: 'brand.logoObjectName',
+  brandLogoData: 'brand.logoData',
   brandName: 'brand.name',
 } as const
 
@@ -234,11 +235,12 @@ export async function verifyAdminLogin(username: string, password: string) {
 }
 
 export async function getBrandConfig() {
-  const [logoObjectName, name] = await Promise.all([
+  const [logoObjectName, logoData, name] = await Promise.all([
     getSetting(SETTINGS.brandLogoObjectName),
+    getSetting(SETTINGS.brandLogoData),
     getSetting(SETTINGS.brandName),
   ])
-  return { logoObjectName: logoObjectName ?? null, name: name ?? '' }
+  return { logoObjectName: logoObjectName ?? null, logoData: logoData ?? null, name: name ?? '' }
 }
 
 export async function updateBrandName(name: string) {
@@ -252,4 +254,18 @@ export async function setBrandLogoObjectName(objectName: string | null) {
   } else {
     await setSetting(SETTINGS.brandLogoObjectName, objectName)
   }
+}
+
+export async function setBrandLogoData(data: Buffer | null) {
+  if (data === null) {
+    await prisma.systemSetting.deleteMany({ where: { key: SETTINGS.brandLogoData } })
+  } else {
+    await setSetting(SETTINGS.brandLogoData, data.toString('base64'))
+  }
+}
+
+export async function getBrandLogoBuffer() {
+  const brand = await getBrandConfig()
+  if (brand.logoData) return Buffer.from(brand.logoData, 'base64')
+  return null
 }

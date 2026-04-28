@@ -18,6 +18,8 @@ function ItemDetailPage() {
   const [editing, setEditing] = useState(false)
   const [tags, setTags] = useState<string[]>([])
   const [tagDraft, setTagDraft] = useState('')
+  const [photoSrc, setPhotoSrc] = useState('')
+  const [photoLoadError, setPhotoLoadError] = useState(false)
 
   const { data: item, refetch } = useQuery({
     queryKey: ['item', id],
@@ -31,15 +33,17 @@ function ItemDetailPage() {
   const { data: shippingOpts } = useQuery({ queryKey: ['options', 'SHIPPING_METHOD'], queryFn: () => selectOptionsApi.list('SHIPPING_METHOD') })
   const { data: categoryOpts } = useQuery({ queryKey: ['options', 'USE_CATEGORY'], queryFn: () => selectOptionsApi.list('USE_CATEGORY') })
 
-  const { register, handleSubmit, reset, control } = useForm<UpdateItemInput>()
+  const { register, handleSubmit, reset, control, formState: { errors } } = useForm<UpdateItemInput>()
 
   useEffect(() => {
     if (item) {
       reset({ ...item, groupId: item.groupId ?? undefined, boxId: item.boxId ?? undefined, ownerId: item.ownerId ?? undefined })
       setTags(item.tags)
       setTagDraft('')
+      setPhotoSrc(item.photoUrl ? itemsApi.photoUrl(id) : '')
+      setPhotoLoadError(false)
     }
-  }, [item, reset])
+  }, [id, item, reset])
 
   const normalizeTag = (value: string) =>
     value.trim().toLowerCase().replace(/\s+/g, ' ').slice(0, 30)
@@ -128,10 +132,25 @@ function ItemDetailPage() {
       <div className="grid gap-6 md:grid-cols-2">
         {/* Photo + QR */}
         <div className="card space-y-4 p-4">
-          <div className="aspect-video overflow-hidden rounded-[22px] bg-black/5 dark:bg-white/10">
-            {item.photoUrl
-              ? <img src={item.photoUrl} alt={item.name} className="h-full w-full object-cover" />
-              : <div className="flex h-full items-center justify-center text-muted">尚無照片</div>
+          <div className="aspect-square overflow-hidden rounded-[22px] bg-black/5 p-2 dark:bg-white/10 sm:aspect-[4/3]">
+            {photoSrc && !photoLoadError
+              ? (
+                <img
+                  src={photoSrc}
+                  alt={item.name}
+                  className="h-full w-full object-contain"
+                  onError={() => {
+                    if (photoSrc !== item.photoUrl && item.photoUrl) {
+                      setPhotoSrc(item.photoUrl)
+                      return
+                    }
+                    setPhotoLoadError(true)
+                  }}
+                />
+              )
+              : <div className="flex h-full items-center justify-center px-4 text-center text-sm text-muted">
+                  {photoLoadError ? '照片載入失敗，請重新上傳' : '尚無照片'}
+                </div>
             }
           </div>
 
@@ -255,7 +274,19 @@ function ItemDetailPage() {
                 <div className="grid grid-cols-2 gap-2">
                   <div>
                     <label className="label">數量</label>
-                    <input type="number" min={1} className="input mt-1" {...register('quantity', { valueAsNumber: true })} />
+                    <input
+                      type="number"
+                      min={1}
+                    max={9999}
+                      className="input mt-1"
+                      {...register('quantity', {
+                        valueAsNumber: true,
+                        min: 1,
+                      max: 9999,
+                      })}
+                    />
+                  <p className="mt-1 text-xs text-muted">可輸入 1-9999</p>
+                  {errors.quantity && <p className="mt-1 text-xs text-red-500">數量需介於 1-9999</p>}
                   </div>
                   <div>
                     <label className="label">指定箱子</label>
@@ -293,20 +324,20 @@ function ItemDetailPage() {
                 </div>
                 <div>
                   <label className="label">搜尋標籤</label>
-                  <div className="mt-1 flex flex-wrap gap-1.5 rounded-xl border border-white/10 bg-black/5 p-2 dark:bg-white/5">
+                  <div className="mt-1 flex flex-wrap items-center gap-1.5 rounded-xl border border-white/10 bg-black/5 p-2 dark:bg-white/5">
                     {tags.map((tag) => (
                       <button
                         key={tag}
                         type="button"
-                        className="badge gap-1 bg-black/5 text-muted hover:bg-brand-500/10 hover:text-brand-600 dark:bg-white/10"
+                        className="badge max-w-full gap-1 bg-black/5 text-muted hover:bg-brand-500/10 hover:text-brand-600 dark:bg-white/10"
                         onClick={() => removeTag(tag)}
                       >
-                        {tag}
-                        <X className="h-3 w-3" />
+                        <span className="max-w-32 truncate">{tag}</span>
+                        <X className="h-3 w-3 shrink-0" />
                       </button>
                     ))}
                     <input
-                      className="min-h-8 min-w-32 flex-1 bg-transparent px-2 text-sm text-app outline-none"
+                      className="min-h-8 min-w-full flex-1 basis-full bg-transparent px-2 text-sm text-app outline-none sm:min-w-48 sm:basis-48"
                       value={tagDraft}
                       onChange={(e) => setTagDraft(e.target.value)}
                       onKeyDown={(e) => {
@@ -319,7 +350,7 @@ function ItemDetailPage() {
                         }
                       }}
                       onBlur={() => addTag(tagDraft)}
-                      placeholder="blue, metal, hex key"
+                      placeholder="例: 筆電、充電器、易碎"
                     />
                   </div>
                   <p className="mt-1 text-xs text-muted">

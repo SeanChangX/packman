@@ -1,13 +1,17 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { useQuery, useMutation } from '@tanstack/react-query'
-import { useState } from 'react'
-import { Printer, Package, Box } from 'lucide-react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { Printer, Package, Box, Eye } from 'lucide-react'
+import * as pdfjsLib from 'pdfjs-dist'
+import pdfjsWorker from 'pdfjs-dist/build/pdf.worker.mjs?url'
 import { useToast } from '@packman/ui'
 import { itemsApi, boxesApi, stickersApi } from '../lib/api'
 import { STATUS_LABELS, STATUS_COLORS, cn } from '../lib/utils'
 import { Select } from '../lib/select'
 import { useAuth } from '../lib/auth-context'
 import type { PackingStatus } from '@packman/shared'
+
+pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker
 
 type StickerSize = 'SMALL' | 'MEDIUM' | 'LARGE' | 'A4_SHEET'
 
@@ -24,6 +28,10 @@ function StickersPage() {
   const [mode, setMode] = useState<'items' | 'boxes'>('items')
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [size, setSize] = useState<StickerSize>('MEDIUM')
+  const [previewing, setPreviewing] = useState(false)
+  const [previewBlob, setPreviewBlob] = useState<Blob | null>(null)
+  const [rendering, setRendering] = useState(false)
+  const canvasRef = useRef<HTMLCanvasElement>(null)
 
   const { data: items } = useQuery({
     queryKey: ['items', 'all'],
@@ -37,6 +45,61 @@ function StickersPage() {
   const list = mode === 'items'
     ? (items?.data ?? [])
     : (boxes ?? [])
+  const selectedKey = useMemo(() => Array.from(selectedIds).sort().join('|'), [selectedIds])
+
+  const fetchStickerBlob = async () => {
+    const ids = Array.from(selectedIds)
+    const endpoint = mode === 'items' ? '/api/stickers/items' : '/api/stickers/boxes'
+    const res = await fetch(endpoint, {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ids, size }),
+    })
+    if (!res.ok) throw new Error(`貼紙生成失敗 (${res.status})`)
+    return res.blob()
+  }
+
+  useEffect(() => {
+    if (!previewBlob) return
+    let cancelled = false
+    setRendering(true)
+
+    const render = async () => {
+      try {
+        const arrayBuffer = await previewBlob.arrayBuffer()
+        const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise
+        const page = await pdf.getPage(1)
+        if (cancelled || !canvasRef.current) return
+
+        const canvas = canvasRef.current
+        const containerW = canvas.parentElement?.clientWidth ?? 900
+        const viewport = page.getViewport({ scale: 1 })
+        const scale = Math.min(containerW / viewport.width, 2)
+        const scaled = page.getViewport({ scale })
+        canvas.width = scaled.width
+        canvas.height = scaled.height
+        const ctx = canvas.getContext('2d')!
+        await page.render({ canvasContext: ctx, viewport: scaled }).promise
+      } finally {
+        if (!cancelled) setRendering(false)
+      }
+    }
+
+    render()
+    return () => { cancelled = true }
+  }, [previewBlob])
+
+  useEffect(() => {
+    if (!previewBlob) return
+    if (selectedIds.size === 0) {
+      setPreviewBlob(null)
+      return
+    }
+    let cancelled = false
+    fetchStickerBlob().then((blob) => { if (!cancelled) setPreviewBlob(blob) }).catch(() => {})
+    return () => { cancelled = true }
+  }, [mode, size, selectedKey])
 
   const download = useMutation({
     mutationFn: async () => {
@@ -46,6 +109,21 @@ function StickersPage() {
     },
     onError: (e: unknown) => showToast((e as Error)?.message ?? '貼紙生成失敗', 'error'),
   })
+
+  const previewSticker = async () => {
+    if (previewBlob) {
+      setPreviewBlob(null)
+      return
+    }
+    setPreviewing(true)
+    try {
+      setPreviewBlob(await fetchStickerBlob())
+    } catch (e: unknown) {
+      showToast((e as Error)?.message ?? '預覽失敗', 'error')
+    } finally {
+      setPreviewing(false)
+    }
+  }
 
   const toggle = (id: string) => {
     setSelectedIds((prev) => {
@@ -106,16 +184,45 @@ function StickersPage() {
             />
           </div>
 
-          <button
-            className="btn-primary justify-self-stretch gap-1 lg:justify-self-end"
-            disabled={selectedIds.size === 0 || download.isPending}
-            onClick={() => download.mutate()}
-          >
-            <Printer className="h-4 w-4" />
-            {download.isPending ? '生成中...' : `下載 PDF (${selectedIds.size})`}
-          </button>
+          <div className="grid gap-2 justify-self-stretch sm:grid-cols-2 lg:justify-self-end">
+            <button
+              className="btn-secondary justify-center gap-1"
+              disabled={selectedIds.size === 0 || previewing || download.isPending}
+              onClick={previewSticker}
+            >
+              <Eye className="h-4 w-4" />
+              {previewing ? '生成中...' : previewBlob ? '關閉預覽' : `預覽 (${selectedIds.size})`}
+            </button>
+            <button
+              className="btn-primary justify-center gap-1"
+              disabled={selectedIds.size === 0 || download.isPending || previewing}
+              onClick={() => download.mutate()}
+            >
+              <Printer className="h-4 w-4" />
+              {download.isPending ? '生成中...' : `下載 PDF (${selectedIds.size})`}
+            </button>
+          </div>
         </div>
       </div>
+
+      {previewBlob && (
+        <div className="card overflow-hidden">
+          <div className="border-b border-black/10 px-4 py-3 dark:border-white/10">
+            <h2 className="font-semibold">貼紙預覽</h2>
+            <p className="text-xs text-muted">顯示 PDF 第一頁，選取項目或尺寸變更後會自動更新。</p>
+          </div>
+          {rendering && (
+            <div className="flex justify-center py-6">
+              <div className="h-6 w-6 animate-spin rounded-full border-4 border-brand-500 border-t-transparent" />
+            </div>
+          )}
+          <canvas
+            ref={canvasRef}
+            className="w-full"
+            style={{ display: rendering ? 'none' : 'block' }}
+          />
+        </div>
+      )}
 
       <div className="card overflow-hidden">
         <div className="flex items-center gap-3 border-b border-black/10 px-4 py-3 dark:border-white/10">

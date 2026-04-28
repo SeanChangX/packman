@@ -260,14 +260,19 @@ function BoxDetailPage() {
                           ? <CheckSquare className="h-6 w-6 text-brand-500" />
                           : <Square className="h-6 w-6 text-muted" />}
                       </span>
-                      <span className="flex-1">
+                      <span className="min-w-0 flex-1">
                         <span className={cn('block font-medium', isPacked && 'text-muted line-through')}>
                           {item.name}
                         </span>
-                        <span className="flex gap-2 text-xs text-muted">
-                          {item.quantity > 1 && <span>× {item.quantity}</span>}
-                          {item.owner && <span>{item.owner.name}</span>}
-                          {item.group && <span style={{ color: item.group.color }}>{item.group.name}</span>}
+                        <span className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted">
+                          <span>負責人: {item.owner?.name ?? '未指定'}</span>
+                          <span>
+                            組別:{' '}
+                            {item.group
+                              ? <span style={{ color: item.group.color }}>{item.group.name}</span>
+                              : '未分組'}
+                          </span>
+                          <span>數量: {item.quantity}</span>
                         </span>
                       </span>
                       <span className={cn('badge text-xs', STATUS_COLORS[item.status])}>
