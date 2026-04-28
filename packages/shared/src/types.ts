@@ -168,6 +168,10 @@ export interface SystemSettings {
     redirectUri: string
   }
   admin: AdminAuthStatus
+  brand: {
+    name: string
+    logoUrl: string | null
+  }
 }
 
 export interface PaginatedResponse<T> {

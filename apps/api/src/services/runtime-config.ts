@@ -22,6 +22,8 @@ const SETTINGS = {
   adminPasswordHash: 'admin.passwordHash',
   jwtSecret: 'security.jwtSecret',
   cookieSecret: 'security.cookieSecret',
+  brandLogoObjectName: 'brand.logoObjectName',
+  brandName: 'brand.name',
 } as const
 
 const DEFAULT_APP_URL = 'http://localhost:3000'
@@ -229,4 +231,25 @@ export async function verifyAdminLogin(username: string, password: string) {
   if (!storedUsername || !storedHash) return false
   if (username !== storedUsername) return false
   return verifyPassword(password, storedHash)
+}
+
+export async function getBrandConfig() {
+  const [logoObjectName, name] = await Promise.all([
+    getSetting(SETTINGS.brandLogoObjectName),
+    getSetting(SETTINGS.brandName),
+  ])
+  return { logoObjectName: logoObjectName ?? null, name: name ?? '' }
+}
+
+export async function updateBrandName(name: string) {
+  await setSetting(SETTINGS.brandName, name.trim())
+  return getBrandConfig()
+}
+
+export async function setBrandLogoObjectName(objectName: string | null) {
+  if (objectName === null) {
+    await prisma.systemSetting.deleteMany({ where: { key: SETTINGS.brandLogoObjectName } })
+  } else {
+    await setSetting(SETTINGS.brandLogoObjectName, objectName)
+  }
 }

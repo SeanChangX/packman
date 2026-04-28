@@ -53,10 +53,10 @@ export function Select<T extends string>({
       <button
         ref={btnRef}
         type="button"
-        className={triggerClassName ?? 'input flex w-full items-center justify-between gap-3 text-left'}
+        className={triggerClassName ?? 'input flex w-full min-w-0 items-center justify-between gap-3 text-left'}
         onClick={handleOpen}
       >
-        <span className={cn(!triggerClassName && !selected && 'text-muted')}>{selected?.label ?? placeholder}</span>
+        <span className={cn('min-w-0 flex-1 truncate whitespace-nowrap', !triggerClassName && !selected && 'text-muted')}>{selected?.label ?? placeholder}</span>
         {!triggerClassName && <ChevronDown className={cn('h-4 w-4 shrink-0 text-muted transition-transform', open && 'rotate-180')} />}
       </button>
       {open && rect && createPortal(

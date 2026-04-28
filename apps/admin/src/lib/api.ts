@@ -86,9 +86,9 @@ export const adminApi = {
     req<void>(`/api/groups/${id}`, { method: 'DELETE' }),
 
   boxes: () => req<Box[]>('/api/boxes'),
-  createBox: (data: { label: string; shippingMethod: string; notes?: string }) =>
+  createBox: (data: { label: string; shippingMethod: string; ownerId?: string; notes?: string }) =>
     req<Box>('/api/boxes', { method: 'POST', body: JSON.stringify(data) }),
-  updateBox: (id: string, data: { label?: string; shippingMethod?: string; notes?: string; status?: string }) =>
+  updateBox: (id: string, data: { label?: string; shippingMethod?: string; ownerId?: string | null; notes?: string; status?: string }) =>
     req<Box>(`/api/boxes/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
   deleteBox: (id: string) =>
     req<void>(`/api/boxes/${id}`, { method: 'DELETE' }),
@@ -129,4 +129,14 @@ export const adminApi = {
     req<SystemSettings['slack']>('/api/admin/settings/slack', { method: 'PATCH', body: JSON.stringify(data) }),
   updateAdminAccount: (data: { username: string; password?: string }) =>
     req<AdminAuthStatus>('/api/admin/settings/admin-account', { method: 'PATCH', body: JSON.stringify(data) }),
+  updateBrandName: (name: string) =>
+    req<SystemSettings['brand']>('/api/admin/settings/brand', { method: 'PATCH', body: JSON.stringify({ name }) }),
+  uploadBrandLogo: async (file: File): Promise<SystemSettings['brand']> => {
+    const form = new FormData()
+    form.append('file', file)
+    const res = await fetch('/api/admin/settings/brand/logo', { method: 'POST', body: form })
+    if (!res.ok) throw new Error(await res.text())
+    return res.json()
+  },
+  deleteBrandLogo: () => req<void>('/api/admin/settings/brand/logo', { method: 'DELETE' }),
 }

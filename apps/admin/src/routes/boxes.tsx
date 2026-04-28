@@ -16,22 +16,34 @@ function BoxesPage() {
   const qc = useQueryClient()
   const { showToast } = useToast()
   const [shippingMethod, setShippingMethod] = useState('CHECKED')
+  const [ownerId, setOwnerId] = useState('')
   const { register, handleSubmit, reset } = useForm<{ label: string; notes?: string }>()
   const { data: boxes } = useQuery({ queryKey: ['admin-boxes'], queryFn: adminApi.boxes })
+  const { data: users } = useQuery({ queryKey: ['admin-users'], queryFn: adminApi.users })
 
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editLabel, setEditLabel] = useState('')
   const [editShipping, setEditShipping] = useState('CHECKED')
+  const [editOwnerId, setEditOwnerId] = useState('')
   const [editNotes, setEditNotes] = useState('')
 
   const create = useMutation({
     mutationFn: (data: { label: string; notes?: string }) =>
-      adminApi.createBox({ ...data, shippingMethod }),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['admin-boxes'] }); reset(); showToast('箱子已新增', 'success') },
+      adminApi.createBox({
+        ...data,
+        shippingMethod,
+        ownerId: ownerId || undefined,
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['admin-boxes'] })
+      reset()
+      setOwnerId('')
+      showToast('箱子已新增', 'success')
+    },
   })
 
   const update = useMutation({
-    mutationFn: ({ id, data }: { id: string; data: { label: string; shippingMethod: string; notes?: string } }) =>
+    mutationFn: ({ id, data }: { id: string; data: { label: string; shippingMethod: string; ownerId: string | null; notes?: string } }) =>
       adminApi.updateBox(id, data),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['admin-boxes'] }); setEditingId(null); showToast('箱子已更新', 'success') },
     onError: (e: unknown) => showToast((e as Error)?.message ?? '箱子更新失敗', 'error'),
@@ -43,12 +55,18 @@ function BoxesPage() {
     onError: (e: unknown) => showToast((e as Error)?.message ?? '箱子刪除失敗', 'error'),
   })
 
-  const startEdit = (box: { id: string; label: string; shippingMethod: string; notes?: string | null }) => {
+  const startEdit = (box: { id: string; label: string; shippingMethod: string; ownerId?: string | null; notes?: string | null }) => {
     setEditingId(box.id)
     setEditLabel(box.label)
     setEditShipping(box.shippingMethod)
+    setEditOwnerId(box.ownerId ?? '')
     setEditNotes(box.notes ?? '')
   }
+
+  const userOptions = [
+    { value: '', label: '— 未指定 —' },
+    ...(users?.map((u) => ({ value: u.id, label: u.name })) ?? []),
+  ]
 
   return (
     <div className="space-y-5">
@@ -60,7 +78,7 @@ function BoxesPage() {
       </div>
 
       <form
-        className="card relative z-10 grid gap-3 p-4 md:grid-cols-[1fr_12rem_1fr_auto]"
+        className="card relative z-10 grid gap-3 p-4 md:grid-cols-[1fr_10rem_12rem_1fr_auto]"
         onSubmit={handleSubmit((data) => create.mutate(data))}
       >
         <input className="input" placeholder="箱子名稱，例如：工具箱 A" {...register('label', { required: true })} />
@@ -68,6 +86,11 @@ function BoxesPage() {
           value={shippingMethod}
           onChange={setShippingMethod}
           options={SHIPPING_OPTIONS}
+        />
+        <Select
+          value={ownerId}
+          onChange={setOwnerId}
+          options={userOptions}
         />
         <input className="input" placeholder="備註" {...register('notes')} />
         <button className="btn-primary" disabled={create.isPending}>
@@ -83,7 +106,7 @@ function BoxesPage() {
           <table className="w-full text-sm">
             <thead className="border-b border-black/10 bg-black/5 dark:border-white/10 dark:bg-white/5">
               <tr>
-                {['名稱', '方式', '狀態', '備註', '操作'].map((h) => (
+                {['名稱', '方式', '負責人', '狀態', '備註', '操作'].map((h) => (
                   <th key={h} className="px-4 py-3 text-left text-xs font-semibold uppercase text-muted">{h}</th>
                 ))}
               </tr>
@@ -106,6 +129,13 @@ function BoxesPage() {
                         options={SHIPPING_OPTIONS}
                       />
                     </td>
+                    <td className="px-4 py-2">
+                      <Select
+                        value={editOwnerId}
+                        onChange={setEditOwnerId}
+                        options={userOptions}
+                      />
+                    </td>
                     <td className="px-4 py-2 text-muted">{box.status}</td>
                     <td className="px-4 py-2">
                       <input
@@ -119,7 +149,15 @@ function BoxesPage() {
                       <div className="flex gap-2">
                         <button
                           className="btn-primary px-3"
-                          onClick={() => update.mutate({ id: box.id, data: { label: editLabel, shippingMethod: editShipping, notes: editNotes || undefined } })}
+                          onClick={() => update.mutate({
+                            id: box.id,
+                            data: {
+                              label: editLabel,
+                              shippingMethod: editShipping,
+                              ownerId: editOwnerId || null,
+                              notes: editNotes || undefined,
+                            },
+                          })}
                           disabled={update.isPending}
                         >
                           <Check className="h-4 w-4" />
@@ -134,6 +172,7 @@ function BoxesPage() {
                   <tr key={box.id}>
                     <td className="px-4 py-3 font-semibold">{box.label}</td>
                     <td className="px-4 py-3 text-muted">{box.shippingMethod === 'CHECKED' ? '託運' : '登機'}</td>
+                    <td className="px-4 py-3 text-muted">{box.owner?.name ?? '-'}</td>
                     <td className="px-4 py-3 text-muted">{box.status}</td>
                     <td className="px-4 py-3 text-muted">{box.notes ?? '-'}</td>
                     <td className="px-4 py-3">

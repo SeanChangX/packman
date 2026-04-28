@@ -24,7 +24,12 @@ import {
   updateAdminAccount,
   updateAppConfig,
   updateSlackConfig,
+  getBrandConfig,
+  updateBrandName,
+  setBrandLogoObjectName,
 } from '../services/runtime-config'
+import { deleteObject, getPresignedUrl, uploadToMinio } from '../services/minio'
+import sharp from 'sharp'
 
 function toCsvRow(row: Record<string, unknown>): string {
   return Object.values(row)
@@ -55,10 +60,11 @@ export async function adminRoutes(app: FastifyInstance) {
   app.addHook('preHandler', requireAdminOrAdminSecret)
 
   app.get('/settings', async () => {
-    const [appConfig, slack, admin] = await Promise.all([
+    const [appConfig, slack, admin, brand] = await Promise.all([
       getAppConfig(),
       getSlackConfig(),
       getAdminAuthStatus(),
+      getBrandConfig(),
     ])
     return {
       app: appConfig,
@@ -69,7 +75,54 @@ export async function adminRoutes(app: FastifyInstance) {
         redirectUri: slack.redirectUri,
       },
       admin,
+      brand: {
+        name: brand.name,
+        logoUrl: brand.logoObjectName ? await getPresignedUrl(brand.logoObjectName) : null,
+      },
     }
+  })
+
+  app.patch('/settings/brand', async (request) => {
+    const body = request.body as { name?: string }
+    await updateBrandName(body.name ?? '')
+    const brand = await getBrandConfig()
+    return {
+      name: brand.name,
+      logoUrl: brand.logoObjectName ? await getPresignedUrl(brand.logoObjectName) : null,
+    }
+  })
+
+  app.post('/settings/brand/logo', async (request, reply) => {
+    const data = await request.file()
+    if (!data) return reply.status(400).send({ message: '請上傳圖片' })
+
+    const ALLOWED = ['image/png', 'image/jpeg', 'image/webp', 'image/svg+xml']
+    if (!ALLOWED.includes(data.mimetype)) {
+      return reply.status(400).send({ message: '僅支援 PNG、JPG、WebP、SVG' })
+    }
+
+    const raw = await data.toBuffer()
+    const png = await sharp(raw).resize({ width: 400, height: 200, fit: 'inside', withoutEnlargement: true }).png().toBuffer()
+
+    const objectName = `brand/logo.png`
+    await uploadToMinio(objectName, png, 'image/png')
+
+    const prev = await getBrandConfig()
+    if (prev.logoObjectName && prev.logoObjectName !== objectName) {
+      await deleteObject(prev.logoObjectName).catch(() => {})
+    }
+
+    await setBrandLogoObjectName(objectName)
+    return { logoUrl: await getPresignedUrl(objectName) }
+  })
+
+  app.delete('/settings/brand/logo', async (request, reply) => {
+    const brand = await getBrandConfig()
+    if (brand.logoObjectName) {
+      await deleteObject(brand.logoObjectName).catch(() => {})
+      await setBrandLogoObjectName(null)
+    }
+    return reply.status(204).send()
   })
 
   app.patch('/settings/app', async (request) => {

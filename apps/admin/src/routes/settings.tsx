@@ -1,7 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useState } from 'react'
-import { Save, ShieldCheck, Slack, Globe2 } from 'lucide-react'
+import { Save, ShieldCheck, Slack, Globe2, ImagePlus, Trash2 } from 'lucide-react'
 import { useToast } from '@packman/ui'
 import { adminApi } from '../lib/api'
 
@@ -25,6 +25,9 @@ function SettingsPage() {
   const [adminUsername, setAdminUsername] = useState('')
   const [adminPassword, setAdminPassword] = useState('')
   const [adminPasswordConfirm, setAdminPasswordConfirm] = useState('')
+  const [brandName, setBrandName] = useState('')
+  const [brandLogoUrl, setBrandLogoUrl] = useState<string | null>(null)
+  const [logoUploading, setLogoUploading] = useState(false)
 
   useEffect(() => {
     if (!settings) return
@@ -36,6 +39,8 @@ function SettingsPage() {
     setSlackRedirectUri(settings.slack.redirectUri)
     setSlackClientSecret(settings.slack.clientSecretSet ? MASKED_SECRET : '')
     setAdminUsername(settings.admin.username)
+    setBrandName(settings.brand?.name ?? '')
+    setBrandLogoUrl(settings.brand?.logoUrl ?? null)
   }, [settings])
 
   const refresh = () => qc.invalidateQueries({ queryKey: ['admin-settings'] })
@@ -62,6 +67,32 @@ function SettingsPage() {
       showToast('Slack OAuth 已更新', 'success')
     },
     onError: (e: unknown) => showToast((e as Error)?.message ?? 'Slack OAuth 更新失敗', 'error'),
+  })
+
+  const updateBrand = useMutation({
+    mutationFn: () => adminApi.updateBrandName(brandName),
+    onSuccess: (data: { name: string; logoUrl: string | null }) => { setBrandLogoUrl(data.logoUrl); refresh(); showToast('品牌名稱已更新', 'success') },
+    onError: (e: unknown) => showToast((e as Error)?.message ?? '更新失敗', 'error'),
+  })
+
+  const uploadLogo = async (file: File) => {
+    setLogoUploading(true)
+    try {
+      const data = await adminApi.uploadBrandLogo(file)
+      setBrandLogoUrl(data.logoUrl)
+      refresh()
+      showToast('Logo 已上傳', 'success')
+    } catch (e: unknown) {
+      showToast((e as Error)?.message ?? 'Logo 上傳失敗', 'error')
+    } finally {
+      setLogoUploading(false)
+    }
+  }
+
+  const deleteLogo = useMutation({
+    mutationFn: () => adminApi.deleteBrandLogo(),
+    onSuccess: () => { setBrandLogoUrl(null); refresh(); showToast('Logo 已移除', 'success') },
+    onError: (e: unknown) => showToast((e as Error)?.message ?? '移除失敗', 'error'),
   })
 
   const updateAdmin = useMutation({
@@ -203,6 +234,74 @@ function SettingsPage() {
         </p>
         <div className="mt-5 flex justify-end">
           <button onClick={() => updateAdmin.mutate()} disabled={updateAdmin.isPending} className="btn-primary">
+            <Save className="h-4 w-4" />
+            儲存
+          </button>
+        </div>
+      </section>
+
+      <section className="card p-5">
+        <div className="mb-5 flex items-center gap-3">
+          <ImagePlus className="h-5 w-5 text-brand-500" />
+          <div>
+            <h2 className="text-base font-bold text-app">品牌識別</h2>
+            <p className="text-sm text-muted">Logo 與名稱將顯示在所有貼紙的頂部</p>
+          </div>
+        </div>
+
+        <div className="grid gap-6 md:grid-cols-2">
+          {/* Logo upload */}
+          <div className="flex flex-col gap-3">
+            <span className="label">品牌 Logo</span>
+            <div className="flex items-center gap-4">
+              {brandLogoUrl ? (
+                <img src={brandLogoUrl} alt="Brand logo" className="h-14 max-w-[140px] rounded-lg border border-black/10 object-contain dark:border-white/10" />
+              ) : (
+                <div className="flex h-14 w-32 items-center justify-center rounded-lg border border-dashed border-black/20 text-xs text-muted dark:border-white/20">
+                  尚未上傳
+                </div>
+              )}
+              <div className="flex flex-col gap-2">
+                <label className={`btn-secondary cursor-pointer gap-1 text-sm ${logoUploading ? 'pointer-events-none opacity-50' : ''}`}>
+                  <ImagePlus className="h-4 w-4" />
+                  {logoUploading ? '上傳中...' : '上傳 Logo'}
+                  <input
+                    type="file"
+                    className="hidden"
+                    accept="image/png,image/jpeg,image/webp,image/svg+xml"
+                    onChange={(e: { target: HTMLInputElement }) => { const f = e.target.files?.[0]; if (f) uploadLogo(f) }}
+                  />
+                </label>
+                {brandLogoUrl && (
+                  <button
+                    onClick={() => deleteLogo.mutate()}
+                    disabled={deleteLogo.isPending}
+                    className="btn-ghost gap-1 text-sm text-red-500 hover:text-red-600"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                    移除
+                  </button>
+                )}
+              </div>
+            </div>
+            <p className="text-xs text-muted">支援 PNG、JPG、WebP、SVG，建議橫式，最大顯示 400×200px</p>
+          </div>
+
+          {/* Brand name */}
+          <label className="flex flex-col gap-1.5">
+            <span className="label">品牌名稱</span>
+            <input
+              className="input"
+              value={brandName}
+              onChange={(e) => setBrandName(e.target.value)}
+              placeholder="例如：活動名稱、組織名稱"
+            />
+            <p className="text-xs text-muted">顯示在 Logo 旁邊；若有 Logo 可留空</p>
+          </label>
+        </div>
+
+        <div className="mt-5 flex justify-end">
+          <button onClick={() => updateBrand.mutate()} disabled={updateBrand.isPending} className="btn-primary">
             <Save className="h-4 w-4" />
             儲存
           </button>

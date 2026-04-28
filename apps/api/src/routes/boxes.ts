@@ -4,7 +4,8 @@ import { prisma } from '../plugins/prisma'
 import { requireAuth, requireAdminOrAdminSecret, requireAuthOrAdminSecret } from '../plugins/auth'
 import { CreateBoxSchema, UpdateBoxSchema } from '@packman/shared'
 import { generateBoxStickerPdf } from '../services/pdf'
-import { getAppConfig } from '../services/runtime-config'
+import { getAppConfig, getBrandConfig } from '../services/runtime-config'
+import { getObjectBuffer } from '../services/minio'
 
 const boxInclude = {
   owner: { select: { id: true, name: true, avatarUrl: true } },
@@ -115,12 +116,13 @@ export async function boxRoutes(app: FastifyInstance) {
       if (!box) return reply.status(404).send({ message: 'Box not found' })
 
       const size = (request.query.size as any) ?? 'MEDIUM'
-      const { appUrl } = await getAppConfig()
-      const pdfBuffer = await generateBoxStickerPdf([box], appUrl, size)
+      const [{ appUrl }, brand] = await Promise.all([getAppConfig(), getBrandConfig()])
+      const logoBuffer = brand.logoObjectName ? await getObjectBuffer(brand.logoObjectName).catch(() => null) : null
+      const pdfBuffer = await generateBoxStickerPdf([box], appUrl, size, logoBuffer, brand.name)
 
       reply
         .header('Content-Type', 'application/pdf')
-        .header('Content-Disposition', `attachment; filename="box-${box.label}-sticker.pdf"`)
+        .header('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(`box-${box.label}-sticker.pdf`)}`)
         .send(pdfBuffer)
     }
   )

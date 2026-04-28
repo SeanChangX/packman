@@ -2,13 +2,19 @@ import { createFileRoute, Link } from '@tanstack/react-router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { useForm } from 'react-hook-form'
-import { Plus, X, Trash2 } from 'lucide-react'
+import { Package, Plus, Trash2, UserRound, X } from 'lucide-react'
 import { useToast } from '@packman/ui'
 import { boxesApi, usersApi } from '../lib/api'
 import { STATUS_LABELS, STATUS_COLORS, cn, formatApiError } from '../lib/utils'
 import { Select, SelectController } from '../lib/select'
-import type { CreateBoxInput, PackingStatus } from '@packman/shared'
+import type { CreateBoxInput, PackingStatus, UpdateBoxInput, User } from '@packman/shared'
 import { useAuth } from '../lib/auth-context'
+
+const STATUS_OPTIONS = [
+  { value: 'NOT_PACKED', label: '尚未裝箱' },
+  { value: 'PACKED', label: '已裝箱' },
+  { value: 'SEALED', label: '已封箱' },
+] as const
 
 function NewBoxModal({ onClose }: { onClose: () => void }) {
   const qc = useQueryClient()
@@ -82,6 +88,11 @@ function BoxesPage() {
   const isAdmin = user?.role === 'ADMIN'
   const [showNew, setShowNew] = useState(false)
   const { data: boxes, isLoading } = useQuery({ queryKey: ['boxes'], queryFn: () => boxesApi.list() })
+  const { data: users } = useQuery({
+    queryKey: ['users'],
+    queryFn: usersApi.list,
+    enabled: isAdmin,
+  })
 
   const deleteBox = useMutation({
     mutationFn: (id: string) => boxesApi.delete(id),
@@ -92,48 +103,87 @@ function BoxesPage() {
     onError: (e: unknown) => showToast(formatApiError(e), 'error'),
   })
 
-  const updateBoxStatus = useMutation({
-    mutationFn: ({ id, status }: { id: string; status: PackingStatus }) =>
-      boxesApi.update(id, { status }),
+  const updateBox = useMutation({
+    mutationFn: ({ id, data }: { id: string; data: UpdateBoxInput }) =>
+      boxesApi.update(id, data),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['boxes'] }),
     onError: (e: unknown) => showToast(formatApiError(e), 'error'),
   })
 
   const checked = boxes?.filter((b) => b.shippingMethod === 'CHECKED') ?? []
   const carryOn = boxes?.filter((b) => b.shippingMethod === 'CARRY_ON') ?? []
+  const getOwnerOptions = (owner?: Pick<User, 'id' | 'name'>) => [
+    { value: '', label: '— 未指定 —' },
+    ...(owner && !users?.some((u) => u.id === owner.id)
+      ? [{ value: owner.id, label: owner.name }]
+      : []),
+    ...(users?.map((u) => ({ value: u.id, label: u.name })) ?? []),
+  ]
 
   const BoxCard = ({ box }: { box: typeof boxes extends (infer T)[] | undefined ? T : never }) => (
-    <div className="card flex gap-3 p-4 transition-shadow hover:shadow-md">
-      <Link to="/boxes/$id" params={{ id: box!.id }} className="flex-1 min-w-0">
-        <span className="text-2xl font-bold text-app">{box!.label}</span>
-        {box!.owner && (
-          <p className="mt-1 text-sm text-muted">負責人: {box!.owner.name}</p>
-        )}
-        <p className="mt-2 text-xs text-muted">{box!.itemCount ?? 0} 件物品</p>
-      </Link>
-      <div className="flex shrink-0 flex-col items-end justify-between gap-2">
+    <div className="card group flex min-h-[13rem] flex-col gap-5 p-5 transition-all hover:-translate-y-0.5 hover:border-brand-500/30 hover:shadow-2xl">
+      <div className="flex items-start justify-between gap-4">
+        <Link to="/boxes/$id" params={{ id: box!.id }} className="min-w-0 flex-1">
+          <span className="block truncate text-2xl font-bold text-app">{box!.label}</span>
+          <span className="mt-2 inline-flex items-center gap-1.5 text-sm text-muted">
+            <Package className="h-4 w-4" />
+            {box!.itemCount ?? 0} 件物品
+          </span>
+        </Link>
         {isAdmin
           ? <Select
               value={box!.status}
-              onChange={(v) => updateBoxStatus.mutate({ id: box!.id, status: v as PackingStatus })}
-              triggerClassName={cn('badge cursor-pointer border-0', STATUS_COLORS[box!.status])}
-              options={[
-                { value: 'NOT_PACKED', label: '尚未裝箱' },
-                { value: 'PACKED', label: '已裝箱' },
-                { value: 'SEALED', label: '已封箱' },
-              ]}
+              onChange={(v) => updateBox.mutate({
+                id: box!.id,
+                data: { status: v as PackingStatus },
+              })}
+              triggerClassName={cn('badge shrink-0 cursor-pointer border-0 px-3 py-1.5 text-sm shadow-sm', STATUS_COLORS[box!.status])}
+              options={STATUS_OPTIONS}
             />
           : <span className={cn('badge', STATUS_COLORS[box!.status])}>
               {STATUS_LABELS[box!.status]}
             </span>
         }
-        {isAdmin && (
-          <button
-            onClick={() => { if (confirm(`確定刪除箱子「${box!.label}」？`)) deleteBox.mutate(box!.id) }}
-            className="rounded-xl p-1 text-muted hover:bg-brand-500/10 hover:text-brand-500"
-          >
-            <Trash2 className="h-4 w-4" />
-          </button>
+      </div>
+
+      <div className="mt-auto border-t border-black/10 pt-4 dark:border-white/10">
+        {isAdmin ? (
+          <div className="flex items-end gap-3">
+            <div className="min-w-0 flex-1">
+              <span className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold text-muted">
+                <UserRound className="h-3.5 w-3.5" />
+                負責人
+              </span>
+              <Select
+                className="min-w-0"
+                value={box!.ownerId ?? ''}
+                onChange={(v) => updateBox.mutate({
+                  id: box!.id,
+                  data: { ownerId: v || null },
+                })}
+                options={getOwnerOptions(box!.owner)}
+              />
+            </div>
+            <button
+              type="button"
+              aria-label={`刪除箱子 ${box!.label}`}
+              title="刪除箱子"
+              onClick={() => { if (confirm(`確定刪除箱子「${box!.label}」？`)) deleteBox.mutate(box!.id) }}
+              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-black/10 text-muted transition-colors hover:border-brand-500/30 hover:bg-brand-500/10 hover:text-brand-500 dark:border-white/10"
+            >
+              <Trash2 className="h-4 w-4" />
+            </button>
+          </div>
+        ) : box!.owner ? (
+          <p className="flex items-center gap-2 text-sm text-muted">
+            <UserRound className="h-4 w-4" />
+            負責人: {box!.owner.name}
+          </p>
+        ) : (
+          <p className="flex items-center gap-2 text-sm text-muted">
+            <UserRound className="h-4 w-4" />
+            尚未指定負責人
+          </p>
         )}
       </div>
     </div>
@@ -158,14 +208,20 @@ function BoxesPage() {
         : (
           <div className="space-y-6">
             <section>
-              <h2 className="mb-3 font-semibold text-muted">託運箱 ({checked.length})</h2>
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+              <div className="mb-3 flex items-center gap-2">
+                <h2 className="font-semibold text-muted">託運箱</h2>
+                <span className="badge bg-black/5 text-muted dark:bg-white/10">{checked.length}</span>
+              </div>
+              <div className="grid grid-cols-1 gap-5 md:grid-cols-2 2xl:grid-cols-3">
                 {checked.map((b) => <BoxCard key={b.id} box={b} />)}
               </div>
             </section>
             <section>
-              <h2 className="mb-3 font-semibold text-muted">登機箱 ({carryOn.length})</h2>
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+              <div className="mb-3 flex items-center gap-2">
+                <h2 className="font-semibold text-muted">登機箱</h2>
+                <span className="badge bg-black/5 text-muted dark:bg-white/10">{carryOn.length}</span>
+              </div>
+              <div className="grid grid-cols-1 gap-5 md:grid-cols-2 2xl:grid-cols-3">
                 {carryOn.map((b) => <BoxCard key={b.id} box={b} />)}
               </div>
             </section>

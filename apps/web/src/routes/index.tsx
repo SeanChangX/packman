@@ -1,15 +1,15 @@
-import { createFileRoute } from '@tanstack/react-router'
+import { createFileRoute, Link } from '@tanstack/react-router'
 import { useQuery } from '@tanstack/react-query'
-import { Package, Box, Battery, CheckCircle2, Clock } from 'lucide-react'
+import { Package, Box, Battery, CheckCircle2 } from 'lucide-react'
 import { itemsApi, boxesApi, batteriesApi } from '../lib/api'
 import { STATUS_LABELS, STATUS_COLORS, cn } from '../lib/utils'
 import type { PackingStatus } from '@packman/shared'
 
-function StatCard({ icon: Icon, label, value, color }: {
-  icon: React.ElementType; label: string; value: number; color: string
+function StatCard({ icon: Icon, label, value, color, to }: {
+  icon: React.ElementType; label: string; value: number; color: string; to: string
 }) {
   return (
-    <div className="metric-card">
+    <Link to={to} className="metric-card block transition-all hover:-translate-y-0.5 hover:border-brand-500/30 hover:shadow-2xl active:scale-[0.98]">
       <div className="flex items-center justify-between">
         <div>
           <p className="text-sm font-semibold text-muted">{label}</p>
@@ -19,7 +19,7 @@ function StatCard({ icon: Icon, label, value, color }: {
           <Icon className="h-6 w-6 text-white" />
         </div>
       </div>
-    </div>
+    </Link>
   )
 }
 
@@ -58,10 +58,10 @@ function Dashboard() {
       </div>
 
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-        <StatCard icon={Package} label="物品總數" value={totalItems} color="bg-brand-500" />
-        <StatCard icon={CheckCircle2} label="已打包" value={packedItems} color="bg-black" />
-        <StatCard icon={Box} label="已封箱" value={sealedBoxes} color="bg-zinc-700" />
-        <StatCard icon={Battery} label="電池數" value={batteries?.length ?? 0} color="bg-red-950" />
+        <StatCard icon={Package} label="物品總數" value={totalItems} color="bg-brand-500" to="/items" />
+        <StatCard icon={CheckCircle2} label="已打包" value={packedItems} color="bg-black" to="/items" />
+        <StatCard icon={Box} label="已封箱" value={sealedBoxes} color="bg-zinc-700" to="/boxes" />
+        <StatCard icon={Battery} label="電池數" value={batteries?.length ?? 0} color="bg-red-950" to="/batteries" />
       </div>
 
       {/* Packing progress */}
@@ -96,9 +96,10 @@ function Dashboard() {
         <h2 className="mb-4 font-semibold text-app">箱子狀態</h2>
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-6">
           {boxes?.map((box) => (
-            <a
+            <Link
               key={box.id}
-              href={`/boxes/${box.id}`}
+              to="/boxes/$id"
+              params={{ id: box.id }}
               className={cn(
                 'flex min-h-24 flex-col items-center justify-center rounded-[22px] border p-3 text-center transition-transform hover:-translate-y-0.5',
                 box.status === 'SEALED' ? 'border-black bg-black text-white dark:border-white dark:bg-white dark:text-black'
@@ -107,7 +108,7 @@ function Dashboard() {
             >
               <span className="text-lg font-bold">{box.label}</span>
               <span className="text-xs opacity-70">{STATUS_LABELS[box.status]}</span>
-            </a>
+            </Link>
           ))}
         </div>
       </div>

@@ -35,12 +35,13 @@ const navItems = [
   { to: '/profile', icon: UserCircle, label: '我的' },
 ]
 
-function NavLink({ to, icon: Icon, label, compact = false }: {
-  to: string; icon: React.ElementType; label: string; compact?: boolean
+function NavLink({ to, icon: Icon, label, compact = false, onClick }: {
+  to: string; icon: React.ElementType; label: string; compact?: boolean; onClick?: () => void
 }) {
   return (
     <Link
       to={to}
+      onClick={onClick}
       className={cn(
         compact
           ? 'flex min-w-[4.4rem] flex-col items-center gap-1 rounded-2xl px-2 py-2 text-[11px] font-semibold text-white/60 transition-colors'
@@ -87,10 +88,16 @@ function Layout() {
     </nav>
   )
 
+  const mobileNav = (
+    <nav className="flex flex-col gap-1 px-2">
+      {visibleNavItems.map((item) => <NavLink key={item.to} {...item} onClick={() => setMobileOpen(false)} />)}
+    </nav>
+  )
+
   return (
     <div className="app-shell flex overflow-hidden">
       <aside className="glass-nav hidden h-[100dvh] w-64 shrink-0 flex-col overflow-hidden border-r md:flex">
-        <div className="flex items-center gap-3 border-b border-white/10 px-4 py-4">
+        <Link to="/" className="flex items-center gap-3 border-b border-white/10 px-4 py-4 transition-colors hover:bg-white/5">
           <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-brand-500 shadow-lg shadow-red-500/30">
             <Package className="h-5 w-5 text-white" />
           </div>
@@ -98,7 +105,7 @@ function Layout() {
             <span className="block text-base font-bold text-white">Packman</span>
             <span className="text-xs font-medium text-white/50">行李管理系統</span>
           </div>
-        </div>
+        </Link>
         <div className="flex flex-1 flex-col gap-4 py-4">
           {nav}
         </div>
@@ -131,12 +138,12 @@ function Layout() {
 
       <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
         <header className="glass-nav sticky top-0 z-30 flex items-center justify-between border-b px-4 py-3 md:hidden">
-          <div className="flex items-center gap-2">
+          <Link to="/" className="flex items-center gap-2" onClick={() => setMobileOpen(false)}>
             <div className="flex h-9 w-9 items-center justify-center rounded-2xl bg-brand-500">
               <Package className="h-5 w-5 text-white" />
             </div>
             <span className="font-bold text-white">Packman</span>
-          </div>
+          </Link>
           <button onClick={() => setMobileOpen(!mobileOpen)} className="rounded-2xl p-2 text-white/80">
             {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
           </button>
@@ -144,7 +151,7 @@ function Layout() {
 
         {mobileOpen && (
           <div className="glass-nav absolute inset-x-3 top-16 z-50 rounded-[28px] border p-3 md:hidden">
-            <div className="p-4">{nav}</div>
+            <div className="p-4">{mobileNav}</div>
             <button
               onClick={logout}
               className="mx-4 mb-3 flex w-[calc(100%-2rem)] items-center justify-center gap-2 rounded-xl border border-white/10 px-3 py-3 text-sm font-semibold text-white/70 hover:bg-white/10 hover:text-white"
