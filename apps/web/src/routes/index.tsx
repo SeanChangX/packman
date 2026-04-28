@@ -30,9 +30,9 @@ const BOX_STATUS_CARD_COLORS: Record<PackingStatus, string> = {
 }
 
 function Dashboard() {
-  const { data: items } = useQuery({
-    queryKey: ['items', 'all'],
-    queryFn: () => itemsApi.list({ pageSize: 200 }),
+  const { data: stats } = useQuery({
+    queryKey: ['items', 'stats'],
+    queryFn: () => itemsApi.stats(),
   })
   const { data: boxes } = useQuery({
     queryKey: ['boxes'],
@@ -43,16 +43,15 @@ function Dashboard() {
     queryFn: () => batteriesApi.list(),
   })
 
-  const totalItems = items?.total ?? 0
-  const packedItems = items?.data.filter(
-    (i) => i.status === 'PACKED' || i.status === 'SEALED'
-  ).length ?? 0
+  const totalItems = stats?.total ?? 0
+  const packedItems = (stats?.PACKED ?? 0) + (stats?.SEALED ?? 0)
   const sealedBoxes = boxes?.filter((b) => b.status === 'SEALED').length ?? 0
 
   const statusGroups: Record<PackingStatus, number> = {
-    NOT_PACKED: 0, PACKED: 0, SEALED: 0,
+    NOT_PACKED: stats?.NOT_PACKED ?? 0,
+    PACKED: stats?.PACKED ?? 0,
+    SEALED: stats?.SEALED ?? 0,
   }
-  items?.data.forEach((i) => statusGroups[i.status]++)
 
   return (
     <div className="space-y-6">

@@ -30,25 +30,37 @@ function imageContentType(objectName: string) {
 }
 
 export async function itemRoutes(app: FastifyInstance) {
+  app.get('/stats', { preHandler: requireAuth }, async () => {
+    const eventId = await getActiveEventId()
+    const [total, notPacked, packed, sealed] = await Promise.all([
+      prisma.item.count({ where: { eventId } }),
+      prisma.item.count({ where: { eventId, status: 'NOT_PACKED' } }),
+      prisma.item.count({ where: { eventId, status: 'PACKED' } }),
+      prisma.item.count({ where: { eventId, status: 'SEALED' } }),
+    ])
+    return { total, NOT_PACKED: notPacked, PACKED: packed, SEALED: sealed }
+  })
+
   app.get('/', { preHandler: requireAuth }, async (request) => {
     const q = request.query as Record<string, string>
     const page = parseInt(q.page ?? '1', 10)
-    const pageSize = Math.min(parseInt(q.pageSize ?? '50', 10), 100)
+    const pageSize = Math.min(parseInt(q.pageSize ?? '50', 10), 500)
     const search = q.search?.trim()
     const eventId = await getActiveEventId()
-    const tagMatchedIds = search
-      ? await prisma.$queryRaw<Array<{ id: string }>>`
-          SELECT "id"
-          FROM "Item"
-          WHERE "eventId" = ${eventId}
-            AND EXISTS (
-              SELECT 1
-              FROM unnest("tags") AS tag
-              WHERE tag ILIKE ${`%${search}%`}
-            )
-          LIMIT 1000
-        `
-      : []
+
+    // Tag substring search uses raw query (LATERAL unnest + ILIKE) but is now narrowed
+    // by eventId index first, dramatically reducing the unnest workload.
+    let tagMatchedIds: Array<{ id: string }> = []
+    if (search) {
+      tagMatchedIds = await prisma.$queryRaw<Array<{ id: string }>>`
+        SELECT i."id"
+        FROM "Item" i
+        WHERE i."eventId" = ${eventId}
+          AND EXISTS (
+            SELECT 1 FROM unnest(i."tags") AS tag WHERE tag ILIKE ${`%${search}%`}
+          )
+      `
+    }
 
     const where: Record<string, any> = { eventId }
     if (q.groupId) where.groupId = q.groupId
@@ -57,8 +69,9 @@ export async function itemRoutes(app: FastifyInstance) {
     if (q.shippingMethod) where.shippingMethod = q.shippingMethod
     if (search) {
       where.OR = [
+        // Backed by trigram GIN index (Item_name_trgm_idx)
         { name: { contains: search, mode: 'insensitive' } },
-        { id: { in: tagMatchedIds.map((item) => item.id) } },
+        { id: { in: tagMatchedIds.map((row) => row.id) } },
       ]
     }
 

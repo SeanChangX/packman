@@ -35,7 +35,7 @@ function StickersPage() {
 
   const { data: items } = useQuery({
     queryKey: ['items', 'all'],
-    queryFn: () => itemsApi.list({ pageSize: 200 }),
+    queryFn: () => itemsApi.list({ pageSize: 500 }),
   })
   const { data: boxes } = useQuery({
     queryKey: ['boxes'],

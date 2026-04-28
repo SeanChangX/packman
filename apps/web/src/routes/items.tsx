@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from '@tanstack/react-router'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { useState } from 'react'
+import { useQuery, useMutation, useQueryClient, useInfiniteQuery } from '@tanstack/react-query'
+import { useState, useEffect, useRef } from 'react'
 import { Plus, Search, Trash2 } from 'lucide-react'
 import { useToast } from '@packman/ui'
 import { itemsApi, groupsApi, selectOptionsApi } from '../lib/api'
@@ -16,21 +16,47 @@ function ItemsPage() {
   const isAdmin = user?.role === 'ADMIN'
 
   const [search, setSearch] = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState<PackingStatus | ''>('')
   const [shippingFilter, setShippingFilter] = useState('')
   const [groupFilter, setGroupFilter] = useState('')
   const [selected, setSelected] = useState<Set<string>>(new Set())
+  const sentinelRef = useRef<HTMLDivElement>(null)
 
-  const { data, isLoading } = useQuery({
-    queryKey: ['items', search, statusFilter, shippingFilter, groupFilter],
-    queryFn: () => itemsApi.list({
-      search: search || undefined,
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(search), 300)
+    return () => clearTimeout(timer)
+  }, [search])
+
+  const PAGE_SIZE = 50
+  const { data, isLoading, fetchNextPage, hasNextPage, isFetchingNextPage } = useInfiniteQuery({
+    queryKey: ['items', debouncedSearch, statusFilter, shippingFilter, groupFilter],
+    queryFn: ({ pageParam = 1 }) => itemsApi.list({
+      search: debouncedSearch || undefined,
       status: statusFilter || undefined,
       shippingMethod: shippingFilter || undefined,
       groupId: groupFilter || undefined,
-      pageSize: 100,
+      page: pageParam as number,
+      pageSize: PAGE_SIZE,
     }),
+    initialPageParam: 1,
+    getNextPageParam: (lastPage, allPages) => {
+      const loaded = allPages.reduce((sum, p) => sum + p.data.length, 0)
+      return loaded < lastPage.total ? allPages.length + 1 : undefined
+    },
   })
+
+  useEffect(() => {
+    const sentinel = sentinelRef.current
+    if (!sentinel || !hasNextPage) return
+    const io = new IntersectionObserver((entries) => {
+      if (entries[0]?.isIntersecting && !isFetchingNextPage) {
+        fetchNextPage()
+      }
+    }, { rootMargin: '400px' })
+    io.observe(sentinel)
+    return () => io.disconnect()
+  }, [hasNextPage, isFetchingNextPage, fetchNextPage])
 
   const { data: groups } = useQuery({ queryKey: ['groups'], queryFn: groupsApi.list })
   const { data: shippingOpts = [] } = useQuery({ queryKey: ['options', 'SHIPPING_METHOD'], queryFn: () => selectOptionsApi.list('SHIPPING_METHOD') })
@@ -52,7 +78,8 @@ function ItemsPage() {
     onError: (e: unknown) => showToast(formatApiError(e), 'error'),
   })
 
-  const items = data?.data ?? []
+  const items = data?.pages.flatMap((p) => p.data) ?? []
+  const total = data?.pages[0]?.total ?? 0
   const allChecked = items.length > 0 && selected.size === items.length
   const someChecked = selected.size > 0 && selected.size < items.length
 
@@ -78,7 +105,7 @@ function ItemsPage() {
       <div className="page-header">
         <div>
           <h1 className="page-title">物品清單</h1>
-          <p className="page-subtitle">共 {data?.total ?? 0} 件物品</p>
+          <p className="page-subtitle">共 {total} 件物品（已載入 {items.length}）</p>
         </div>
         <div className="flex gap-2">
           {isAdmin && selected.size > 0 && (
@@ -248,6 +275,15 @@ function ItemsPage() {
               )}
       </div>
 
+      {/* Mobile sentinel */}
+      <div ref={sentinelRef} className="md:hidden">
+        {isFetchingNextPage && (
+          <div className="flex justify-center py-4">
+            <div className="h-6 w-6 animate-spin rounded-full border-4 border-brand-500 border-t-transparent" />
+          </div>
+        )}
+      </div>
+
       {/* Table */}
       <div className="card table-shell hidden md:block">
         <div className="table-scroll">
@@ -363,6 +399,16 @@ function ItemsPage() {
             </tbody>
           </table>
         </div>
+      </div>
+
+      {/* Desktop sentinel */}
+      <div className="hidden md:block">
+        <div ref={sentinelRef} />
+        {isFetchingNextPage && (
+          <div className="flex justify-center py-4">
+            <div className="h-6 w-6 animate-spin rounded-full border-4 border-brand-500 border-t-transparent" />
+          </div>
+        )}
       </div>
     </div>
   )

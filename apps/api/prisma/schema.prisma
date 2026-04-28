@@ -59,6 +59,8 @@ model Box {
   createdAt      DateTime       @default(now())
 
   @@unique([label, eventId])
+  @@index([eventId])
+  @@index([eventId, shippingMethod])
 }
 
 model Item {
@@ -86,6 +88,13 @@ model Item {
   event          Event           @relation(fields: [eventId], references: [id])
   createdAt      DateTime        @default(now())
   aiTagJobs       AiTagJob[]
+
+  @@index([eventId, createdAt])
+  @@index([eventId, status])
+  @@index([eventId, boxId])
+  @@index([eventId, groupId])
+  @@index([eventId, ownerId])
+  @@index([tags], type: Gin)
 }
 
 model Battery {
@@ -98,6 +107,10 @@ model Battery {
   eventId     String
   event       Event    @relation(fields: [eventId], references: [id])
   createdAt   DateTime @default(now())
+
+  @@index([eventId])
+  @@index([eventId, batteryType])
+  @@index([eventId, ownerId])
 }
 
 model SelectOption {

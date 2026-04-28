@@ -45,7 +45,7 @@ services:
       - "8080:8080"
     env_file: .env
     environment:
-      DATABASE_URL: postgresql://packman:packman@postgres:5432/packman
+      DATABASE_URL: postgresql://packman:packman@postgres:5432/packman?connection_limit=20&pool_timeout=20
       MINIO_ENDPOINT: minio
       MINIO_PORT: "9000"
       PORT: "8080"

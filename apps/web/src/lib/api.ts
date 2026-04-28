@@ -98,6 +98,7 @@ interface ItemsQuery {
 }
 
 export const itemsApi = {
+  stats: () => request<{ total: number; NOT_PACKED: number; PACKED: number; SEALED: number }>(`${BASE}/items/stats`),
   list: (q?: ItemsQuery) => {
     const params = new URLSearchParams()
     if (q?.groupId) params.set('groupId', q.groupId)

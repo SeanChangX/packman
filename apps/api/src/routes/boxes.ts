@@ -18,18 +18,28 @@ export async function boxRoutes(app: FastifyInstance) {
     const eventId = await getActiveEventId()
     const boxes = await prisma.box.findMany({
       where: { eventId, ...(query.shippingMethod ? { shippingMethod: query.shippingMethod as any } : {}) },
-      include: {
-        ...boxInclude,
-        _count: { select: { items: true } },
-        items: { select: { weightG: true, quantity: true } },
-      },
+      include: boxInclude,
       orderBy: { label: 'asc' },
     })
-    return boxes.map(({ _count, items, ...box }) => ({
-      ...box,
-      itemCount: _count.items,
-      totalWeightG: items.reduce((sum: number, item: { weightG: number | null; quantity: number }) => sum + (item.weightG ?? 0) * item.quantity, 0),
-    }))
+    if (boxes.length === 0) return []
+
+    const boxIds = boxes.map((b) => b.id)
+    const aggregates = await prisma.$queryRaw<Array<{ boxId: string; itemCount: bigint; totalWeightG: bigint | null }>>`
+      SELECT "boxId", COUNT(*)::bigint AS "itemCount",
+             COALESCE(SUM(COALESCE("weightG", 0) * "quantity"), 0)::bigint AS "totalWeightG"
+      FROM "Item"
+      WHERE "boxId" = ANY(${boxIds}::text[])
+      GROUP BY "boxId"
+    `
+    const aggMap = new Map(aggregates.map((a) => [a.boxId, a]))
+    return boxes.map((box) => {
+      const agg = aggMap.get(box.id)
+      return {
+        ...box,
+        itemCount: agg ? Number(agg.itemCount) : 0,
+        totalWeightG: agg ? Number(agg.totalWeightG ?? 0) : 0,
+      }
+    })
   })
 
   app.get<{ Params: { id: string } }>(

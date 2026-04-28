@@ -32,6 +32,7 @@ import {
 } from '../services/runtime-config'
 import { deleteObject, getObjectBuffer, listAllObjectNames, uploadToMinio } from '../services/minio'
 import AdmZip from 'adm-zip'
+import { invalidate } from '../services/cache'
 import sharp from 'sharp'
 import { getActiveEventId } from '../services/events'
 
@@ -264,6 +265,7 @@ export async function adminRoutes(app: FastifyInstance) {
     const value = body.value ?? randomBytes(4).toString('hex').toUpperCase()
     try {
       const opt = await prisma.selectOption.create({ data: { ...body, value } })
+      invalidate('selectOptions')
       return reply.status(201).send(opt)
     } catch {
       reply.status(409).send({ message: '該類型中已有相同 value' })
@@ -273,7 +275,9 @@ export async function adminRoutes(app: FastifyInstance) {
   app.patch<{ Params: { id: string } }>('/select-options/:id', async (request, reply) => {
     const body = UpdateSelectOptionSchema.parse(request.body)
     try {
-      return await prisma.selectOption.update({ where: { id: request.params.id }, data: body })
+      const opt = await prisma.selectOption.update({ where: { id: request.params.id }, data: body })
+      invalidate('selectOptions')
+      return opt
     } catch {
       reply.status(404).send({ message: 'Option not found' })
     }
@@ -282,6 +286,7 @@ export async function adminRoutes(app: FastifyInstance) {
   app.delete<{ Params: { id: string } }>('/select-options/:id', async (request, reply) => {
     try {
       await prisma.selectOption.delete({ where: { id: request.params.id } })
+      invalidate('selectOptions')
       return reply.status(204).send()
     } catch {
       reply.status(404).send({ message: 'Option not found' })
@@ -508,6 +513,9 @@ export async function adminRoutes(app: FastifyInstance) {
     } catch (err: any) {
       return reply.status(500).send({ message: `資料還原失敗：${err?.message ?? '未知錯誤'}` })
     }
+
+    invalidate('groups:all')
+    invalidate('selectOptions')
 
     let photoOk = 0
     let photoFail = 0
