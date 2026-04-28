@@ -1,6 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useState, useRef } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { Check, Pencil, Upload, Zap, RefreshCw, Plus, Trash2, X } from 'lucide-react'
 import { useToast } from '@packman/ui'
 import { adminApi } from '../lib/api'
@@ -28,6 +28,9 @@ function OllamaTest() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [baseUrl, setBaseUrl] = useState('')
+  const [generateTimeoutSeconds, setGenerateTimeoutSeconds] = useState('60')
+  const [healthTimeoutSeconds, setHealthTimeoutSeconds] = useState('5')
+  const [tagPrompt, setTagPrompt] = useState('')
   const [editingEndpointId, setEditingEndpointId] = useState<string | null>(null)
   const [editingBaseUrl, setEditingBaseUrl] = useState('')
   const inputRef = useRef<HTMLInputElement>(null)
@@ -36,6 +39,15 @@ function OllamaTest() {
     queryKey: ['ollama-config'],
     queryFn: adminApi.ollamaConfig,
   })
+
+  useEffect(() => {
+    if (!config) return
+    const generateTimeoutMs = typeof config.generateTimeoutMs === 'number' ? config.generateTimeoutMs : 60_000
+    const healthTimeoutMs = typeof config.healthTimeoutMs === 'number' ? config.healthTimeoutMs : 5_000
+    setGenerateTimeoutSeconds(String(Math.round(generateTimeoutMs / 1000)))
+    setHealthTimeoutSeconds(String(Math.round(healthTimeoutMs / 1000)))
+    setTagPrompt(config.tagPrompt || config.defaultTagPrompt || '')
+  }, [config])
 
   const refreshConfig = () => qc.invalidateQueries({ queryKey: ['ollama-config'] })
 
@@ -46,6 +58,27 @@ function OllamaTest() {
       showToast('Ollama 模型已更新', 'success')
     },
     onError: (e: unknown) => showToast((e as Error)?.message ?? '模型更新失敗', 'error'),
+  })
+
+  const updateTimeouts = useMutation({
+    mutationFn: () => adminApi.updateOllamaConfig({
+      generateTimeoutMs: Math.round(generateTimeoutValue * 1000),
+      healthTimeoutMs: Math.round(healthTimeoutValue * 1000),
+    }),
+    onSuccess: () => {
+      refreshConfig()
+      showToast('Ollama timeout 已更新', 'success')
+    },
+    onError: (e: unknown) => showToast((e as Error)?.message ?? 'Timeout 更新失敗', 'error'),
+  })
+
+  const updatePrompt = useMutation({
+    mutationFn: (prompt: string) => adminApi.updateOllamaConfig({ tagPrompt: prompt }),
+    onSuccess: () => {
+      refreshConfig()
+      showToast('Ollama prompt 已更新', 'success')
+    },
+    onError: (e: unknown) => showToast((e as Error)?.message ?? 'Prompt 更新失敗', 'error'),
   })
 
   const createEndpoint = useMutation({
@@ -126,6 +159,12 @@ function OllamaTest() {
     modelOptions.unshift({ value: activeModel, label: `${activeModel} (0/${enabledEndpointCount || 0} servers)` })
   }
 
+  const generateTimeoutValue = Number(generateTimeoutSeconds)
+  const healthTimeoutValue = Number(healthTimeoutSeconds)
+  const generateTimeoutValid = Number.isFinite(generateTimeoutValue) && generateTimeoutValue >= 5 && generateTimeoutValue <= 600
+  const healthTimeoutValid = Number.isFinite(healthTimeoutValue) && healthTimeoutValue >= 1 && healthTimeoutValue <= 60
+  const promptValid = tagPrompt.trim().length > 0 && tagPrompt.trim().length <= 2000
+
   return (
     <div className="page space-y-5">
       <div className="page-header">
@@ -189,6 +228,76 @@ function OllamaTest() {
                 建議選擇每台啟用 server 都有的模型；辨識時只會派給已下載該模型的 URL。
               </p>
             )}
+          </div>
+
+          <div className="card p-5">
+            <div className="mb-3">
+              <h2 className="text-sm font-bold text-app">Timeout</h2>
+              <p className="text-xs text-muted">辨識 timeout 用於 /api/generate，健康檢查 timeout 用於 /api/tags</p>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] sm:items-end">
+              <label className="block">
+                <span className="label">辨識 timeout 秒</span>
+                <input
+                  className="input mt-1"
+                  type="number"
+                  min={5}
+                  max={600}
+                  value={generateTimeoutSeconds}
+                  onChange={(e) => setGenerateTimeoutSeconds(e.target.value)}
+                />
+              </label>
+              <label className="block">
+                <span className="label">健康檢查 timeout 秒</span>
+                <input
+                  className="input mt-1"
+                  type="number"
+                  min={1}
+                  max={60}
+                  value={healthTimeoutSeconds}
+                  onChange={(e) => setHealthTimeoutSeconds(e.target.value)}
+                />
+              </label>
+              <button
+                className="btn-primary"
+                disabled={!generateTimeoutValid || !healthTimeoutValid || updateTimeouts.isPending}
+                onClick={() => updateTimeouts.mutate()}
+              >
+                儲存
+              </button>
+            </div>
+            <p className="mt-2 text-xs text-muted">
+              目前：辨識 {Math.round((config?.generateTimeoutMs ?? 60_000) / 1000)}s，健康檢查 {Math.round((config?.healthTimeoutMs ?? 5_000) / 1000)}s
+            </p>
+          </div>
+
+          <div className="card p-5">
+            <div className="mb-3">
+              <h2 className="text-sm font-bold text-app">Tag Prompt</h2>
+              <p className="text-xs text-muted">用於圖片辨識，輸出仍會由後端清理成 lowercase English tags</p>
+            </div>
+            <textarea
+              className="input min-h-40 font-mono text-xs"
+              value={tagPrompt}
+              onChange={(e) => setTagPrompt(e.target.value)}
+            />
+            <div className="mt-3 flex flex-wrap justify-end gap-2">
+              <button
+                className="btn-secondary"
+                type="button"
+                onClick={() => setTagPrompt(config?.defaultTagPrompt ?? '')}
+              >
+                恢復預設
+              </button>
+              <button
+                className="btn-primary"
+                disabled={!promptValid || updatePrompt.isPending}
+                onClick={() => updatePrompt.mutate(tagPrompt.trim())}
+              >
+                儲存
+              </button>
+            </div>
+            <p className="mt-2 text-xs text-muted">{tagPrompt.length} / 2000</p>
           </div>
 
           <div className="card overflow-hidden">

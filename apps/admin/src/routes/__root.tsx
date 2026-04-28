@@ -56,7 +56,7 @@ function AdminLayout() {
           </div>
         </nav>
       </aside>
-      <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
         <header className="glass-nav sticky top-0 z-30 flex items-center gap-3 border-b px-4 py-3 md:hidden">
           <div className="flex h-9 w-9 items-center justify-center rounded-2xl bg-brand-500">
             <Package className="h-5 w-5 text-white" />
@@ -78,7 +78,7 @@ function AdminLayout() {
             </Link>
           ))}
         </nav>
-        <main className="min-w-0 flex-1 overflow-auto">
+        <main className="min-h-0 min-w-0 flex-1 overflow-auto">
           <div className="page">
             <Outlet />
           </div>

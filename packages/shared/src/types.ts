@@ -135,6 +135,10 @@ export interface OllamaEndpointStatus extends OllamaEndpoint {
 
 export interface OllamaConfig {
   activeModel: string
+  generateTimeoutMs: number
+  healthTimeoutMs: number
+  tagPrompt: string
+  defaultTagPrompt: string
   models: string[]
   endpoints: OllamaEndpointStatus[]
   aiTagJobs?: {

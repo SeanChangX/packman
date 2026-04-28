@@ -92,7 +92,10 @@ export const CreateSelectOptionSchema = z.object({
 export const UpdateSelectOptionSchema = CreateSelectOptionSchema.partial().omit({ type: true, value: true })
 
 export const UpdateOllamaConfigSchema = z.object({
-  activeModel: z.string().min(1).max(100),
+  activeModel: z.string().min(1).max(100).optional(),
+  generateTimeoutMs: z.number().int().min(5_000).max(600_000).optional(),
+  healthTimeoutMs: z.number().int().min(1_000).max(60_000).optional(),
+  tagPrompt: z.string().min(1).max(2000).optional(),
 })
 
 export const CreateOllamaEndpointSchema = z.object({

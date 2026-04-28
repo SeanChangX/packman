@@ -129,7 +129,7 @@ function Layout() {
         </div>
       </aside>
 
-      <div className="flex flex-1 flex-col overflow-hidden">
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
         <header className="glass-nav sticky top-0 z-30 flex items-center justify-between border-b px-4 py-3 md:hidden">
           <div className="flex items-center gap-2">
             <div className="flex h-9 w-9 items-center justify-center rounded-2xl bg-brand-500">
@@ -155,7 +155,7 @@ function Layout() {
           </div>
         )}
 
-        <main className="flex-1 overflow-auto">
+        <main className="min-h-0 min-w-0 flex-1 overflow-auto">
           <div className="page">
             {loading
               ? <div className="flex min-h-[60vh] items-center justify-center"><div className="h-8 w-8 animate-spin rounded-full border-4 border-brand-500 border-t-transparent" /></div>

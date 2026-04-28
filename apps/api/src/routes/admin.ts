@@ -12,7 +12,7 @@ import {
 import {
   analyzeImageWithOllama,
   listOllamaModelStatus,
-  setActiveOllamaModel,
+  updateOllamaConfig,
 } from '../services/ollama'
 
 function toCsvRow(row: Record<string, unknown>): string {
@@ -180,7 +180,7 @@ export async function adminRoutes(app: FastifyInstance) {
 
   app.patch('/ollama-config', async (request) => {
     const body = UpdateOllamaConfigSchema.parse(request.body)
-    await setActiveOllamaModel(body.activeModel)
+    await updateOllamaConfig(body)
     return ollamaConfigWithJobStats()
   })
 

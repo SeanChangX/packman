@@ -56,7 +56,9 @@
 
 @layer components {
   .app-shell {
+    height: 100dvh;
     min-height: 100dvh;
+    overflow: hidden;
   }
 
   .page {

@@ -3,16 +3,21 @@ import sharp from 'sharp'
 import { prisma } from '../plugins/prisma'
 
 const MODEL_SETTING_KEY = 'ollama.visionModel'
+const GENERATE_TIMEOUT_SETTING_KEY = 'ollama.generateTimeoutMs'
+const HEALTH_TIMEOUT_SETTING_KEY = 'ollama.healthTimeoutMs'
+const TAG_PROMPT_SETTING_KEY = 'ollama.tagPrompt'
 const DEFAULT_MODEL = process.env.OLLAMA_VISION_MODEL ?? 'llava'
+const DEFAULT_GENERATE_TIMEOUT_MS = 60_000
+const DEFAULT_HEALTH_TIMEOUT_MS = 5_000
 
-const TAG_PROMPT = [
-  'Analyze the object in this image.',
-  'Return only 5 to 8 short English search tags.',
-  'Use simple object keywords people would search for: color, size, material, shape, visible features, product type, and notable markings.',
-  'Do not include brand guesses unless clearly visible.',
-  'Do not write explanations, numbering, JSON, or sentences.',
-  'Output comma-separated lowercase English tags only.',
-  'Example: blue, metal, hex key, l-shaped, tool, metric, compact',
+export const DEFAULT_TAG_PROMPT = [
+  'Create search tags for the main visible object.',
+  'Output one comma-separated line only.',
+  'Use 4-10 lowercase English tags.',
+  'Prefer short visual keywords: object type, color, material, shape, size, connector/port, marking, count, use.',
+  'Use generic terms. Include brand/model text only if clearly readable.',
+  'No sentences. No numbering. No JSON. No duplicates. No uncertain guesses.',
+  'Example: hex key, blue, metal, l-shaped, tool, metric, compact',
 ].join(' ')
 
 const modelCache = new Map<string, { models: string[]; expiresAt: number }>()
@@ -61,14 +66,50 @@ export async function getActiveOllamaModel(): Promise<string> {
   return setting?.value ?? DEFAULT_MODEL
 }
 
-export async function setActiveOllamaModel(model: string): Promise<string> {
-  const trimmed = model.trim()
+async function getNumberSetting(key: string, fallback: number): Promise<number> {
+  const setting = await prisma.systemSetting.findUnique({ where: { key } })
+  const value = setting ? Number(setting.value) : NaN
+  return Number.isFinite(value) ? value : fallback
+}
+
+export async function getOllamaTimeouts() {
+  const [generateTimeoutMs, healthTimeoutMs] = await Promise.all([
+    getNumberSetting(GENERATE_TIMEOUT_SETTING_KEY, DEFAULT_GENERATE_TIMEOUT_MS),
+    getNumberSetting(HEALTH_TIMEOUT_SETTING_KEY, DEFAULT_HEALTH_TIMEOUT_MS),
+  ])
+  return { generateTimeoutMs, healthTimeoutMs }
+}
+
+export async function getTagPrompt(): Promise<string> {
+  const setting = await prisma.systemSetting.findUnique({ where: { key: TAG_PROMPT_SETTING_KEY } })
+  return setting?.value || DEFAULT_TAG_PROMPT
+}
+
+async function setSetting(key: string, value: string) {
   await prisma.systemSetting.upsert({
-    where: { key: MODEL_SETTING_KEY },
-    update: { value: trimmed },
-    create: { key: MODEL_SETTING_KEY, value: trimmed },
+    where: { key },
+    update: { value },
+    create: { key, value },
   })
-  return trimmed
+}
+
+export async function updateOllamaConfig({
+  activeModel,
+  generateTimeoutMs,
+  healthTimeoutMs,
+  tagPrompt,
+}: {
+  activeModel?: string
+  generateTimeoutMs?: number
+  healthTimeoutMs?: number
+  tagPrompt?: string
+}) {
+  await Promise.all([
+    activeModel ? setSetting(MODEL_SETTING_KEY, activeModel.trim()) : Promise.resolve(),
+    generateTimeoutMs !== undefined ? setSetting(GENERATE_TIMEOUT_SETTING_KEY, String(generateTimeoutMs)) : Promise.resolve(),
+    healthTimeoutMs !== undefined ? setSetting(HEALTH_TIMEOUT_SETTING_KEY, String(healthTimeoutMs)) : Promise.resolve(),
+    tagPrompt !== undefined ? setSetting(TAG_PROMPT_SETTING_KEY, tagPrompt.trim() || DEFAULT_TAG_PROMPT) : Promise.resolve(),
+  ])
 }
 
 export async function ensureOllamaDefaults() {
@@ -87,6 +128,21 @@ export async function ensureOllamaDefaults() {
     where: { key: MODEL_SETTING_KEY },
     update: {},
     create: { key: MODEL_SETTING_KEY, value: DEFAULT_MODEL },
+  })
+  await prisma.systemSetting.upsert({
+    where: { key: GENERATE_TIMEOUT_SETTING_KEY },
+    update: {},
+    create: { key: GENERATE_TIMEOUT_SETTING_KEY, value: String(DEFAULT_GENERATE_TIMEOUT_MS) },
+  })
+  await prisma.systemSetting.upsert({
+    where: { key: HEALTH_TIMEOUT_SETTING_KEY },
+    update: {},
+    create: { key: HEALTH_TIMEOUT_SETTING_KEY, value: String(DEFAULT_HEALTH_TIMEOUT_MS) },
+  })
+  await prisma.systemSetting.upsert({
+    where: { key: TAG_PROMPT_SETTING_KEY },
+    update: {},
+    create: { key: TAG_PROMPT_SETTING_KEY, value: DEFAULT_TAG_PROMPT },
   })
 }
 
@@ -115,25 +171,25 @@ function endpointScore(endpoint: EndpointCandidate) {
   return reliability / Math.max(300, latency)
 }
 
-async function fetchEndpointModels(baseUrl: string): Promise<string[]> {
+async function fetchEndpointModels(baseUrl: string, timeoutMs = DEFAULT_HEALTH_TIMEOUT_MS): Promise<string[]> {
   const normalized = normalizeBaseUrl(baseUrl)
   const cached = modelCache.get(normalized)
   if (cached && cached.expiresAt > Date.now()) return cached.models
 
   const res = await axios.get<{ models: { name: string }[] }>(
     `${normalized}/api/tags`,
-    { timeout: 5000 }
+    { timeout: timeoutMs }
   )
   const models = res.data.models?.map((model) => model.name) ?? []
   modelCache.set(normalized, { models, expiresAt: Date.now() + 60_000 })
   return models
 }
 
-async function endpointsWithModel(endpoints: EndpointCandidate[], model: string) {
+async function endpointsWithModel(endpoints: EndpointCandidate[], model: string, timeoutMs: number) {
   const checks = await Promise.allSettled(
     endpoints.map(async (endpoint) => ({
       endpoint,
-      models: await fetchEndpointModels(endpoint.baseUrl),
+      models: await fetchEndpointModels(endpoint.baseUrl, timeoutMs),
     }))
   )
 
@@ -239,7 +295,7 @@ function parseEnglishTags(rawText: string): string[] {
     )
     .filter((tag) => tag.length > 0 && tag.length <= 30 && /[a-z]/.test(tag))
 
-  return [...new Set(tags)].slice(0, 8)
+  return [...new Set(tags)].slice(0, 10)
 }
 
 function orderedEndpoints(endpoints: EndpointCandidate[]) {
@@ -251,17 +307,19 @@ function orderedEndpoints(endpoints: EndpointCandidate[]) {
 }
 
 export async function analyzeImageWithOllama(imageBuffer: Buffer): Promise<OllamaAnalysisResult> {
-  const [base64Image, model, endpoints] = await Promise.all([
+  const [base64Image, model, endpoints, timeouts, tagPrompt] = await Promise.all([
     prepareImage(imageBuffer),
     getActiveOllamaModel(),
     getEnabledEndpoints(),
+    getOllamaTimeouts(),
+    getTagPrompt(),
   ])
 
   if (endpoints.length === 0) {
     throw new Error('沒有可用的 Ollama endpoint')
   }
 
-  const compatibleEndpoints = await endpointsWithModel(endpoints, model)
+  const compatibleEndpoints = await endpointsWithModel(endpoints, model, timeouts.healthTimeoutMs)
   if (compatibleEndpoints.length === 0) {
     throw new Error(`沒有可用且已下載 ${model} 的 Ollama endpoint`)
   }
@@ -272,8 +330,8 @@ export async function analyzeImageWithOllama(imageBuffer: Buffer): Promise<Ollam
     try {
       const response = await axios.post<{ response: string }>(
         `${normalizeBaseUrl(endpoint.baseUrl)}/api/generate`,
-        { model, prompt: TAG_PROMPT, images: [base64Image], stream: false },
-        { timeout: 60_000 }
+        { model, prompt: tagPrompt, images: [base64Image], stream: false },
+        { timeout: timeouts.generateTimeoutMs }
       )
 
       const latencyMs = Date.now() - startedAt
@@ -298,9 +356,11 @@ export async function analyzeImageWithOllama(imageBuffer: Buffer): Promise<Ollam
 
 export async function listOllamaModelStatus() {
   await ensureOllamaDefaults()
-  const [activeModel, endpoints] = await Promise.all([
+  const [activeModel, endpoints, timeouts, tagPrompt] = await Promise.all([
     getActiveOllamaModel(),
     prisma.ollamaEndpoint.findMany({ orderBy: { createdAt: 'asc' } }),
+    getOllamaTimeouts(),
+    getTagPrompt(),
   ])
 
   const statuses = await Promise.all(
@@ -309,7 +369,7 @@ export async function listOllamaModelStatus() {
       try {
         const res = await axios.get<{ models: { name: string }[] }>(
           `${normalizeBaseUrl(endpoint.baseUrl)}/api/tags`,
-          { timeout: 5000 }
+          { timeout: timeouts.healthTimeoutMs }
         )
         const models = res.data.models?.map((model) => model.name) ?? []
         modelCache.set(normalizeBaseUrl(endpoint.baseUrl), { models, expiresAt: Date.now() + 60_000 })
@@ -334,5 +394,5 @@ export async function listOllamaModelStatus() {
   )
 
   const models = [...new Set(statuses.flatMap((endpoint) => endpoint.models))].sort()
-  return { activeModel, models, endpoints: statuses }
+  return { activeModel, ...timeouts, tagPrompt, defaultTagPrompt: DEFAULT_TAG_PROMPT, models, endpoints: statuses }
 }

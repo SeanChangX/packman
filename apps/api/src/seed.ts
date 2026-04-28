@@ -1,4 +1,5 @@
 import { prisma } from './plugins/prisma'
+import { DEFAULT_TAG_PROMPT } from './services/ollama'
 
 const LEGACY_DEFAULT_BOX_LABELS = [
   '1', '2', '3', '4', '5', '6', '7', '8', '9',
@@ -110,6 +111,21 @@ export async function seedDefaultData() {
       key: 'ollama.visionModel',
       value: process.env.OLLAMA_VISION_MODEL ?? 'llava',
     },
+  })
+  await prisma.systemSetting.upsert({
+    where: { key: 'ollama.generateTimeoutMs' },
+    update: {},
+    create: { key: 'ollama.generateTimeoutMs', value: '60000' },
+  })
+  await prisma.systemSetting.upsert({
+    where: { key: 'ollama.healthTimeoutMs' },
+    update: {},
+    create: { key: 'ollama.healthTimeoutMs', value: '5000' },
+  })
+  await prisma.systemSetting.upsert({
+    where: { key: 'ollama.tagPrompt' },
+    update: {},
+    create: { key: 'ollama.tagPrompt', value: DEFAULT_TAG_PROMPT },
   })
 
   console.log('Seed complete.')

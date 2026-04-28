@@ -86,7 +86,7 @@ export const adminApi = {
     req<void>(`/api/admin/select-options/${id}`, { method: 'DELETE' }),
 
   ollamaConfig: () => req<OllamaConfig>('/api/admin/ollama-config'),
-  updateOllamaConfig: (data: { activeModel: string }) =>
+  updateOllamaConfig: (data: { activeModel?: string; generateTimeoutMs?: number; healthTimeoutMs?: number; tagPrompt?: string }) =>
     req<OllamaConfig>('/api/admin/ollama-config', { method: 'PATCH', body: JSON.stringify(data) }),
   createOllamaEndpoint: (data: { baseUrl: string; enabled?: boolean }) =>
     req<OllamaEndpoint>('/api/admin/ollama-endpoints', { method: 'POST', body: JSON.stringify(data) }),
