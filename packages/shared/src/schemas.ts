@@ -91,8 +91,25 @@ export const CreateSelectOptionSchema = z.object({
 
 export const UpdateSelectOptionSchema = CreateSelectOptionSchema.partial().omit({ type: true, value: true })
 
+export const UpdateOllamaConfigSchema = z.object({
+  activeModel: z.string().min(1).max(100),
+})
+
+export const CreateOllamaEndpointSchema = z.object({
+  baseUrl: z.string().url().max(300),
+  enabled: z.boolean().default(true),
+})
+
+export const UpdateOllamaEndpointSchema = z.object({
+  baseUrl: z.string().url().max(300).optional(),
+  enabled: z.boolean().optional(),
+})
+
 export type CreateSelectOptionInput = z.infer<typeof CreateSelectOptionSchema>
 export type UpdateSelectOptionInput = z.infer<typeof UpdateSelectOptionSchema>
+export type UpdateOllamaConfigInput = z.infer<typeof UpdateOllamaConfigSchema>
+export type CreateOllamaEndpointInput = z.infer<typeof CreateOllamaEndpointSchema>
+export type UpdateOllamaEndpointInput = z.infer<typeof UpdateOllamaEndpointSchema>
 
 export type CreateGroupInput = z.infer<typeof CreateGroupSchema>
 export type UpdateGroupInput = z.infer<typeof UpdateGroupSchema>

@@ -87,6 +87,47 @@ export interface BatteryRegulation {
   createdAt: string
 }
 
+export interface OllamaEndpoint {
+  id: string
+  baseUrl: string
+  enabled: boolean
+  avgLatencyMs?: number | null
+  lastLatencyMs?: number | null
+  requestCount: number
+  failureCount: number
+  lastSuccessAt?: string | null
+  lastErrorAt?: string | null
+  lastError?: string | null
+  healthAvgLatencyMs?: number | null
+  healthLastLatencyMs?: number | null
+  healthCheckCount: number
+  healthFailureCount: number
+  healthLastSuccessAt?: string | null
+  healthLastErrorAt?: string | null
+  healthLastError?: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+export interface OllamaEndpointStatus extends OllamaEndpoint {
+  ok: boolean
+  models: string[]
+  message?: string
+}
+
+export interface OllamaConfig {
+  activeModel: string
+  models: string[]
+  endpoints: OllamaEndpointStatus[]
+  aiTagJobs?: {
+    queued: number
+    running: number
+    done: number
+    failed: number
+    cancelled: number
+  }
+}
+
 export interface PaginatedResponse<T> {
   data: T[]
   total: number

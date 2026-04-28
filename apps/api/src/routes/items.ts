@@ -4,7 +4,7 @@ import { prisma } from '../plugins/prisma'
 import { requireAuth, requireAdmin } from '../plugins/auth'
 import { CreateItemSchema, UpdateItemSchema } from '@packman/shared'
 import { uploadToMinio, getPresignedUrl } from '../services/minio'
-import { triggerAiTagging } from '../services/ollama'
+import { enqueueAiTagJob } from '../services/ai-tag-queue'
 
 const APP_URL = process.env.APP_URL ?? 'http://localhost:3000'
 
@@ -20,13 +20,31 @@ export async function itemRoutes(app: FastifyInstance) {
     const q = request.query as Record<string, string>
     const page = parseInt(q.page ?? '1', 10)
     const pageSize = Math.min(parseInt(q.pageSize ?? '50', 10), 100)
+    const search = q.search?.trim()
+    const tagMatchedIds = search
+      ? await prisma.$queryRaw<Array<{ id: string }>>`
+          SELECT "id"
+          FROM "Item"
+          WHERE EXISTS (
+            SELECT 1
+            FROM unnest("tags") AS tag
+            WHERE tag ILIKE ${`%${search}%`}
+          )
+          LIMIT 1000
+        `
+      : []
 
     const where: Record<string, any> = {}
     if (q.groupId) where.groupId = q.groupId
     if (q.boxId) where.boxId = q.boxId
     if (q.status) where.status = q.status
     if (q.shippingMethod) where.shippingMethod = q.shippingMethod
-    if (q.search) where.name = { contains: q.search, mode: 'insensitive' }
+    if (search) {
+      where.OR = [
+        { name: { contains: search, mode: 'insensitive' } },
+        { id: { in: tagMatchedIds.map((item) => item.id) } },
+      ]
+    }
 
     const [data, total] = await Promise.all([
       prisma.item.findMany({
@@ -95,7 +113,7 @@ export async function itemRoutes(app: FastifyInstance) {
     }
   )
 
-  // Upload photo: save to MinIO, trigger Ollama async tagging
+  // Upload photo: save to MinIO, queue Ollama tagging
   app.post<{ Params: { id: string } }>(
     '/:id/photo',
     { preHandler: requireAuth },
@@ -106,8 +124,8 @@ export async function itemRoutes(app: FastifyInstance) {
       const data = await request.file()
       if (!data) return reply.status(400).send({ message: 'No file uploaded' })
 
-      const ext = data.filename.split('.').pop() ?? 'jpg'
-      const objectName = `items/${item.id}/photo.${ext}`
+      const ext = data.filename.split('.').pop()?.replace(/[^a-zA-Z0-9]/g, '') || 'jpg'
+      const objectName = `items/${item.id}/photos/${Date.now()}.${ext}`
 
       const buffer = await data.toBuffer()
       await uploadToMinio(objectName, buffer, data.mimetype)
@@ -119,10 +137,7 @@ export async function itemRoutes(app: FastifyInstance) {
         data: { photoUrl, aiTagStatus: 'PENDING' },
       })
 
-      // Trigger AI tagging in the background (non-blocking)
-      triggerAiTagging(item.id, buffer).catch((err) =>
-        app.log.error({ err, itemId: item.id }, 'AI tagging failed')
-      )
+      await enqueueAiTagJob(item.id, objectName)
 
       return { photoUrl }
     }

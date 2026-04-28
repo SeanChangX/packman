@@ -17,6 +17,7 @@ import { stickerRoutes } from './routes/stickers'
 import { optionRoutes } from './routes/options'
 import { adminRoutes } from './routes/admin'
 import { seedDefaultData } from './seed'
+import { startAiTagQueueWorker } from './services/ai-tag-queue'
 
 const PORT = parseInt(process.env.PORT ?? '8080', 10)
 const APP_URL = process.env.APP_URL ?? 'http://localhost:3000'
@@ -43,6 +44,9 @@ async function build() {
         }
         if (target.includes('batteryId')) {
           return reply.status(409).send({ message: '電池編號已存在' })
+        }
+        if (target.includes('baseUrl')) {
+          return reply.status(409).send({ message: 'Ollama URL 已存在' })
         }
         return reply.status(409).send({ message: '資料已存在，請勿重複建立' })
       }
@@ -94,6 +98,8 @@ build().then(async (app) => {
   } catch (err) {
     app.log.warn({ err }, 'MinIO bucket setup failed — photo uploads will not work')
   }
+
+  startAiTagQueueWorker(app)
 
   app.listen({ port: PORT, host: '0.0.0.0' }, (err) => {
     if (err) {

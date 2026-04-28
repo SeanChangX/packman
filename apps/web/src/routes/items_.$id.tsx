@@ -16,6 +16,7 @@ function ItemDetailPage() {
   const { showToast } = useToast()
   const fileRef = useRef<HTMLInputElement>(null)
   const [editing, setEditing] = useState(false)
+  const [tagsText, setTagsText] = useState('')
 
   const { data: item, refetch } = useQuery({
     queryKey: ['item', id],
@@ -24,7 +25,7 @@ function ItemDetailPage() {
       q.state.data?.aiTagStatus === 'PENDING' ? 3000 : false,
   })
   const { data: groups } = useQuery({ queryKey: ['groups'], queryFn: groupsApi.list })
-  const { data: boxes } = useQuery({ queryKey: ['boxes'], queryFn: boxesApi.list })
+  const { data: boxes } = useQuery({ queryKey: ['boxes'], queryFn: () => boxesApi.list() })
   const { data: users } = useQuery({ queryKey: ['users'], queryFn: usersApi.list })
   const { data: shippingOpts } = useQuery({ queryKey: ['options', 'SHIPPING_METHOD'], queryFn: () => selectOptionsApi.list('SHIPPING_METHOD') })
   const { data: categoryOpts } = useQuery({ queryKey: ['options', 'USE_CATEGORY'], queryFn: () => selectOptionsApi.list('USE_CATEGORY') })
@@ -32,8 +33,19 @@ function ItemDetailPage() {
   const { register, handleSubmit, reset, control } = useForm<UpdateItemInput>()
 
   useEffect(() => {
-    if (item) reset({ ...item, groupId: item.groupId ?? undefined, boxId: item.boxId ?? undefined, ownerId: item.ownerId ?? undefined })
+    if (item) {
+      reset({ ...item, groupId: item.groupId ?? undefined, boxId: item.boxId ?? undefined, ownerId: item.ownerId ?? undefined })
+      setTagsText(item.tags.join(', '))
+    }
   }, [item, reset])
+
+  const parseTags = (value: string) =>
+    [...new Set(
+      value
+        .split(/[,，、;\n]/)
+        .map((tag) => tag.trim().toLowerCase().replace(/\s+/g, ' '))
+        .filter((tag) => tag.length > 0 && tag.length <= 30)
+    )].slice(0, 20)
 
   const update = useMutation({
     mutationFn: (data: UpdateItemInput) => itemsApi.update(id, data),
@@ -119,7 +131,7 @@ function ItemDetailPage() {
           <div>
             <div className="flex items-center gap-1 text-sm font-semibold text-app">
               <Tag className="h-4 w-4" />
-              <span>AI 標籤</span>
+              <span>搜尋標籤</span>
               {item.aiTagStatus === 'PENDING' && (
                 <span className="ml-1 animate-pulse text-xs text-brand-600">辨識中...</span>
               )}
@@ -131,7 +143,7 @@ function ItemDetailPage() {
               ? <div className="mt-2 flex flex-wrap gap-1">
                   {item.tags.map((t) => <span key={t} className="badge bg-black/5 text-muted dark:bg-white/10">{t}</span>)}
                 </div>
-              : <p className="mt-1 text-xs text-muted">上傳照片後自動辨識標籤</p>
+              : <p className="mt-1 text-xs text-muted">上傳照片後自動辨識，也可以手動新增</p>
             }
           </div>
 
@@ -143,7 +155,7 @@ function ItemDetailPage() {
         <div className="card p-4">
           {editing
             ? (
-              <form className="space-y-3" onSubmit={handleSubmit((data) => update.mutate(data))}>
+              <form className="space-y-3" onSubmit={handleSubmit((data) => update.mutate({ ...data, tags: parseTags(tagsText) }))}>
                 <div>
                   <label className="label">品項名稱</label>
                   <input className="input mt-1" {...register('name')} />
@@ -236,6 +248,16 @@ function ItemDetailPage() {
                     placeholder="— 請選擇 —"
                     emptyValue="null"
                     options={optionsToSelectItems(categoryOpts ?? [])}
+                  />
+                </div>
+                <div>
+                  <label className="label">搜尋標籤</label>
+                  <textarea
+                    className="input mt-1"
+                    rows={2}
+                    value={tagsText}
+                    onChange={(e) => setTagsText(e.target.value)}
+                    placeholder="blue, metal, hex key, tool"
                   />
                 </div>
                 <div className="flex justify-end gap-2">

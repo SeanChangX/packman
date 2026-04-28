@@ -48,12 +48,12 @@ Edit `.env` and fill in:
 - `SLACK_CLIENT_SECRET` — from Slack app
 - `SLACK_WORKSPACE_ID` — your team ID (starts with T)
 - `SLACK_REDIRECT_URI` — `http://YOUR_IP:8080/auth/slack/callback`
-- `OLLAMA_BASE_URL` — your Ollama instance (e.g. `http://192.168.1.100:11434`)
-- `OLLAMA_VISION_MODEL` — e.g. `llava` or `llava-next`
 - `APP_URL` — `http://YOUR_IP:3000`
 - `ADMIN_URL` — `http://YOUR_IP:3001`
 - `JWT_SECRET` — a random secret string
 - `MINIO_SECRET_KEY` — change from default!
+
+Ollama servers and the active vision model are managed in **Admin → Ollama**. For parallel Ollama servers, pull the same selected model on each server. The admin page shows model coverage such as `2/3 servers`, and recognition only dispatches to servers that have the selected model.
 
 ### 3. Build and Start
 

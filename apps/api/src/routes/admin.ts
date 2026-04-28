@@ -1,15 +1,19 @@
 import { FastifyInstance } from 'fastify'
 import { randomBytes } from 'crypto'
-import axios from 'axios'
-import sharp from 'sharp'
 import { prisma } from '../plugins/prisma'
 import { requireAdminOrAdminSecret } from '../plugins/auth'
-import { CreateSelectOptionSchema, UpdateSelectOptionSchema } from '@packman/shared'
-
-const OLLAMA_BASE_URL = process.env.OLLAMA_BASE_URL ?? 'http://localhost:11434'
-const OLLAMA_MODEL = process.env.OLLAMA_VISION_MODEL ?? 'llava'
-const TAG_PROMPT =
-  '請用繁體中文列出這個物品的5個簡短標籤，只需要輸出標籤，用逗號分隔，不要有其他說明。例如：電子設備, 充電器, 攜帶型, 黑色, 科技'
+import {
+  CreateOllamaEndpointSchema,
+  CreateSelectOptionSchema,
+  UpdateOllamaConfigSchema,
+  UpdateOllamaEndpointSchema,
+  UpdateSelectOptionSchema,
+} from '@packman/shared'
+import {
+  analyzeImageWithOllama,
+  listOllamaModelStatus,
+  setActiveOllamaModel,
+} from '../services/ollama'
 
 function toCsvRow(row: Record<string, unknown>): string {
   return Object.values(row)
@@ -19,6 +23,21 @@ function toCsvRow(row: Record<string, unknown>): string {
 
 function toCsv(headers: string[], rows: Record<string, unknown>[]): string {
   return [headers.join(','), ...rows.map(toCsvRow)].join('\n')
+}
+
+async function ollamaConfigWithJobStats() {
+  const [config, queued, running, done, failed, cancelled] = await Promise.all([
+    listOllamaModelStatus(),
+    prisma.aiTagJob.count({ where: { status: 'QUEUED' } }),
+    prisma.aiTagJob.count({ where: { status: 'RUNNING' } }),
+    prisma.aiTagJob.count({ where: { status: 'DONE' } }),
+    prisma.aiTagJob.count({ where: { status: 'FAILED' } }),
+    prisma.aiTagJob.count({ where: { status: 'CANCELLED' } }),
+  ])
+  return {
+    ...config,
+    aiTagJobs: { queued, running, done, failed, cancelled },
+  }
 }
 
 export async function adminRoutes(app: FastifyInstance) {
@@ -145,11 +164,55 @@ export async function adminRoutes(app: FastifyInstance) {
 
   app.get('/ollama-status', async (_request, reply) => {
     try {
-      const res = await axios.get<{ models: { name: string }[] }>(`${OLLAMA_BASE_URL}/api/tags`, { timeout: 5000 })
-      const models = res.data.models?.map((m) => m.name) ?? []
-      return { ok: true, models, activeModel: OLLAMA_MODEL }
+      const status = await ollamaConfigWithJobStats()
+      const ok = status.endpoints.some((endpoint) => endpoint.enabled && endpoint.ok)
+      return {
+        ok,
+        ...status,
+        message: ok ? undefined : 'Ollama 無法連線',
+      }
+    } catch (err: any) {
+      return reply.status(503).send({ ok: false, message: err?.message ?? 'Ollama 無法連線' })
+    }
+  })
+
+  app.get('/ollama-config', async () => ollamaConfigWithJobStats())
+
+  app.patch('/ollama-config', async (request) => {
+    const body = UpdateOllamaConfigSchema.parse(request.body)
+    await setActiveOllamaModel(body.activeModel)
+    return ollamaConfigWithJobStats()
+  })
+
+  app.post('/ollama-endpoints', async (request, reply) => {
+    const body = CreateOllamaEndpointSchema.parse(request.body)
+    const endpoint = await prisma.ollamaEndpoint.create({
+      data: { ...body, baseUrl: body.baseUrl.replace(/\/+$/, '') },
+    })
+    return reply.status(201).send(endpoint)
+  })
+
+  app.patch<{ Params: { id: string } }>('/ollama-endpoints/:id', async (request, reply) => {
+    const body = UpdateOllamaEndpointSchema.parse(request.body)
+    try {
+      return await prisma.ollamaEndpoint.update({
+        where: { id: request.params.id },
+        data: {
+          ...body,
+          ...(body.baseUrl ? { baseUrl: body.baseUrl.replace(/\/+$/, '') } : {}),
+        },
+      })
     } catch {
-      return reply.status(503).send({ ok: false, message: 'Ollama 無法連線' })
+      return reply.status(404).send({ message: 'Ollama endpoint not found' })
+    }
+  })
+
+  app.delete<{ Params: { id: string } }>('/ollama-endpoints/:id', async (request, reply) => {
+    try {
+      await prisma.ollamaEndpoint.delete({ where: { id: request.params.id } })
+      return reply.status(204).send()
+    } catch {
+      return reply.status(404).send({ message: 'Ollama endpoint not found' })
     }
   })
 
@@ -158,27 +221,9 @@ export async function adminRoutes(app: FastifyInstance) {
     if (!data) return reply.status(400).send({ message: '請上傳圖片' })
 
     const raw = await data.toBuffer()
-    const resized = await sharp(raw)
-      .resize(1024, 1024, { fit: 'inside', withoutEnlargement: true })
-      .jpeg({ quality: 85 })
-      .toBuffer()
-    const base64Image = resized.toString('base64')
-
     try {
-      const response = await axios.post<{ response: string }>(
-        `${OLLAMA_BASE_URL}/api/generate`,
-        { model: OLLAMA_MODEL, prompt: TAG_PROMPT, images: [base64Image], stream: false },
-        { timeout: 60_000 }
-      )
-
-      const rawText = response.data.response.trim()
-      const tags = rawText
-        .split(/[,，、]/)
-        .map((t) => t.trim())
-        .filter((t) => t.length > 0 && t.length <= 30)
-        .slice(0, 8)
-
-      return { ok: true, tags, raw: rawText, model: OLLAMA_MODEL }
+      const result = await analyzeImageWithOllama(raw)
+      return { ok: true, ...result }
     } catch (err: any) {
       return reply.status(503).send({ ok: false, message: err?.message ?? 'Ollama 請求失敗' })
     }

@@ -7,6 +7,7 @@ import { itemsApi, boxesApi, stickersApi } from '../lib/api'
 import { STATUS_LABELS, STATUS_COLORS, cn } from '../lib/utils'
 import { Select } from '../lib/select'
 import { useAuth } from '../lib/auth-context'
+import type { PackingStatus } from '@packman/shared'
 
 type StickerSize = 'SMALL' | 'MEDIUM' | 'LARGE' | 'A4_SHEET'
 
@@ -134,6 +135,7 @@ function StickersPage() {
           {list.map((item) => {
             const isItem = mode === 'items'
             const i = item as any
+            const status = i.status as PackingStatus
             return (
               <li
                 key={item.id}
@@ -153,10 +155,10 @@ function StickersPage() {
                   {!isItem && i.owner && <p className="text-xs text-muted">負責人: {i.owner.name}</p>}
                 </div>
                 {isItem && (
-                  <span className={cn('badge', STATUS_COLORS[i.status])}>{STATUS_LABELS[i.status]}</span>
+                  <span className={cn('badge', STATUS_COLORS[status])}>{STATUS_LABELS[status]}</span>
                 )}
                 {!isItem && (
-                  <span className={cn('badge', STATUS_COLORS[i.status])}>{STATUS_LABELS[i.status]}</span>
+                  <span className={cn('badge', STATUS_COLORS[status])}>{STATUS_LABELS[status]}</span>
                 )}
               </li>
             )

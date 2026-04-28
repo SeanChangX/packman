@@ -1,4 +1,4 @@
-import type { User, Group, Box, BatteryRegulation, SelectOption } from '@packman/shared'
+import type { User, Group, Box, BatteryRegulation, SelectOption, OllamaConfig, OllamaEndpoint } from '@packman/shared'
 
 function buildHeaders(options?: RequestInit): Headers {
   const headers = new Headers(options?.headers)
@@ -84,4 +84,14 @@ export const adminApi = {
     req<SelectOption>(`/api/admin/select-options/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
   deleteSelectOption: (id: string) =>
     req<void>(`/api/admin/select-options/${id}`, { method: 'DELETE' }),
+
+  ollamaConfig: () => req<OllamaConfig>('/api/admin/ollama-config'),
+  updateOllamaConfig: (data: { activeModel: string }) =>
+    req<OllamaConfig>('/api/admin/ollama-config', { method: 'PATCH', body: JSON.stringify(data) }),
+  createOllamaEndpoint: (data: { baseUrl: string; enabled?: boolean }) =>
+    req<OllamaEndpoint>('/api/admin/ollama-endpoints', { method: 'POST', body: JSON.stringify(data) }),
+  updateOllamaEndpoint: (id: string, data: { baseUrl?: string; enabled?: boolean }) =>
+    req<OllamaEndpoint>(`/api/admin/ollama-endpoints/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
+  deleteOllamaEndpoint: (id: string) =>
+    req<void>(`/api/admin/ollama-endpoints/${id}`, { method: 'DELETE' }),
 }

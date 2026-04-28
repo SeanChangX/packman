@@ -11,7 +11,7 @@ function NewItemPage() {
   const navigate = useNavigate()
   const qc = useQueryClient()
   const { data: groups } = useQuery({ queryKey: ['groups'], queryFn: groupsApi.list })
-  const { data: boxes } = useQuery({ queryKey: ['boxes'], queryFn: boxesApi.list })
+  const { data: boxes } = useQuery({ queryKey: ['boxes'], queryFn: () => boxesApi.list() })
   const { data: users } = useQuery({ queryKey: ['users'], queryFn: usersApi.list })
   const { data: shippingOpts } = useQuery({ queryKey: ['options', 'SHIPPING_METHOD'], queryFn: () => selectOptionsApi.list('SHIPPING_METHOD') })
   const { data: categoryOpts } = useQuery({ queryKey: ['options', 'USE_CATEGORY'], queryFn: () => selectOptionsApi.list('USE_CATEGORY') })

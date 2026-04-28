@@ -5,6 +5,13 @@ const LEGACY_DEFAULT_BOX_LABELS = [
   'A', 'B', 'C', 'D', 'E', 'F', '大機', '推車1',
 ]
 
+function defaultOllamaBaseUrls() {
+  return (process.env.OLLAMA_BASE_URL ?? 'http://localhost:11434')
+    .split(',')
+    .map((url) => url.trim().replace(/\/+$/, ''))
+    .filter(Boolean)
+}
+
 async function ensureExampleBox() {
   const boxCount = await prisma.box.count()
 
@@ -84,6 +91,26 @@ export async function seedDefaultData() {
       create: opt,
     })
   }
+
+  const endpointCount = await prisma.ollamaEndpoint.count()
+  if (endpointCount === 0) {
+    for (const baseUrl of defaultOllamaBaseUrls()) {
+      await prisma.ollamaEndpoint.upsert({
+        where: { baseUrl },
+        update: {},
+        create: { baseUrl },
+      })
+    }
+  }
+
+  await prisma.systemSetting.upsert({
+    where: { key: 'ollama.visionModel' },
+    update: {},
+    create: {
+      key: 'ollama.visionModel',
+      value: process.env.OLLAMA_VISION_MODEL ?? 'llava',
+    },
+  })
 
   console.log('Seed complete.')
 }

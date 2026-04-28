@@ -67,6 +67,7 @@ model Item {
   photoUrl       String?
   aiTagStatus    AiTagStatus     @default(NONE)
   createdAt      DateTime        @default(now())
+  aiTagJobs       AiTagJob[]
 }
 
 model Battery {
@@ -98,6 +99,55 @@ model BatteryRegulation {
   createdAt DateTime @default(now())
 }
 
+model SystemSetting {
+  key       String   @id
+  value     String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model OllamaEndpoint {
+  id                  String    @id @default(uuid())
+  baseUrl             String    @unique
+  enabled             Boolean   @default(true)
+  avgLatencyMs        Float?
+  lastLatencyMs       Int?
+  requestCount        Int       @default(0)
+  failureCount        Int       @default(0)
+  lastSuccessAt       DateTime?
+  lastErrorAt         DateTime?
+  lastError           String?
+  healthAvgLatencyMs  Float?
+  healthLastLatencyMs Int?
+  healthCheckCount    Int       @default(0)
+  healthFailureCount  Int       @default(0)
+  healthLastSuccessAt DateTime?
+  healthLastErrorAt   DateTime?
+  healthLastError     String?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+}
+
+model AiTagJob {
+  id          String         @id @default(uuid())
+  itemId      String
+  item        Item           @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  objectName  String
+  status      AiTagJobStatus @default(QUEUED)
+  attempts    Int            @default(0)
+  maxAttempts Int            @default(3)
+  nextRunAt   DateTime       @default(now())
+  lockedAt    DateTime?
+  lockedBy    String?
+  lastError   String?
+  completedAt DateTime?
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  @@index([status, nextRunAt])
+  @@index([itemId, status])
+}
+
 enum Role {
   ADMIN
   MEMBER
@@ -125,4 +175,12 @@ enum AiTagStatus {
   PENDING
   DONE
   FAILED
+}
+
+enum AiTagJobStatus {
+  QUEUED
+  RUNNING
+  DONE
+  FAILED
+  CANCELLED
 }

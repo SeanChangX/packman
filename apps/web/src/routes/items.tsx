@@ -102,7 +102,7 @@ function ItemsPage() {
           <Search className="absolute left-3 top-3.5 h-4 w-4 text-muted" />
           <input
             className="input pl-9"
-            placeholder="搜尋物品名稱..."
+            placeholder="搜尋物品名稱或 tag..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
