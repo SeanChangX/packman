@@ -3,14 +3,15 @@ services:
     container_name: packman-postgres
     image: postgres:16-alpine
     restart: unless-stopped
+    env_file: .env
     environment:
-      POSTGRES_USER: packman
-      POSTGRES_PASSWORD: packman
-      POSTGRES_DB: packman
+      POSTGRES_USER: ${POSTGRES_USER:-packman}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-packman}
+      POSTGRES_DB: ${POSTGRES_DB:-packman}
     volumes:
       - postgres-data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U packman"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-packman}"]
       interval: 5s
       timeout: 5s
       retries: 10
@@ -45,7 +46,7 @@ services:
       - "8080:8080"
     env_file: .env
     environment:
-      DATABASE_URL: postgresql://packman:packman@postgres:5432/packman
+      DATABASE_URL: postgresql://${POSTGRES_USER:-packman}:${POSTGRES_PASSWORD:-packman}@postgres:5432/${POSTGRES_DB:-packman}
       MINIO_ENDPOINT: minio
       MINIO_PORT: "9000"
       PORT: "8080"
