@@ -23,3 +23,12 @@ updates:
       - /apps/admin
     schedule:
       interval: weekly
+    groups:
+      docker-base-images:
+        patterns:
+          - 'node'
+          - 'nginx'
+    ignore:
+      # Skip non-LTS (odd-numbered) Node majors — only follow LTS line.
+      - dependency-name: 'node'
+        versions: ['25.x', '27.x', '29.x', '31.x']

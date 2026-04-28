@@ -1,141 +1,242 @@
-# Packman 行李管理系統
+<p align="right"><a href="README.zh-TW.md">繁體中文</a></p>
 
-Competition luggage management system for robotics teams. Built to replace the Notion-based workflow for international competitions.
+<div align="center">
+
+<img src="apps/admin/public/favicon.svg" alt="Packman logo" width="120">
+
+# Packman
+
+**Competition luggage management system for robotics teams.**
+
+[![GitHub stars](https://img.shields.io/github/stars/SeanChangX/packman)](https://github.com/SeanChangX/packman) [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT) [![Build & push](https://github.com/SeanChangX/packman/actions/workflows/build-and-push.yml/badge.svg)](https://github.com/SeanChangX/packman/actions/workflows/build-and-push.yml)
+
+<table>
+<tr>
+<td width="50%" align="center"><img src="docs/images/Dashboard.png" alt="Dashboard" width="100%"><br><strong>Dashboard</strong><br>Packing progress, box status grid</td>
+<td width="50%" align="center"><img src="docs/images/Items.png" alt="Items" width="100%"><br><strong>Items</strong><br>Searchable, filter by group / box / status</td>
+</tr>
+<tr>
+<td width="50%" align="center"><img src="docs/images/Boxes.png" alt="Boxes" width="100%"><br><strong>Boxes</strong><br>Per-box weight, item count, QR sticker</td>
+<td width="50%" align="center"><img src="docs/images/ItemDetail.png" alt="Item detail" width="100%"><br><strong>Item detail</strong><br>Photo upload, AI auto-tagging via Ollama</td>
+</tr>
+<tr>
+<td width="50%" align="center"><img src="docs/images/AdminEvents.png" alt="Admin Events" width="100%"><br><strong>Admin — Events</strong><br>Per-event scoping, switch active event</td>
+<td width="50%" align="center"><img src="docs/images/AdminBackup.png" alt="Admin Backup" width="100%"><br><strong>Admin — Backup & restore</strong><br>Full ZIP export including photos</td>
+</tr>
+</table>
+
+<br>
+
+<div align="center">
+
+[**Features**](#features) &#8226;
+[**Getting started**](#getting-started) &#8226;
+[**Architecture**](#system-architecture) &#8226;
+[**Stickers & QR**](#stickers--qr-workflow) &#8226;
+[**AI tagging**](#ai-auto-tagging) &#8226;
+[**Backup**](#backup--restore) &#8226;
+[**Development**](#development)
+
+</div>
+
+</div>
+
+---
 
 ## Features
 
-- **物品清單** — Add, edit, filter items by group/box/status/shipping method
-- **箱子管理** — Organize items into checked/carry-on boxes with QR checklists
-- **電池分配** — Battery assignment with Taiwan CAA + French DGAC regulation reminders
-- **AI 自動標籤** — Upload item photos, local Ollama vision model auto-generates Chinese tags
-- **QR Code 掃描** — Scan box/item QR codes to open checklists instantly on mobile
-- **貼紙列印** — Generate PDF stickers in 4 sizes (50×30mm to A4 sheet)
-- **Slack 登入** — Single sign-on via your private Slack workspace
-- **管理後台** — Admin panel for user/group management and CSV export
+Packing for an international robotics competition with 30+ people, 5 oversized boxes, dozens of batteries and a flight that won't take any of them in the wrong category — that's how this started. We were tracking everything in a Notion table that nobody updated. Packman replaces that with a single source of truth, scannable QR codes on every box, AI-tagged photos so you can find anything by what it looks like, and per-event scoping so the same system works year after year.
 
-## Architecture
+- **Items** — Add, edit, search by name/tag, filter by group/box/status/shipping
+- **Boxes** — Organize items into checked / carry-on, scannable QR sticker per box
+- **Batteries** — Per-battery assignment with Taiwan CAA + French DGAC reminders
+- **AI auto-tagging** — Snap a photo, local Ollama vision model writes the tags
+- **QR scan-on-site** — Open `/scan` on phone, point at sticker, jump to checklist
+- **Sticker printing** — PDF stickers in 4 sizes (50×30 mm to A4 sheet)
+- **Slack SSO** — Sign in with your team's private Slack workspace
+- **Per-event scoping** — One DB, many events (Eurobot 2025 / 2026 / …); active event switch
+- **Full backup** — Database + photos exported as a single ZIP, restorable in one click
 
-| Service | Port | Description |
-|---------|------|-------------|
-| Main app | 3000 | React + Vite frontend |
-| Admin panel | 3001 | Admin React + Vite frontend |
-| API | 8080 | Node.js + Fastify + TypeScript |
-| PostgreSQL | 5432 (internal) | Database |
-| MinIO | 9000/9001 | Photo storage |
+<p align="right">— Made by SCX, originally for the <a href="https://github.com/DIT-ROBOTICS/">DIT Robotics</a> team.</p>
 
-## Setup
+---
 
-### 1. Slack App
+## Getting started
 
-1. Go to https://api.slack.com/apps → **Create New App** → From scratch
-2. Name: `Packman` — select your workspace
-3. **OAuth & Permissions** → Add redirect URL:
+### Prerequisites
+
+- Docker and Docker Compose
+- A Slack workspace (for SSO login)
+- (Optional) A machine running Ollama with a vision model (`llava` etc.) for AI tagging
+
+### Run with Docker
+
+1. Clone:
+   ```bash
+   git clone https://github.com/SeanChangX/packman.git
+   cd packman
    ```
-   http://YOUR_HOMELAB_IP:8080/auth/slack/callback
+
+2. Copy the example env and edit infra-only fields:
+   ```bash
+   cp .env.example .env
+   ```
+
+   Slack OAuth / app URLs / admin account / Ollama servers / branding are all configured **in the admin UI**, not in `.env`. JWT and cookie secrets are auto-generated on first startup.
+
+3. Pull pre-built production images and start:
+   ```bash
+   docker compose pull
+   docker compose up -d
+   ```
+
+   Or build locally:
+   ```bash
+   docker compose -f docker-compose.dev.yml up --build
+   ```
+
+4. **Set the admin password first.** Open **http://localhost:3001** (admin panel). On first visit it shows a setup form — choose username + password.
+
+5. Use the app:
+   - **http://localhost:3000** — Main app (members)
+   - **http://localhost:3001** — Admin panel
+   - **http://localhost:9001** — MinIO console (photo storage)
+
+### Slack app setup
+
+1. https://api.slack.com/apps → **Create New App** → From scratch
+2. Name `Packman`, pick your workspace
+3. **OAuth & Permissions** → add redirect URL:
+   ```
+   http://YOUR_HOST:8080/auth/slack/callback
    ```
 4. User Token Scopes: `identity.basic`, `identity.email`, `identity.avatar`
-5. **Basic Information** → copy **Client ID** + **Client Secret**
-6. Find your Workspace ID in the URL: `https://app.slack.com/client/TXXXXXXXX/`
+5. Copy **Client ID** + **Client Secret** + **Workspace ID** into Admin → Settings → Slack
 
-### 2. Environment Variables
+---
 
-```bash
-cp .env.example .env
+## System architecture
+
+```
+[ Browser ] ─── [ Web (3000) ]  ─┐
+                                 ├─→ [ API (8080) ] ─── [ Postgres ]
+[ Browser ] ─── [ Admin (3001) ] ─┘                  └─ [ MinIO (photos) ]
+                                                     └─ [ Ollama (vision LLM) ]
 ```
 
-Edit `.env` and fill in the infrastructure settings:
-- `DATABASE_URL` — PostgreSQL connection string
-- `MINIO_*` — MinIO connection settings; change `MINIO_SECRET_KEY` from the default
-- `PORT` / `NODE_ENV` — API runtime settings
+| Service | Port | Stack |
+|---------|------|-------|
+| **Web** | 3000 | React + Vite + TanStack Router/Query |
+| **Admin** | 3001 | React + Vite (separate SPA) |
+| **API** | 8080 | Node.js + Fastify + Prisma + TypeScript |
+| **Postgres** | internal | Schema with per-event scoping, GIN/trigram indexes |
+| **MinIO** | 9000 / 9001 | S3-compatible photo storage |
 
-Slack OAuth, App URLs, the admin account, Ollama servers, the active vision model, and AI prompt settings are managed in the Admin UI. JWT and cookie signing secrets are generated automatically on first API startup and stored in the database.
+Docker images are built on every push to `main` via [GitHub Actions](.github/workflows/build-and-push.yml) and pushed to `ghcr.io/seanchangx/packman-{api,web,admin}` with `latest`, branch, sha, and semver tags.
 
-### 3. Build and Start
+---
 
-```bash
-docker compose build
-docker compose up -d
-```
+## Stickers & QR workflow
 
-### 4. Initial Data
+1. **Print stickers** — Admin panel → 貼紙列印 → choose size and items/boxes → PDF
+2. **Stick before packing** — Each sticker has a QR code pointing at the item/box page
+3. **Scan on-site** — Open `/scan` on phone, point at a box sticker, get the checklist
+4. **Tick off items** — Mark each item PACKED / SEALED as you load it
 
-The API seeds default data automatically on first startup. This creates:
-- **Groups**: 一個範例組別（可在管理後台刪除）
-- **Boxes**: 一個範例箱（可在管理後台刪除）
+| Sticker size | Dimensions | Use case |
+|---|---|---|
+| SMALL | 50 × 30 mm | Small parts, individual items |
+| MEDIUM | 100 × 50 mm | Standard item labels |
+| LARGE | 150 × 100 mm | Box ID labels |
+| A4_SHEET | A4, 2 × 4 grid | 8 stickers per page |
 
-On first visit to the admin panel, create the admin username and password. Slack login is only for normal app users.
+Stickers include the brand logo (configurable in Admin → Settings → Brand) and embed a QR code that opens the item or box detail page on any phone.
+
+---
+
+## AI auto-tagging
+
+Optional Ollama integration. Upload an item photo → background worker calls a local Ollama vision model → tags appear on the item record.
+
+- Set up one or more Ollama endpoints in **Admin → AI 辨識**
+- Pick a vision model (e.g. `llava`, `llama3.2-vision`)
+- Customize the Chinese tagging prompt (default works for general gear)
+- Health checks + latency stats per endpoint, automatic failover
+
+Photos and tags are searchable from the items page. Re-tag any photo manually from its detail page.
+
+---
+
+## Per-event scoping
+
+One Packman instance can run multiple events. Items, boxes, and batteries are scoped to the **active event**; switching events instantly changes what users see, without touching the data.
+
+- Admin → 活動管理 → create / rename / activate / delete
+- Same box label (e.g. "1") can exist in different events without conflict
+- Backups capture all events at once
+
+---
+
+## Backup & restore
+
+Admin → 匯出資料 → **完整備份**:
+
+- Downloads `packman-backup-YYYY-MM-DD.zip` containing:
+  - `data.json` — all events, items, boxes, batteries, users, groups, options, regulations, settings, Ollama endpoints
+  - `photos/` — every photo in MinIO (item photos + brand logo)
+- **Restore** uploads the same ZIP back: wipes current data inside a transaction, then re-imports everything including photos
+- Validates ZIP magic bytes, version (1.x), required fields, and only allows whitelisted photo extensions (jpg/png/webp/gif/heic)
+
+---
 
 ## Development
-
-All code runs inside Docker — no local Node.js required.
-
-### UI Development (with HMR)
-
-Use the dev compose file when iterating on frontend code — Vite dev servers with Hot Module Replacement, no rebuild needed on every change:
 
 ```bash
 docker compose -f docker-compose.dev.yml up --build
 ```
 
-- Web app: http://localhost:3000
-- Admin panel: http://localhost:3001
+| Service | URL |
+|---------|-----|
+| Web (Vite HMR) | http://localhost:3000 |
+| Admin (Vite HMR) | http://localhost:3001 |
+| API | http://localhost:8080 |
+| MinIO console | http://localhost:9001 |
 
-Changes to `apps/web/src/` and `apps/admin/src/` are reflected instantly.
-Rebuilding is only needed when adding packages or changing `packages/shared`.
+Changes to `apps/web/src/` and `apps/admin/src/` reload instantly. Rebuild only when adding packages or changing `packages/shared`.
 
-### Production Build
-
-```bash
-docker compose build
-docker compose up -d
-```
+### Useful commands
 
 ```bash
-# View logs
+# Logs
 docker compose logs -f api
-docker compose logs -f web
 
-# Restart a service after code changes
-docker compose restart api
+# Open a Prisma migration shell
+docker compose exec api npx prisma migrate dev --name my_change
 
-# Run a migration
-docker compose exec api npx prisma migrate dev --name my_migration
-
-# Open Prisma Studio (DB browser)
+# Browse the DB
 docker compose exec api npx prisma studio --port 5555 --browser none
-# Then access http://localhost:5555
+# → http://localhost:5555
 
-# MinIO web console
-# http://YOUR_IP:9001  (user: packman, password: from MINIO_SECRET_KEY in .env)
-
-# Manually seed the database
+# Re-seed
 docker compose exec api node dist/seed.js
 ```
 
-## Sticker Sizes
+### Releasing
 
-| Size | Dimensions | Use case |
-|------|-----------|----------|
-| SMALL | 50×30mm | Small labels |
-| MEDIUM | 100×50mm | Standard labels |
-| LARGE | 150×100mm | Large box labels |
-| A4_SHEET | A4 with 2×4 grid | 8 labels per sheet |
+Push to `main` triggers a [GitHub Actions](.github/workflows/build-and-push.yml) build that pushes 3 images to GHCR with `latest` + branch + sha tags. Push a `v*` tag to also publish semver tags:
 
-## Battery Regulations
+```bash
+git tag v1.0.0 && git push --tags
+# Server side:
+IMAGE_TAG=v1.0.0 docker compose up -d
+```
 
-The battery management page includes built-in reminders for:
-- 🇹🇼 Taiwan CAA carry-on rules (工具機電池, 行動電源, 磁酸鋰鐵電池)
-- 🇫🇷 French DGAC / IATA rules for international flights
+---
 
-## QR Code Workflow
+## License
 
-1. **Print stickers** — Generate box/item sticker PDFs with embedded QR codes
-2. **Attach stickers** — Stick on boxes/items before packing
-3. **Scan on-site** — Use `/scan` page on mobile → opens checklist
-4. **Check off items** — Tap to verify items in the box
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-## Data Export
+This project is licensed under the [MIT License](https://opensource.org/licenses/MIT) - see the [LICENSE](LICENSE) file for details.
 
-Admin panel (`http://YOUR_IP:3001`) → **匯出資料**:
-- `items.csv` — Full item list with all fields (UTF-8 BOM for Excel)
-- `batteries.csv` — Battery assignment list
+____
