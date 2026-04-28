@@ -31,6 +31,7 @@ RUN pnpm install --prod
 COPY --from=builder /app/packages/shared/dist ./packages/shared/dist
 COPY --from=builder /app/apps/api/dist ./apps/api/dist
 COPY --from=builder /app/apps/api/prisma ./apps/api/prisma
+COPY apps/api/fonts ./apps/api/fonts
 COPY --from=builder /app/node_modules/.pnpm ./node_modules/.pnpm
 
 WORKDIR /app/apps/api

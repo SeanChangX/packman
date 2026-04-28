@@ -1,6 +1,7 @@
 import PDFDocument from 'pdfkit'
 import QRCode from 'qrcode'
 import { existsSync } from 'fs'
+import path from 'path'
 
 type StickerSize = 'SMALL' | 'MEDIUM' | 'LARGE' | 'A4_SHEET'
 
@@ -13,6 +14,7 @@ interface StickerDimensions {
   headerH: number
   columns: number
   rows: number
+  qrScale: number
 }
 
 const SIZES: Record<StickerSize, StickerDimensions> = {
@@ -20,25 +22,25 @@ const SIZES: Record<StickerSize, StickerDimensions> = {
     width: 142, height: 85,
     fontSize: { title: 9, body: 6.5, small: 5.5 },
     qrSize: 56, padding: 5, headerH: 14,
-    columns: 1, rows: 1,
+    columns: 1, rows: 1, qrScale: 8,
   },
   MEDIUM: {
     width: 284, height: 142,
     fontSize: { title: 14, body: 9, small: 7.5 },
     qrSize: 96, padding: 8, headerH: 22,
-    columns: 1, rows: 1,
+    columns: 1, rows: 1, qrScale: 6,
   },
   LARGE: {
     width: 425, height: 284,
     fontSize: { title: 23, body: 15, small: 12 },
     qrSize: 168, padding: 12, headerH: 46,
-    columns: 1, rows: 1,
+    columns: 1, rows: 1, qrScale: 4,
   },
   A4_SHEET: {
     width: 595, height: 842,
     fontSize: { title: 15, body: 10, small: 8 },
     qrSize: 92, padding: 7, headerH: 28,
-    columns: 2, rows: 4,
+    columns: 2, rows: 4, qrScale: 4,
   },
 }
 
@@ -53,14 +55,27 @@ const CJK_BOLD_PATHS = [
   '/usr/share/fonts/noto-cjk/NotoSansCJK-Bold.otf',
 ]
 
+const MSTIFF_PATH = path.join(__dirname, '../../fonts/MStiffHei_HK_UltraBold.ttf')
+
 const CJK_FONT = CJK_FONT_PATHS.find(existsSync)
 const CJK_BOLD = CJK_BOLD_PATHS.find(existsSync)
+const HAS_MSTIFF = existsSync(MSTIFF_PATH)
+
 const REGULAR = CJK_FONT ? 'CJKRegular' : 'Helvetica'
 const BOLD = CJK_BOLD ? 'CJKBold' : (CJK_FONT ? 'CJKRegular' : 'Helvetica-Bold')
 
-function registerFonts(doc: PDFKit.PDFDocument) {
+function registerFonts(doc: PDFKit.PDFDocument): string {
   if (CJK_FONT) doc.registerFont('CJKRegular', CJK_FONT, 'NotoSansCJKtc-Regular')
   if (CJK_BOLD) doc.registerFont('CJKBold', CJK_BOLD, 'NotoSansCJKtc-Bold')
+  if (HAS_MSTIFF) {
+    try {
+      doc.registerFont('MStiffHei', MSTIFF_PATH)
+      return 'MStiffHei'
+    } catch {
+      // WOFF2 failed to load; fall through to BOLD
+    }
+  }
+  return BOLD
 }
 
 function formatPrintDate(date = new Date()) {
@@ -75,9 +90,8 @@ function formatPrintDate(date = new Date()) {
   return `${value('year')}-${value('month')}-${value('day')}`
 }
 
-async function qrBuffer(url: string, size: number): Promise<Buffer> {
-  // Generate at 4× for crisp rendering when PDF viewer scales the page
-  return QRCode.toBuffer(url, { width: size * 4, margin: 2 })
+async function qrBuffer(url: string, size: number, scale = 4): Promise<Buffer> {
+  return QRCode.toBuffer(url, { width: size * scale, margin: 2 })
 }
 
 function drawIdPill(doc: PDFKit.PDFDocument, id: string, x: number, y: number, fontSize: number) {
@@ -102,7 +116,6 @@ function idPillHeight(fontSize: number) {
   return fs + fs * 0.28 * 2
 }
 
-// Shrink font until text fits in maxWidth; returns chosen size
 function fitFontSize(doc: PDFKit.PDFDocument, text: string, maxWidth: number, startSize: number, minSize: number): number {
   let size = startSize
   doc.fontSize(size)
@@ -144,6 +157,7 @@ function drawTagPills(
   y: number,
   maxWidth: number,
   fontSize: number,
+  maxY = Infinity,
 ) {
   const visibleTags = tags.slice(0, 5)
   const fs = fontSize * 0.8
@@ -157,9 +171,10 @@ function drawTagPills(
 
   doc.font(BOLD).fontSize(fs)
   for (const tag of visibleTags) {
-    const label = fitSingleLineText(doc, tag, Math.max(1, maxWidth - pH * 2))
+    const availTextW = Math.max(1, maxWidth - pH * 2)
+    const label = fitSingleLineText(doc, tag, availTextW)
     if (!label) continue
-    const textW = doc.widthOfString(label)
+    const textW = Math.min(doc.widthOfString(label), availTextW)
     const pillW = textW + pH * 2
 
     if (cursorX > x && cursorX + pillW > x + maxWidth) {
@@ -169,14 +184,15 @@ function drawTagPills(
       cursorY += pillH + gap
     }
 
-    const availableTextW = Math.max(1, pillW - pH * 2)
-    const textH = doc.heightOfString(label, { width: availableTextW, lineBreak: false, lineGap: 0 })
+    if (cursorY + pillH > maxY) break
+
+    const textH = doc.heightOfString(label, { width: textW, lineBreak: false, lineGap: 0 })
     const textY = cursorY + (pillH - textH) / 2 - fs * 0.08
 
     doc.roundedRect(cursorX, cursorY, pillW, pillH, pillH / 2).fill('#8b95a1')
     doc.fillColor('#ffffff')
       .text(label, cursorX + pH, textY, {
-        width: availableTextW,
+        width: textW,
         lineBreak: false,
         lineGap: 0,
       })
@@ -194,8 +210,8 @@ function drawHeader(
   logoBuffer: Buffer | null,
   dim: StickerDimensions,
   printDate: string,
+  headerFont: string,
 ) {
-  // Background
   doc.save()
   doc.rect(x, y, w, h).fill('#DE272C')
   doc.restore()
@@ -203,26 +219,34 @@ function drawHeader(
   const leftX = x + dim.padding
   const rightX = x + w - dim.padding
 
+  // Shear factor for forward-italic slant on banner text (positive = top leans right)
+  const slant = -0.2
+
   const headerFontSize = Math.min(h * 0.52, dim.fontSize.small * 1.45)
-  doc.font(BOLD).fontSize(headerFontSize)
+  doc.font(headerFont).fontSize(headerFontSize)
   const dateW = doc.widthOfString(printDate)
   const dateTextH = doc.heightOfString(printDate, { width: dateW, lineBreak: false, lineGap: 0 })
   const dateY = y + (h - dateTextH) / 2 - headerFontSize * 0.08
+
+  // Draw date with slant anchored at text top so top edge stays flush right
+  doc.save()
+  doc.transform(1, 0, slant, 1, -slant * dateY, 0)
   doc.fillColor('#ffffff').text(printDate, rightX - dateW, dateY, {
     width: dateW,
     lineBreak: false,
     lineGap: 0,
   })
+  doc.restore()
 
   let brandX = leftX
   if (logoBuffer) {
-    const logoH = h * 0.78
-    const logoW = h * 0.75
+    const logoH = h * 0.88
+    const logoW = h * 0.88
     try {
       doc.image(logoBuffer, leftX, y + (h - logoH) / 2, {
         fit: [logoW, logoH],
       })
-      brandX = leftX + logoW + dim.padding * 0.45
+      brandX = leftX + logoW + dim.padding * 0.5
     } catch {
       brandX = leftX
     }
@@ -230,19 +254,21 @@ function drawHeader(
 
   if (brandName) {
     const textW = Math.max(1, rightX - dateW - dim.padding - brandX)
-    doc
-      .font(BOLD)
-      .fontSize(headerFontSize)
-      .fillColor('#ffffff')
+    doc.font(headerFont).fontSize(headerFontSize)
     const textH = doc.heightOfString(brandName, { width: textW, lineBreak: false, lineGap: 0 })
     const textY = y + (h - textH) / 2 - headerFontSize * 0.08
-    doc
+
+    // Draw brand name with same slant
+    doc.save()
+    doc.transform(1, 0, slant, 1, -slant * textY, 0)
+    doc.fillColor('#ffffff')
       .text(brandName, brandX, textY, {
         width: textW,
         lineBreak: false,
         ellipsis: true,
         lineGap: 0,
       })
+    doc.restore()
   }
 
   doc.fillColor('#000000')
@@ -258,25 +284,21 @@ async function drawBoxLabel(
   logoBuffer: Buffer | null,
   brandName: string,
   printDate: string,
+  headerFont: string,
 ) {
   const { padding, fontSize, qrSize, headerH } = dim
   const contentY = y + headerH
   const contentH = dim.height - headerH
   const { textX, qrX, textW } = labelLayout(x, dim)
 
-  // Border
   doc.rect(x, y, dim.width, dim.height).stroke('#d1d5db')
+  drawHeader(doc, x, y, dim.width, headerH, brandName, logoBuffer, dim, printDate, headerFont)
 
-  // Header
-  drawHeader(doc, x, y, dim.width, headerH, brandName, logoBuffer, dim, printDate)
-
-  // QR code
   const qrUrl = `${appUrl}/boxes/${box.id}`
-  const qr = await qrBuffer(qrUrl, qrSize)
+  const qr = await qrBuffer(qrUrl, qrSize, dim.qrScale)
   const qrY = contentY + (contentH - qrSize) / 2
   doc.image(qr, qrX, qrY, { width: qrSize })
 
-  // Label — auto-shrink
   const labelText = box.label
   doc.font(BOLD)
   fitFontSize(doc, labelText, textW, fontSize.title * 1.8, fontSize.body)
@@ -289,7 +311,6 @@ async function drawBoxLabel(
 
   let lineY = contentY + padding + titleH + padding * 0.75
 
-  // Owner
   if (box.owner) {
     doc.font(REGULAR).fontSize(fontSize.body).fillColor('#374151')
       .text(`負責人  ${box.owner.name}`, textX, lineY, { width: textW, lineBreak: false, ellipsis: true })
@@ -297,7 +318,6 @@ async function drawBoxLabel(
     lineY += ownerH + padding * 0.5
   }
 
-  // ID pill
   drawIdPill(doc, box.id, x + padding, y + dim.height - padding - idPillHeight(fontSize.small), fontSize.small)
 
   doc.fillColor('#000000')
@@ -319,6 +339,7 @@ async function drawItemLabel(
   logoBuffer: Buffer | null,
   brandName: string,
   printDate: string,
+  headerFont: string,
 ) {
   const { padding, fontSize, qrSize, headerH } = dim
   const contentY = y + headerH
@@ -326,14 +347,13 @@ async function drawItemLabel(
   const { textX, qrX, textW } = labelLayout(x, dim)
 
   doc.rect(x, y, dim.width, dim.height).stroke('#d1d5db')
-  drawHeader(doc, x, y, dim.width, headerH, brandName, logoBuffer, dim, printDate)
+  drawHeader(doc, x, y, dim.width, headerH, brandName, logoBuffer, dim, printDate, headerFont)
 
   const qrUrl = `${appUrl}/items/${item.id}`
-  const qr = await qrBuffer(qrUrl, qrSize)
+  const qr = await qrBuffer(qrUrl, qrSize, dim.qrScale)
   const qrY = contentY + (contentH - qrSize) / 2
   doc.image(qr, qrX, qrY, { width: qrSize })
 
-  // Item name — auto-shrink
   doc.font(BOLD)
   fitFontSize(doc, item.name, textW, fontSize.title * 1.5, fontSize.body)
   doc.text(item.name, textX, contentY + padding, { width: textW, lineBreak: false, ellipsis: true })
@@ -341,7 +361,6 @@ async function drawItemLabel(
 
   let lineY = contentY + padding + titleH + padding * 0.65
 
-  // Owner
   if (item.owner) {
     doc.font(REGULAR).fontSize(fontSize.body).fillColor('#374151')
       .text(`負責人  ${item.owner.name}`, textX, lineY, { width: textW, lineBreak: false, ellipsis: true })
@@ -349,7 +368,6 @@ async function drawItemLabel(
     lineY += ownerH + padding * 0.45
   }
 
-  // Group + Box
   const meta: string[] = []
   if (item.group) meta.push(item.group.name)
   if (item.box) meta.push(item.box.label)
@@ -363,12 +381,12 @@ async function drawItemLabel(
     lineY += padding * 0.2
   }
 
-  // Tags
   if (item.tags.length > 0) {
-    drawTagPills(doc, item.tags, textX, lineY, textW, fontSize.small)
+    const idPillH = idPillHeight(fontSize.small)
+    const tagMaxY = y + dim.height - padding - idPillH - padding * 0.3
+    drawTagPills(doc, item.tags, textX, lineY, textW, fontSize.small, tagMaxY)
   }
 
-  // ID pill
   drawIdPill(doc, item.id, x + padding, y + dim.height - padding - idPillHeight(fontSize.small), fontSize.small)
 
   doc.fillColor('#000000')
@@ -393,7 +411,7 @@ export async function generateBoxStickerPdf(
       margins: { top: 0, left: 0, right: 0, bottom: 0 },
       autoFirstPage: false,
     })
-    registerFonts(doc)
+    const headerFont = registerFonts(doc)
     doc.on('data', (c: Buffer) => chunks.push(c))
     doc.on('end', () => resolve(Buffer.concat(chunks)))
     doc.on('error', reject)
@@ -409,13 +427,13 @@ export async function generateBoxStickerPdf(
           for (let j = 0; j < page.length; j++) {
             const col = j % dim.columns
             const row = Math.floor(j / dim.columns)
-            await drawBoxLabel(doc, page[j], appUrl, col * cellW, row * cellH, { ...dim, width: cellW, height: cellH }, logoBuffer, brandName, printDate)
+            await drawBoxLabel(doc, page[j], appUrl, col * cellW, row * cellH, { ...dim, width: cellW, height: cellH }, logoBuffer, brandName, printDate, headerFont)
           }
         }
       } else {
         for (const box of boxes) {
           doc.addPage()
-          await drawBoxLabel(doc, box, appUrl, 0, 0, dim, logoBuffer, brandName, printDate)
+          await drawBoxLabel(doc, box, appUrl, 0, 0, dim, logoBuffer, brandName, printDate, headerFont)
         }
       }
       doc.end()
@@ -442,7 +460,7 @@ export async function generateItemStickerPdf(
       margins: { top: 0, left: 0, right: 0, bottom: 0 },
       autoFirstPage: false,
     })
-    registerFonts(doc)
+    const headerFont = registerFonts(doc)
     doc.on('data', (c: Buffer) => chunks.push(c))
     doc.on('end', () => resolve(Buffer.concat(chunks)))
     doc.on('error', reject)
@@ -458,13 +476,13 @@ export async function generateItemStickerPdf(
           for (let j = 0; j < page.length; j++) {
             const col = j % dim.columns
             const row = Math.floor(j / dim.columns)
-            await drawItemLabel(doc, page[j], appUrl, col * cellW, row * cellH, { ...dim, width: cellW, height: cellH }, logoBuffer, brandName, printDate)
+            await drawItemLabel(doc, page[j], appUrl, col * cellW, row * cellH, { ...dim, width: cellW, height: cellH }, logoBuffer, brandName, printDate, headerFont)
           }
         }
       } else {
         for (const item of items) {
           doc.addPage()
-          await drawItemLabel(doc, item, appUrl, 0, 0, dim, logoBuffer, brandName, printDate)
+          await drawItemLabel(doc, item, appUrl, 0, 0, dim, logoBuffer, brandName, printDate, headerFont)
         }
       }
       doc.end()
