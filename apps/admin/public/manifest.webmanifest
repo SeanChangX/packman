@@ -1,20 +1,21 @@
 {
   "name": "Packman Admin",
   "short_name": "Packman Admin",
-  "description": "Packman 管理控制台",
-  "start_url": "/",
-  "scope": "/",
-  "display": "standalone",
-  "display_override": ["standalone", "minimal-ui"],
-  "background_color": "#050505",
-  "theme_color": "#DE272C",
-  "orientation": "any",
   "icons": [
     {
-      "src": "/packman-icon.svg",
-      "sizes": "any",
-      "type": "image/svg+xml",
-      "purpose": "any maskable"
+      "src": "/web-app-manifest-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/web-app-manifest-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
     }
-  ]
+  ],
+  "theme_color": "#DE272C",
+  "background_color": "#0F0F0F",
+  "display": "standalone"
 }

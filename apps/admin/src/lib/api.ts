@@ -1,4 +1,14 @@
-import type { User, Group, Box, BatteryRegulation, SelectOption, OllamaConfig, OllamaEndpoint } from '@packman/shared'
+import type {
+  AdminAuthStatus,
+  User,
+  Group,
+  Box,
+  BatteryRegulation,
+  SelectOption,
+  OllamaConfig,
+  OllamaEndpoint,
+  SystemSettings,
+} from '@packman/shared'
 
 function buildHeaders(options?: RequestInit): Headers {
   const headers = new Headers(options?.headers)
@@ -27,6 +37,23 @@ async function req<T>(url: string, options?: RequestInit): Promise<T> {
 }
 
 export const adminApi = {
+  adminStatus: async () => {
+    const res = await fetch('/auth/admin-status', { credentials: 'include' })
+    if (!res.ok) throw new Error('無法取得管理員狀態')
+    return res.json() as Promise<AdminAuthStatus>
+  },
+  setupAdmin: async (username: string, password: string) => {
+    const res = await fetch('/auth/admin-setup', {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, password }),
+    })
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ message: '建立失敗' }))
+      throw new Error(err.message)
+    }
+  },
   login: async (username: string, password: string) => {
     const res = await fetch('/auth/admin-login', {
       method: 'POST',
@@ -94,4 +121,12 @@ export const adminApi = {
     req<OllamaEndpoint>(`/api/admin/ollama-endpoints/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
   deleteOllamaEndpoint: (id: string) =>
     req<void>(`/api/admin/ollama-endpoints/${id}`, { method: 'DELETE' }),
+
+  settings: () => req<SystemSettings>('/api/admin/settings'),
+  updateAppSettings: (data: { appUrl: string; adminUrl: string; apiUrl: string }) =>
+    req<SystemSettings['app']>('/api/admin/settings/app', { method: 'PATCH', body: JSON.stringify(data) }),
+  updateSlackSettings: (data: { clientId: string; clientSecret?: string; workspaceId: string; redirectUri: string }) =>
+    req<SystemSettings['slack']>('/api/admin/settings/slack', { method: 'PATCH', body: JSON.stringify(data) }),
+  updateAdminAccount: (data: { username: string; password?: string }) =>
+    req<AdminAuthStatus>('/api/admin/settings/admin-account', { method: 'PATCH', body: JSON.stringify(data) }),
 }

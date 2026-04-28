@@ -43,17 +43,12 @@ Competition luggage management system for robotics teams. Built to replace the N
 cp .env.example .env
 ```
 
-Edit `.env` and fill in:
-- `SLACK_CLIENT_ID` — from Slack app
-- `SLACK_CLIENT_SECRET` — from Slack app
-- `SLACK_WORKSPACE_ID` — your team ID (starts with T)
-- `SLACK_REDIRECT_URI` — `http://YOUR_IP:8080/auth/slack/callback`
-- `APP_URL` — `http://YOUR_IP:3000`
-- `ADMIN_URL` — `http://YOUR_IP:3001`
-- `JWT_SECRET` — a random secret string
-- `MINIO_SECRET_KEY` — change from default!
+Edit `.env` and fill in the infrastructure settings:
+- `DATABASE_URL` — PostgreSQL connection string
+- `MINIO_*` — MinIO connection settings; change `MINIO_SECRET_KEY` from the default
+- `PORT` / `NODE_ENV` — API runtime settings
 
-Ollama servers and the active vision model are managed in **Admin → Ollama**. For parallel Ollama servers, pull the same selected model on each server. The admin page shows model coverage such as `2/3 servers`, and recognition only dispatches to servers that have the selected model.
+Slack OAuth, App URLs, the admin account, Ollama servers, the active vision model, and AI prompt settings are managed in the Admin UI. JWT and cookie signing secrets are generated automatically on first API startup and stored in the database.
 
 ### 3. Build and Start
 
@@ -68,7 +63,7 @@ The API seeds default data automatically on first startup. This creates:
 - **Groups**: 一個範例組別（可在管理後台刪除）
 - **Boxes**: 一個範例箱（可在管理後台刪除）
 
-The admin panel is protected separately with `ADMIN_USER` / `ADMIN_PASSWORD`, and forwards `ADMIN_API_SECRET` to the API internally. Slack login is only for normal app users.
+On first visit to the admin panel, create the admin username and password. Slack login is only for normal app users.
 
 ## Development
 

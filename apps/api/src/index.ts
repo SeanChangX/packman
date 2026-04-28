@@ -18,13 +18,13 @@ import { optionRoutes } from './routes/options'
 import { adminRoutes } from './routes/admin'
 import { seedDefaultData } from './seed'
 import { startAiTagQueueWorker } from './services/ai-tag-queue'
+import { getAppConfig, initRuntimeSecrets } from './services/runtime-config'
 
 const PORT = parseInt(process.env.PORT ?? '8080', 10)
-const APP_URL = process.env.APP_URL ?? 'http://localhost:3000'
-const ADMIN_URL = process.env.ADMIN_URL ?? 'http://localhost:3001'
 
 async function build() {
   const app = Fastify({ logger: { level: 'info' } })
+  const secrets = await initRuntimeSecrets()
 
   app.setErrorHandler((error, request, reply) => {
     request.log.error(error)
@@ -58,12 +58,17 @@ async function build() {
   })
 
   await app.register(cors, {
-    origin: [APP_URL, ADMIN_URL],
+    origin: (origin, callback) => {
+      if (!origin) return callback(null, true)
+      getAppConfig()
+        .then(({ appUrl, adminUrl }) => callback(null, origin === appUrl || origin === adminUrl))
+        .catch((err) => callback(err, false))
+    },
     credentials: true,
   })
 
   await app.register(cookie, {
-    secret: process.env.JWT_SECRET ?? 'fallback-secret',
+    secret: secrets.cookieSecret,
   })
 
   await app.register(multipart, {

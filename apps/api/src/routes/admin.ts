@@ -5,15 +5,26 @@ import { requireAdminOrAdminSecret } from '../plugins/auth'
 import {
   CreateOllamaEndpointSchema,
   CreateSelectOptionSchema,
+  UpdateAdminAccountSchema,
+  UpdateAppSettingsSchema,
   UpdateOllamaConfigSchema,
   UpdateOllamaEndpointSchema,
   UpdateSelectOptionSchema,
+  UpdateSlackSettingsSchema,
 } from '@packman/shared'
 import {
   analyzeImageWithOllama,
   listOllamaModelStatus,
   updateOllamaConfig,
 } from '../services/ollama'
+import {
+  getAdminAuthStatus,
+  getAppConfig,
+  getSlackConfig,
+  updateAdminAccount,
+  updateAppConfig,
+  updateSlackConfig,
+} from '../services/runtime-config'
 
 function toCsvRow(row: Record<string, unknown>): string {
   return Object.values(row)
@@ -42,6 +53,45 @@ async function ollamaConfigWithJobStats() {
 
 export async function adminRoutes(app: FastifyInstance) {
   app.addHook('preHandler', requireAdminOrAdminSecret)
+
+  app.get('/settings', async () => {
+    const [appConfig, slack, admin] = await Promise.all([
+      getAppConfig(),
+      getSlackConfig(),
+      getAdminAuthStatus(),
+    ])
+    return {
+      app: appConfig,
+      slack: {
+        clientId: slack.clientId,
+        clientSecretSet: slack.clientSecretSet,
+        workspaceId: slack.workspaceId,
+        redirectUri: slack.redirectUri,
+      },
+      admin,
+    }
+  })
+
+  app.patch('/settings/app', async (request) => {
+    const body = UpdateAppSettingsSchema.parse(request.body)
+    return updateAppConfig(body)
+  })
+
+  app.patch('/settings/slack', async (request) => {
+    const body = UpdateSlackSettingsSchema.parse(request.body)
+    return updateSlackConfig({
+      ...body,
+      clientSecret: body.clientSecret?.trim() || undefined,
+    })
+  })
+
+  app.patch('/settings/admin-account', async (request) => {
+    const body = UpdateAdminAccountSchema.parse(request.body)
+    return updateAdminAccount({
+      username: body.username,
+      password: body.password || undefined,
+    })
+  })
 
   app.get('/users', async () => {
     return prisma.user.findMany({

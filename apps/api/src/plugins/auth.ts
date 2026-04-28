@@ -2,6 +2,7 @@ import fp from 'fastify-plugin'
 import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify'
 import jwt from 'jsonwebtoken'
 import { prisma } from './prisma'
+import { getJwtExpiresIn, getJwtSecret } from '../services/runtime-config'
 
 export interface JwtPayload {
   userId: string
@@ -15,16 +16,12 @@ declare module 'fastify' {
   }
 }
 
-const JWT_SECRET = process.env.JWT_SECRET ?? 'dev-secret-change-me'
-const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN ?? '7d'
-const ADMIN_API_SECRET = process.env.ADMIN_API_SECRET ?? ''
-
 export function signToken(payload: JwtPayload, expiresIn?: string): string {
-  return jwt.sign(payload, JWT_SECRET, { expiresIn: expiresIn ?? JWT_EXPIRES_IN } as jwt.SignOptions)
+  return jwt.sign(payload, getJwtSecret(), { expiresIn: expiresIn ?? getJwtExpiresIn() } as jwt.SignOptions)
 }
 
 export function verifyToken(token: string): JwtPayload {
-  return jwt.verify(token, JWT_SECRET) as JwtPayload
+  return jwt.verify(token, getJwtSecret()) as JwtPayload
 }
 
 async function authPluginFn(app: FastifyInstance) {
@@ -80,7 +77,6 @@ function hasAdminPanelCookie(request: FastifyRequest): boolean {
 }
 
 export async function requireAuthOrAdminSecret(request: FastifyRequest, reply: FastifyReply) {
-  if (ADMIN_API_SECRET && request.headers['x-admin-auth'] === ADMIN_API_SECRET) return
   if (hasAdminPanelCookie(request)) return
   if (!request.userId) {
     return reply.status(401).send({ message: 'Unauthorized' })
@@ -88,7 +84,6 @@ export async function requireAuthOrAdminSecret(request: FastifyRequest, reply: F
 }
 
 export async function requireAdminOrAdminSecret(request: FastifyRequest, reply: FastifyReply) {
-  if (ADMIN_API_SECRET && request.headers['x-admin-auth'] === ADMIN_API_SECRET) return
   if (hasAdminPanelCookie(request)) return
   await requireAdmin(request, reply)
 }

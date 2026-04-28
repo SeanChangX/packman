@@ -49,8 +49,6 @@ services:
       MINIO_ENDPOINT: minio
       MINIO_PORT: "9000"
       PORT: "8080"
-      ADMIN_USER: ${ADMIN_USER:-admin}
-      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-changeme}
     depends_on:
       postgres:
         condition: service_healthy

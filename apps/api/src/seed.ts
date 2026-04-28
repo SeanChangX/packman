@@ -7,7 +7,7 @@ const LEGACY_DEFAULT_BOX_LABELS = [
 ]
 
 function defaultOllamaBaseUrls() {
-  return (process.env.OLLAMA_BASE_URL ?? 'http://localhost:11434')
+  return 'http://localhost:11434'
     .split(',')
     .map((url) => url.trim().replace(/\/+$/, ''))
     .filter(Boolean)
@@ -109,7 +109,7 @@ export async function seedDefaultData() {
     update: {},
     create: {
       key: 'ollama.visionModel',
-      value: process.env.OLLAMA_VISION_MODEL ?? 'llava',
+      value: 'llava',
     },
   })
   await prisma.systemSetting.upsert({

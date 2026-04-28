@@ -22,7 +22,7 @@ function Login() {
           </div>
         </div>
         <h1 className="mb-2 text-3xl font-bold text-app">Packman</h1>
-        <p className="mb-6 text-sm font-medium text-muted">行李管理系統 - 請使用 Slack 帳號登入</p>
+        <p className="mb-6 text-sm font-medium text-muted">行李管理系統 - 讓打包更 Elegant</p>
 
         {error && (
           <div className="mb-4 rounded-2xl border border-red-500/15 bg-red-500/10 p-3 text-sm font-semibold text-brand-600">

@@ -89,7 +89,7 @@ function Layout() {
 
   return (
     <div className="app-shell flex overflow-hidden">
-      <aside className="glass-nav hidden w-64 shrink-0 flex-col border-r md:flex">
+      <aside className="glass-nav hidden h-[100dvh] w-64 shrink-0 flex-col overflow-hidden border-r md:flex">
         <div className="flex items-center gap-3 border-b border-white/10 px-4 py-4">
           <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-brand-500 shadow-lg shadow-red-500/30">
             <Package className="h-5 w-5 text-white" />

@@ -18,7 +18,7 @@ function AdminDashboard() {
     <div className="space-y-6">
       <div className="page-header">
         <div>
-          <h1 className="page-title">Admin 總覽</h1>
+          <h1 className="page-title">儀表板</h1>
           <p className="page-subtitle">系統資料與打包狀態</p>
         </div>
       </div>

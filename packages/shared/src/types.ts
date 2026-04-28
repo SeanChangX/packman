@@ -150,6 +150,26 @@ export interface OllamaConfig {
   }
 }
 
+export interface AdminAuthStatus {
+  setupRequired: boolean
+  username: string
+}
+
+export interface SystemSettings {
+  app: {
+    appUrl: string
+    adminUrl: string
+    apiUrl: string
+  }
+  slack: {
+    clientId: string
+    clientSecretSet: boolean
+    workspaceId: string
+    redirectUri: string
+  }
+  admin: AdminAuthStatus
+}
+
 export interface PaginatedResponse<T> {
   data: T[]
   total: number

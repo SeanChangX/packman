@@ -5,8 +5,7 @@ import { requireAuth, requireAdmin } from '../plugins/auth'
 import { CreateItemSchema, UpdateItemSchema } from '@packman/shared'
 import { uploadToMinio, getPresignedUrl, deleteObject, objectNameFromUrl } from '../services/minio'
 import { enqueueAiTagJob } from '../services/ai-tag-queue'
-
-const APP_URL = process.env.APP_URL ?? 'http://localhost:3000'
+import { getAppConfig } from '../services/runtime-config'
 
 const itemInclude = {
   owner: { select: { id: true, name: true, avatarUrl: true } },
@@ -188,7 +187,8 @@ export async function itemRoutes(app: FastifyInstance) {
     '/:id/qr',
     { preHandler: requireAuth },
     async (request, reply) => {
-      const url = `${APP_URL}/items/${request.params.id}`
+      const { appUrl } = await getAppConfig()
+      const url = `${appUrl}/items/${request.params.id}`
       const png = await QRCode.toBuffer(url, { width: 300, margin: 2 })
       reply.type('image/png').send(png)
     }

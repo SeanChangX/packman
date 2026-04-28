@@ -2,22 +2,55 @@ import { FastifyInstance } from 'fastify'
 import axios from 'axios'
 import { prisma } from '../plugins/prisma'
 import { requireAuth, setAuthCookie, signToken, verifyToken } from '../plugins/auth'
+import { AdminAccountSchema } from '@packman/shared'
+import {
+  createInitialAdminAccount,
+  getAdminAuthStatus,
+  getAppConfig,
+  getSlackConfig,
+  verifyAdminLogin,
+} from '../services/runtime-config'
 
-const SLACK_CLIENT_ID = process.env.SLACK_CLIENT_ID ?? ''
-const SLACK_CLIENT_SECRET = process.env.SLACK_CLIENT_SECRET ?? ''
-const SLACK_REDIRECT_URI = process.env.SLACK_REDIRECT_URI ?? ''
-const SLACK_WORKSPACE_ID = process.env.SLACK_WORKSPACE_ID ?? ''
-const APP_URL = process.env.APP_URL ?? 'http://localhost:3000'
-const ADMIN_USER = process.env.ADMIN_USER ?? 'admin'
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD ?? 'changeme'
+const ADMIN_LOGIN_WINDOW_MS = 15 * 60 * 1000
+const ADMIN_LOGIN_MAX_FAILURES = 5
+const adminLoginFailures = new Map<string, { count: number; resetAt: number }>()
+
+function adminLoginKey(request: { ip: string }, username: string) {
+  return `${request.ip}:${username.trim().toLowerCase()}`
+}
+
+function isAdminLoginLimited(key: string) {
+  const entry = adminLoginFailures.get(key)
+  if (!entry) return false
+  if (Date.now() > entry.resetAt) {
+    adminLoginFailures.delete(key)
+    return false
+  }
+  return entry.count >= ADMIN_LOGIN_MAX_FAILURES
+}
+
+function recordAdminLoginFailure(key: string) {
+  const now = Date.now()
+  const entry = adminLoginFailures.get(key)
+  if (!entry || now > entry.resetAt) {
+    adminLoginFailures.set(key, { count: 1, resetAt: now + ADMIN_LOGIN_WINDOW_MS })
+    return
+  }
+  adminLoginFailures.set(key, { ...entry, count: entry.count + 1 })
+}
 
 export async function authRoutes(app: FastifyInstance) {
   // Initiate Slack OAuth
   app.get('/slack', async (request, reply) => {
+    const [{ appUrl }, slack] = await Promise.all([getAppConfig(), getSlackConfig()])
+    if (!slack.clientId || !slack.clientSecret || !slack.redirectUri) {
+      return reply.redirect(`${appUrl}/login?error=slack_not_configured`)
+    }
+
     const params = new URLSearchParams({
-      client_id: SLACK_CLIENT_ID,
+      client_id: slack.clientId,
       user_scope: 'identity.basic,identity.email,identity.avatar',
-      redirect_uri: SLACK_REDIRECT_URI,
+      redirect_uri: slack.redirectUri,
     })
     reply.redirect(`https://slack.com/oauth/v2/authorize?${params}`)
   })
@@ -27,9 +60,14 @@ export async function authRoutes(app: FastifyInstance) {
     '/slack/callback',
     async (request, reply) => {
       const { code, error } = request.query
+      const [{ appUrl }, slack] = await Promise.all([getAppConfig(), getSlackConfig()])
 
       if (error || !code) {
-        return reply.redirect(`${APP_URL}/login?error=slack_denied`)
+        return reply.redirect(`${appUrl}/login?error=slack_denied`)
+      }
+
+      if (!slack.clientId || !slack.clientSecret || !slack.redirectUri) {
+        return reply.redirect(`${appUrl}/login?error=slack_not_configured`)
       }
 
       try {
@@ -43,9 +81,9 @@ export async function authRoutes(app: FastifyInstance) {
           'https://slack.com/api/oauth.v2.access',
           new URLSearchParams({
             code,
-            client_id: SLACK_CLIENT_ID,
-            client_secret: SLACK_CLIENT_SECRET,
-            redirect_uri: SLACK_REDIRECT_URI,
+            client_id: slack.clientId,
+            client_secret: slack.clientSecret,
+            redirect_uri: slack.redirectUri,
           }),
           { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
         )
@@ -58,8 +96,8 @@ export async function authRoutes(app: FastifyInstance) {
         if (!accessToken) throw new Error('No user access token from Slack')
 
         // Restrict to specific workspace
-        if (SLACK_WORKSPACE_ID && tokenRes.data.team?.id !== SLACK_WORKSPACE_ID) {
-          return reply.redirect(`${APP_URL}/login?error=wrong_workspace`)
+        if (slack.workspaceId && tokenRes.data.team?.id !== slack.workspaceId) {
+          return reply.redirect(`${appUrl}/login?error=wrong_workspace`)
         }
 
         const userToken = tokenRes.data.authed_user?.id
@@ -97,11 +135,25 @@ export async function authRoutes(app: FastifyInstance) {
         })
 
         await setAuthCookie(reply, user.id, user.role)
-        reply.redirect(APP_URL)
+        reply.redirect(appUrl)
       } catch (err) {
         app.log.error(err)
-        reply.redirect(`${APP_URL}/login?error=auth_failed`)
+        reply.redirect(`${appUrl}/login?error=auth_failed`)
       }
+    }
+  )
+
+  app.get('/admin-status', async () => {
+    const status = await getAdminAuthStatus()
+    return { setupRequired: status.setupRequired, username: status.setupRequired ? status.username : '' }
+  })
+
+  app.post<{ Body: { username: string; password: string } }>(
+    '/admin-setup',
+    async (request, reply) => {
+      const { username, password } = AdminAccountSchema.parse(request.body)
+      await createInitialAdminAccount(username, password)
+      return reply.status(201).send(await getAdminAuthStatus())
     }
   )
 
@@ -110,9 +162,15 @@ export async function authRoutes(app: FastifyInstance) {
     '/admin-login',
     async (request, reply) => {
       const { username, password } = request.body
-      if (username !== ADMIN_USER || password !== ADMIN_PASSWORD) {
+      const key = adminLoginKey(request, username)
+      if (isAdminLoginLimited(key)) {
+        return reply.status(429).send({ message: '登入失敗次數過多，請稍後再試' })
+      }
+      if (!await verifyAdminLogin(username, password)) {
+        recordAdminLoginFailure(key)
         return reply.status(401).send({ message: '帳號或密碼錯誤' })
       }
+      adminLoginFailures.delete(key)
       const token = signToken({ userId: '__admin__', role: 'ADMIN_PANEL' }, '1d')
       reply.setCookie('packman_admin_token', token, {
         httpOnly: true,

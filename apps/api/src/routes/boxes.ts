@@ -4,8 +4,7 @@ import { prisma } from '../plugins/prisma'
 import { requireAuth, requireAdminOrAdminSecret, requireAuthOrAdminSecret } from '../plugins/auth'
 import { CreateBoxSchema, UpdateBoxSchema } from '@packman/shared'
 import { generateBoxStickerPdf } from '../services/pdf'
-
-const APP_URL = process.env.APP_URL ?? 'http://localhost:3000'
+import { getAppConfig } from '../services/runtime-config'
 
 const boxInclude = {
   owner: { select: { id: true, name: true, avatarUrl: true } },
@@ -94,7 +93,8 @@ export async function boxRoutes(app: FastifyInstance) {
     '/:id/qr',
     { preHandler: requireAuth },
     async (request, reply) => {
-      const url = `${APP_URL}/boxes/${request.params.id}`
+      const { appUrl } = await getAppConfig()
+      const url = `${appUrl}/boxes/${request.params.id}`
       const png = await QRCode.toBuffer(url, { width: 300, margin: 2 })
       reply.type('image/png').send(png)
     }
@@ -115,7 +115,8 @@ export async function boxRoutes(app: FastifyInstance) {
       if (!box) return reply.status(404).send({ message: 'Box not found' })
 
       const size = (request.query.size as any) ?? 'MEDIUM'
-      const pdfBuffer = await generateBoxStickerPdf([box], APP_URL, size)
+      const { appUrl } = await getAppConfig()
+      const pdfBuffer = await generateBoxStickerPdf([box], appUrl, size)
 
       reply
         .header('Content-Type', 'application/pdf')

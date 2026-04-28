@@ -3,8 +3,7 @@ import { prisma } from '../plugins/prisma'
 import { requireAdminOrAdminSecret } from '../plugins/auth'
 import { StickerRequestSchema } from '@packman/shared'
 import { generateItemStickerPdf, generateBoxStickerPdf } from '../services/pdf'
-
-const APP_URL = process.env.APP_URL ?? 'http://localhost:3000'
+import { getAppConfig } from '../services/runtime-config'
 
 export async function stickerRoutes(app: FastifyInstance) {
   // Bulk item stickers PDF
@@ -20,7 +19,8 @@ export async function stickerRoutes(app: FastifyInstance) {
       },
     })
 
-    const pdfBuffer = await generateItemStickerPdf(items, APP_URL, body.size)
+    const { appUrl } = await getAppConfig()
+    const pdfBuffer = await generateItemStickerPdf(items, appUrl, body.size)
 
     reply
       .header('Content-Type', 'application/pdf')
@@ -40,7 +40,8 @@ export async function stickerRoutes(app: FastifyInstance) {
       },
     })
 
-    const pdfBuffer = await generateBoxStickerPdf(boxes, APP_URL, body.size)
+    const { appUrl } = await getAppConfig()
+    const pdfBuffer = await generateBoxStickerPdf(boxes, appUrl, body.size)
 
     reply
       .header('Content-Type', 'application/pdf')

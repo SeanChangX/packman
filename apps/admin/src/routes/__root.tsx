@@ -1,5 +1,5 @@
 import { createRootRoute, Outlet, Link, redirect, useLocation } from '@tanstack/react-router'
-import { Users, Tag, Download, LayoutDashboard, Package, Battery, LogOut, Cpu, List } from 'lucide-react'
+import { Users, Tag, Download, LayoutDashboard, Package, Battery, LogOut, Cpu, List, Settings } from 'lucide-react'
 import { adminApi } from '../lib/api'
 
 const navItems = [
@@ -10,7 +10,8 @@ const navItems = [
   { to: '/battery-regulations' as const, icon: Battery, label: '電池規定' },
   { to: '/select-options' as const, icon: List, label: '選項管理' },
   { to: '/export' as const, icon: Download, label: '匯出資料' },
-  { to: '/ollama' as const, icon: Cpu, label: 'Ollama 測試' },
+  { to: '/ollama' as const, icon: Cpu, label: 'AI 辨識' },
+  { to: '/settings' as const, icon: Settings, label: '系統設定' },
 ]
 
 function AdminLayout() {
@@ -24,7 +25,7 @@ function AdminLayout() {
 
   return (
     <div className="app-shell flex overflow-hidden">
-      <aside className="glass-nav hidden w-64 shrink-0 flex-col border-r md:flex">
+      <aside className="glass-nav hidden h-[100dvh] w-64 shrink-0 flex-col overflow-hidden border-r md:flex">
         <div className="flex items-center gap-3 border-b border-white/10 px-4 py-4">
           <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-brand-500 shadow-lg shadow-red-500/30">
             <Package className="h-5 w-5 text-white" />

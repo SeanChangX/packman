@@ -49,7 +49,7 @@ export async function getPresignedUrl(objectName: string): Promise<string> {
   const ssl = process.env.MINIO_USE_SSL === 'true'
   const protocol = ssl ? 'https' : 'http'
 
-  // Use the API_URL for external access if set, otherwise construct from env
+  // Use MINIO_PUBLIC_URL for external access if set, otherwise construct from MinIO env.
   const baseUrl = process.env.MINIO_PUBLIC_URL
     ?? `${protocol}://${endpoint}:${port}`
 

@@ -108,11 +108,38 @@ export const UpdateOllamaEndpointSchema = z.object({
   enabled: z.boolean().optional(),
 })
 
+export const UpdateAppSettingsSchema = z.object({
+  appUrl: z.string().url().max(300),
+  adminUrl: z.string().url().max(300),
+  apiUrl: z.string().url().max(300),
+})
+
+export const UpdateSlackSettingsSchema = z.object({
+  clientId: z.string().max(200),
+  clientSecret: z.string().max(500).optional(),
+  workspaceId: z.string().max(100),
+  redirectUri: z.union([z.literal(''), z.string().url().max(300)]),
+})
+
+export const AdminAccountSchema = z.object({
+  username: z.string().trim().min(3).max(80),
+  password: z.string().min(12).max(128),
+})
+
+export const UpdateAdminAccountSchema = z.object({
+  username: z.string().trim().min(3).max(80),
+  password: z.string().min(12).max(128).optional(),
+})
+
 export type CreateSelectOptionInput = z.infer<typeof CreateSelectOptionSchema>
 export type UpdateSelectOptionInput = z.infer<typeof UpdateSelectOptionSchema>
 export type UpdateOllamaConfigInput = z.infer<typeof UpdateOllamaConfigSchema>
 export type CreateOllamaEndpointInput = z.infer<typeof CreateOllamaEndpointSchema>
 export type UpdateOllamaEndpointInput = z.infer<typeof UpdateOllamaEndpointSchema>
+export type UpdateAppSettingsInput = z.infer<typeof UpdateAppSettingsSchema>
+export type UpdateSlackSettingsInput = z.infer<typeof UpdateSlackSettingsSchema>
+export type AdminAccountInput = z.infer<typeof AdminAccountSchema>
+export type UpdateAdminAccountInput = z.infer<typeof UpdateAdminAccountSchema>
 
 export type CreateGroupInput = z.infer<typeof CreateGroupSchema>
 export type UpdateGroupInput = z.infer<typeof UpdateGroupSchema>

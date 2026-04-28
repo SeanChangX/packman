@@ -6,7 +6,7 @@ const MODEL_SETTING_KEY = 'ollama.visionModel'
 const GENERATE_TIMEOUT_SETTING_KEY = 'ollama.generateTimeoutMs'
 const HEALTH_TIMEOUT_SETTING_KEY = 'ollama.healthTimeoutMs'
 const TAG_PROMPT_SETTING_KEY = 'ollama.tagPrompt'
-const DEFAULT_MODEL = process.env.OLLAMA_VISION_MODEL ?? 'llava'
+const DEFAULT_MODEL = 'llava'
 const DEFAULT_GENERATE_TIMEOUT_MS = 60_000
 const DEFAULT_HEALTH_TIMEOUT_MS = 5_000
 
@@ -46,8 +46,8 @@ function normalizeBaseUrl(url: string) {
   return url.trim().replace(/\/+$/, '')
 }
 
-function envBaseUrls() {
-  return (process.env.OLLAMA_BASE_URL ?? 'http://localhost:11434')
+function defaultBaseUrls() {
+  return 'http://localhost:11434'
     .split(',')
     .map(normalizeBaseUrl)
     .filter(Boolean)
@@ -115,7 +115,7 @@ export async function updateOllamaConfig({
 export async function ensureOllamaDefaults() {
   const endpointCount = await prisma.ollamaEndpoint.count()
   if (endpointCount === 0) {
-    for (const baseUrl of envBaseUrls()) {
+    for (const baseUrl of defaultBaseUrls()) {
       await prisma.ollamaEndpoint.upsert({
         where: { baseUrl },
         update: {},
@@ -154,7 +154,7 @@ async function getEnabledEndpoints(): Promise<EndpointCandidate[]> {
 
   if (endpoints.length > 0) return endpoints
 
-  return envBaseUrls().map((baseUrl, index) => ({
+  return defaultBaseUrls().map((baseUrl, index) => ({
     id: `env-${index}`,
     baseUrl,
     enabled: true,
