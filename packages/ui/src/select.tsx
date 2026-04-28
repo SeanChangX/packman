@@ -43,6 +43,19 @@ export function Select<T extends string>({
     return () => document.removeEventListener('pointerdown', onPointerDown)
   }, [])
 
+  useEffect(() => {
+    if (!open) return
+    const updateRect = () => {
+      if (btnRef.current) setRect(btnRef.current.getBoundingClientRect())
+    }
+    window.addEventListener('scroll', updateRect, true)
+    window.addEventListener('resize', updateRect)
+    return () => {
+      window.removeEventListener('scroll', updateRect, true)
+      window.removeEventListener('resize', updateRect)
+    }
+  }, [open])
+
   const handleOpen = () => {
     if (!open && btnRef.current) setRect(btnRef.current.getBoundingClientRect())
     setOpen((next) => !next)

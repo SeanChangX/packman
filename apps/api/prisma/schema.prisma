@@ -65,6 +65,7 @@ model Item {
   tags           String[]
   specialNotes   String?
   photoUrl       String?
+  weightG        Int?
   aiTagStatus    AiTagStatus     @default(NONE)
   createdAt      DateTime        @default(now())
   aiTagJobs       AiTagJob[]

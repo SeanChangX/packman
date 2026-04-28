@@ -178,6 +178,27 @@ function NewItemPage() {
           </div>
         </div>
 
+        <div>
+          <label className="label">重量（g）</label>
+          <input
+            type="number"
+            min={1}
+            max={1000000}
+            className="input mt-1"
+            placeholder="例: 250"
+            {...register('weightG', {
+              valueAsNumber: true,
+              min: 1,
+              max: 1000000,
+              setValueAs: (v) => (v === '' || isNaN(Number(v)) ? null : Number(v)),
+            })}
+          />
+          <p className="mt-1 text-xs text-muted">
+            {photoFile ? '上傳照片後 AI 會自動估算，也可以手動填入' : '可手動填入，或上傳照片後讓 AI 自動估算'}
+          </p>
+          {errors.weightG && <p className="mt-1 text-xs text-red-500">重量需介於 1-1,000,000 g</p>}
+        </div>
+
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
             <label className="label">指定箱子</label>

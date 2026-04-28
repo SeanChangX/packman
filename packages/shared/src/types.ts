@@ -44,6 +44,7 @@ export interface Box {
   priority?: number
   items?: Item[]
   itemCount?: number
+  totalWeightG?: number
   createdAt: string
 }
 
@@ -66,6 +67,7 @@ export interface Item {
   tags: string[]
   specialNotes?: string
   photoUrl?: string
+  weightG?: number | null
   aiTagStatus: AiTagStatus
   aiTagJobs?: AiTagJob[]
   createdAt: string
@@ -139,6 +141,8 @@ export interface OllamaConfig {
   healthTimeoutMs: number
   tagPrompt: string
   defaultTagPrompt: string
+  weightPrompt: string
+  defaultWeightPrompt: string
   models: string[]
   endpoints: OllamaEndpointStatus[]
   aiTagJobs?: {

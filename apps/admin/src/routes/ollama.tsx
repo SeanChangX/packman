@@ -7,7 +7,7 @@ import { adminApi } from '../lib/api'
 import { Select } from '../lib/select'
 import type { OllamaConfig } from '@packman/shared'
 
-type Result = { ok: boolean; tags: string[]; raw: string; model: string; endpoint: string; latencyMs: number }
+type Result = { ok: boolean; tags: string[]; weightG: number | null; raw: string; model: string; endpoint: string; latencyMs: number }
 
 function formatLatency(ms?: number | null) {
   if (!ms) return '—'
@@ -31,6 +31,7 @@ function OllamaTest() {
   const [generateTimeoutSeconds, setGenerateTimeoutSeconds] = useState('60')
   const [healthTimeoutSeconds, setHealthTimeoutSeconds] = useState('5')
   const [tagPrompt, setTagPrompt] = useState('')
+  const [weightPrompt, setWeightPrompt] = useState('')
   const [editingEndpointId, setEditingEndpointId] = useState<string | null>(null)
   const [editingBaseUrl, setEditingBaseUrl] = useState('')
   const inputRef = useRef<HTMLInputElement>(null)
@@ -47,6 +48,7 @@ function OllamaTest() {
     setGenerateTimeoutSeconds(String(Math.round(generateTimeoutMs / 1000)))
     setHealthTimeoutSeconds(String(Math.round(healthTimeoutMs / 1000)))
     setTagPrompt(config.tagPrompt || config.defaultTagPrompt || '')
+    setWeightPrompt(config.weightPrompt || config.defaultWeightPrompt || '')
   }, [config])
 
   const refreshConfig = () => qc.invalidateQueries({ queryKey: ['ollama-config'] })
@@ -72,11 +74,20 @@ function OllamaTest() {
     onError: (e: unknown) => showToast((e as Error)?.message ?? 'Timeout 更新失敗', 'error'),
   })
 
-  const updatePrompt = useMutation({
+  const updateTagPrompt = useMutation({
     mutationFn: (prompt: string) => adminApi.updateOllamaConfig({ tagPrompt: prompt }),
     onSuccess: () => {
       refreshConfig()
-      showToast('Ollama prompt 已更新', 'success')
+      showToast('Tag prompt 已更新', 'success')
+    },
+    onError: (e: unknown) => showToast((e as Error)?.message ?? 'Prompt 更新失敗', 'error'),
+  })
+
+  const updateWeightPrompt = useMutation({
+    mutationFn: (prompt: string) => adminApi.updateOllamaConfig({ weightPrompt: prompt }),
+    onSuccess: () => {
+      refreshConfig()
+      showToast('Weight prompt 已更新', 'success')
     },
     onError: (e: unknown) => showToast((e as Error)?.message ?? 'Prompt 更新失敗', 'error'),
   })
@@ -164,6 +175,7 @@ function OllamaTest() {
   const generateTimeoutValid = Number.isFinite(generateTimeoutValue) && generateTimeoutValue >= 5 && generateTimeoutValue <= 600
   const healthTimeoutValid = Number.isFinite(healthTimeoutValue) && healthTimeoutValue >= 1 && healthTimeoutValue <= 60
   const promptValid = tagPrompt.trim().length > 0 && tagPrompt.trim().length <= 2000
+  const weightPromptValid = weightPrompt.trim().length > 0 && weightPrompt.trim().length <= 2000
 
   return (
     <div className="page space-y-5">
@@ -291,13 +303,42 @@ function OllamaTest() {
               </button>
               <button
                 className="btn-primary"
-                disabled={!promptValid || updatePrompt.isPending}
-                onClick={() => updatePrompt.mutate(tagPrompt.trim())}
+                disabled={!promptValid || updateTagPrompt.isPending}
+                onClick={() => updateTagPrompt.mutate(tagPrompt.trim())}
               >
                 儲存
               </button>
             </div>
             <p className="mt-2 text-xs text-muted">{tagPrompt.length} / 2000</p>
+          </div>
+
+          <div className="card p-5">
+            <div className="mb-3">
+              <h2 className="text-sm font-bold text-app">Weight Prompt</h2>
+              <p className="text-xs text-muted">用於估算物品重量，輸出需為整數（公克），無法解析則不更新重量</p>
+            </div>
+            <textarea
+              className="input min-h-28 font-mono text-xs"
+              value={weightPrompt}
+              onChange={(e) => setWeightPrompt(e.target.value)}
+            />
+            <div className="mt-3 flex flex-wrap justify-end gap-2">
+              <button
+                className="btn-secondary"
+                type="button"
+                onClick={() => setWeightPrompt(config?.defaultWeightPrompt ?? '')}
+              >
+                恢復預設
+              </button>
+              <button
+                className="btn-primary"
+                disabled={!weightPromptValid || updateWeightPrompt.isPending}
+                onClick={() => updateWeightPrompt.mutate(weightPrompt.trim())}
+              >
+                儲存
+              </button>
+            </div>
+            <p className="mt-2 text-xs text-muted">{weightPrompt.length} / 2000</p>
           </div>
 
           <div className="card overflow-hidden">
@@ -467,6 +508,12 @@ function OllamaTest() {
                       </span>
                     ))}
                   </div>
+                </div>
+                <div>
+                  <p className="mb-1 text-xs font-semibold text-muted">估算重量</p>
+                  <p className="text-sm font-semibold text-app">
+                    {result.weightG != null ? `${result.weightG.toLocaleString()} g` : '無法估算'}
+                  </p>
                 </div>
                 <div>
                   <p className="mb-1 text-xs font-semibold text-muted">原始輸出</p>

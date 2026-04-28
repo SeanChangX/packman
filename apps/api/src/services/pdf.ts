@@ -127,10 +127,11 @@ function fitFontSize(doc: PDFKit.PDFDocument, text: string, maxWidth: number, st
 }
 
 function fitSingleLineText(doc: PDFKit.PDFDocument, text: string, maxWidth: number) {
+  const safeMax = maxWidth - 0.5
   let label = text.trim().slice(0, 24)
-  if (doc.widthOfString(label) <= maxWidth) return label
+  if (doc.widthOfString(label) <= safeMax) return label
 
-  while (label.length > 0 && doc.widthOfString(`${label}...`) > maxWidth) {
+  while (label.length > 0 && doc.widthOfString(`${label}...`) > safeMax) {
     label = label.slice(0, -1)
   }
   return label ? `${label}...` : ''
@@ -195,6 +196,7 @@ function drawTagPills(
         width: textW,
         lineBreak: false,
         lineGap: 0,
+        ellipsis: true,
       })
     cursorX += pillW + gap
   }

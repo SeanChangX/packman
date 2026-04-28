@@ -233,6 +233,12 @@ function ItemsPage() {
                               <p className="text-xs font-semibold text-muted">數量 / 箱子</p>
                               <p className="mt-1 truncate text-app">{item.quantity} / {item.box?.label ?? '—'}</p>
                             </div>
+                            <div className="min-w-0">
+                              <p className="text-xs font-semibold text-muted">重量</p>
+                              <p className="mt-1 truncate text-app">
+                                {item.weightG != null ? `${item.weightG.toLocaleString()} g` : '—'}
+                              </p>
+                            </div>
                           </div>
                         </div>
                       </div>
@@ -259,7 +265,7 @@ function ItemsPage() {
                     />
                   </th>
                 )}
-                {['品項', '負責人', '組別', '運送方式', '數量', '箱子', '狀態', ''].map((h) => (
+                {['品項', '負責人', '組別', '運送方式', '數量', '重量', '箱子', '狀態', ''].map((h) => (
                   <th key={h} className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted">{h}</th>
                 ))}
               </tr>
@@ -325,6 +331,9 @@ function ItemsPage() {
                         {item.shippingMethod ? getLabelFromOptions(shippingOpts, item.shippingMethod) : '—'}
                       </td>
                       <td className="px-4 py-3 text-muted">{item.quantity}</td>
+                      <td className="px-4 py-3 text-muted">
+                        {item.weightG != null ? `${item.weightG.toLocaleString()} g` : '—'}
+                      </td>
                       <td className="px-4 py-3 text-muted">
                         {item.box?.label ?? '—'}
                       </td>

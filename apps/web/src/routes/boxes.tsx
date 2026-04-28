@@ -2,7 +2,7 @@ import { createFileRoute, Link } from '@tanstack/react-router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { useForm } from 'react-hook-form'
-import { Package, Plus, Trash2, UserRound, X } from 'lucide-react'
+import { Package, Plus, Trash2, UserRound, Weight, X } from 'lucide-react'
 import { useToast } from '@packman/ui'
 import { boxesApi, usersApi } from '../lib/api'
 import { STATUS_LABELS, STATUS_COLORS, cn, formatApiError } from '../lib/utils'
@@ -125,10 +125,18 @@ function BoxesPage() {
       <div className="flex items-start justify-between gap-4">
         <Link to="/boxes/$id" params={{ id: box!.id }} className="min-w-0 flex-1">
           <span className="block truncate text-2xl font-bold text-app">{box!.label}</span>
-          <span className="mt-2 inline-flex items-center gap-1.5 text-sm text-muted">
-            <Package className="h-4 w-4" />
-            {box!.itemCount ?? 0} 件物品
-          </span>
+          <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted">
+            <span className="inline-flex items-center gap-1.5">
+              <Package className="h-4 w-4" />
+              {box!.itemCount ?? 0} 件物品
+            </span>
+            {(box!.totalWeightG ?? 0) > 0 && (
+              <span className="inline-flex items-center gap-1.5">
+                <Weight className="h-4 w-4" />
+                {(box!.totalWeightG! / 1000).toFixed(2).replace(/\.?0+$/, '')} kg
+              </span>
+            )}
+          </div>
         </Link>
         {isAdmin
           ? <Select

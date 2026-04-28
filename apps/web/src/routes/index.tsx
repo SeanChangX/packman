@@ -120,6 +120,11 @@ function Dashboard() {
             >
               <span className="text-lg font-bold">{box.label}</span>
               <span className="text-xs opacity-70">{STATUS_LABELS[box.status]}</span>
+              {(box.totalWeightG ?? 0) > 0 && (
+                <span className="mt-0.5 text-xs opacity-60">
+                  {(box.totalWeightG! / 1000).toFixed(2).replace(/\.?0+$/, '')} kg
+                </span>
+              )}
             </Link>
           ))}
         </div>

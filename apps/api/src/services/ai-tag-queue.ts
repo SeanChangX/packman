@@ -131,7 +131,7 @@ async function claimNextJob(): Promise<ClaimedJob | null> {
   })
 }
 
-async function completeJob(job: ClaimedJob, tags: string[]) {
+async function completeJob(job: ClaimedJob, tags: string[], weightG: number | null) {
   await prisma.$transaction(async (tx) => {
     const updated = await tx.aiTagJob.updateMany({
       where: { id: job.id, status: 'RUNNING', lockedBy: WORKER_ID },
@@ -145,9 +145,15 @@ async function completeJob(job: ClaimedJob, tags: string[]) {
     })
     if (updated.count === 0) return
 
+    const current = await tx.item.findUnique({ where: { id: job.itemId }, select: { weightG: true } })
     await tx.item.update({
       where: { id: job.itemId },
-      data: { tags, aiTagStatus: 'DONE' },
+      data: {
+        tags,
+        aiTagStatus: 'DONE',
+        // Only fill AI weight if user hasn't set one manually
+        ...(weightG !== null && current?.weightG == null ? { weightG } : {}),
+      },
     })
   })
 }
@@ -186,7 +192,7 @@ async function processJob(job: ClaimedJob, app: FastifyInstance) {
   try {
     const imageBuffer = await getObjectBuffer(job.objectName)
     const result = await analyzeImageWithOllama(imageBuffer)
-    await completeJob(job, result.tags)
+    await completeJob(job, result.tags, result.weightG)
   } catch (error) {
     app.log.error({ err: error, jobId: job.id, itemId: job.itemId }, 'AI tag job failed')
     await failJob(job, error)

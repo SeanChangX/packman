@@ -21,12 +21,14 @@ export async function boxRoutes(app: FastifyInstance) {
       include: {
         ...boxInclude,
         _count: { select: { items: true } },
+        items: { select: { weightG: true, quantity: true } },
       },
       orderBy: { label: 'asc' },
     })
-    return boxes.map(({ _count, ...box }) => ({
+    return boxes.map(({ _count, items, ...box }) => ({
       ...box,
       itemCount: _count.items,
+      totalWeightG: items.reduce((sum: number, item: { weightG: number | null; quantity: number }) => sum + (item.weightG ?? 0) * item.quantity, 0),
     }))
   })
 

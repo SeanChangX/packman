@@ -31,6 +31,7 @@ export const CreateItemSchema = z.object({
   useCategory: z.string().optional(),
   tags: z.array(z.string()).default([]),
   specialNotes: z.string().optional(),
+  weightG: z.number().int().min(1).max(1_000_000).nullable().optional(),
 })
 
 export const UpdateItemSchema = CreateItemSchema.partial().extend({
@@ -41,6 +42,7 @@ export const UpdateItemSchema = CreateItemSchema.partial().extend({
   boxId: z.string().uuid().nullable().optional(),
   useCategory: z.string().nullable().optional(),
   specialNotes: z.string().nullable().optional(),
+  weightG: z.number().int().min(1).max(1_000_000).nullable().optional(),
   status: z.enum(['NOT_PACKED', 'PACKED', 'SEALED']).optional(),
 })
 
@@ -96,6 +98,7 @@ export const UpdateOllamaConfigSchema = z.object({
   generateTimeoutMs: z.number().int().min(5_000).max(600_000).optional(),
   healthTimeoutMs: z.number().int().min(1_000).max(60_000).optional(),
   tagPrompt: z.string().min(1).max(2000).optional(),
+  weightPrompt: z.string().min(1).max(2000).optional(),
 })
 
 export const CreateOllamaEndpointSchema = z.object({

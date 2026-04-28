@@ -289,6 +289,24 @@ function ItemDetailPage() {
                   {errors.quantity && <p className="mt-1 text-xs text-red-500">數量需介於 1-9999</p>}
                   </div>
                   <div>
+                    <label className="label">重量（g）</label>
+                    <input
+                      type="number"
+                      min={1}
+                      max={1000000}
+                      className="input mt-1"
+                      placeholder="例: 250"
+                      {...register('weightG', {
+                        valueAsNumber: true,
+                        min: 1,
+                        max: 1000000,
+                        setValueAs: (v) => (v === '' || isNaN(Number(v)) ? null : Number(v)),
+                      })}
+                    />
+                    {errors.weightG && <p className="mt-1 text-xs text-red-500">重量需介於 1-1,000,000 g</p>}
+                  </div>
+                </div>
+                <div>
                     <label className="label">指定箱子</label>
                     <SelectController
                       name="boxId"
@@ -301,7 +319,6 @@ function ItemDetailPage() {
                         ...(boxes?.map((b) => ({ value: b.id, label: b.label })) ?? []),
                       ]}
                     />
-                  </div>
                 </div>
                 <div>
                   <label className="label">說明</label>
@@ -369,6 +386,7 @@ function ItemDetailPage() {
                   ['負責人', item.owner?.name ?? '—'],
                   ['組別', item.group?.name ?? '—'],
                   ['數量', item.quantity],
+                  ['重量', item.weightG != null ? `${item.weightG.toLocaleString()} g` : '—'],
                   ['運送方式', item.shippingMethod ? getLabelFromOptions(shippingOpts, item.shippingMethod) : '—'],
                   ['箱子', item.box?.label ?? '—'],
                   ['用途分類', item.useCategory ? getLabelFromOptions(categoryOpts, item.useCategory) : '—'],

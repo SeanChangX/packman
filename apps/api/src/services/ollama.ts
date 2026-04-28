@@ -6,6 +6,7 @@ const MODEL_SETTING_KEY = 'ollama.visionModel'
 const GENERATE_TIMEOUT_SETTING_KEY = 'ollama.generateTimeoutMs'
 const HEALTH_TIMEOUT_SETTING_KEY = 'ollama.healthTimeoutMs'
 const TAG_PROMPT_SETTING_KEY = 'ollama.tagPrompt'
+const WEIGHT_PROMPT_SETTING_KEY = 'ollama.weightPrompt'
 const DEFAULT_MODEL = 'llava'
 const DEFAULT_GENERATE_TIMEOUT_MS = 60_000
 const DEFAULT_HEALTH_TIMEOUT_MS = 5_000
@@ -18,6 +19,12 @@ export const DEFAULT_TAG_PROMPT = [
   'Use generic terms. Include brand/model text only if clearly readable.',
   'No sentences. No numbering. No JSON. No duplicates. No uncertain guesses.',
   'Example: hex key, blue, metal, l-shaped, tool, metric, compact',
+].join(' ')
+
+export const DEFAULT_WEIGHT_PROMPT = [
+  'What does the main object in this image typically weigh?',
+  'Think about what kind of object it is, then state its typical weight in grams.',
+  'Output a single integer only. No units, no explanation.',
 ].join(' ')
 
 const modelCache = new Map<string, { models: string[]; expiresAt: number }>()
@@ -36,6 +43,7 @@ type EndpointCandidate = {
 
 export type OllamaAnalysisResult = {
   tags: string[]
+  weightG: number | null
   raw: string
   model: string
   endpoint: string
@@ -85,6 +93,11 @@ export async function getTagPrompt(): Promise<string> {
   return setting?.value || DEFAULT_TAG_PROMPT
 }
 
+export async function getWeightPrompt(): Promise<string> {
+  const setting = await prisma.systemSetting.findUnique({ where: { key: WEIGHT_PROMPT_SETTING_KEY } })
+  return setting?.value || DEFAULT_WEIGHT_PROMPT
+}
+
 async function setSetting(key: string, value: string) {
   await prisma.systemSetting.upsert({
     where: { key },
@@ -98,17 +111,20 @@ export async function updateOllamaConfig({
   generateTimeoutMs,
   healthTimeoutMs,
   tagPrompt,
+  weightPrompt,
 }: {
   activeModel?: string
   generateTimeoutMs?: number
   healthTimeoutMs?: number
   tagPrompt?: string
+  weightPrompt?: string
 }) {
   await Promise.all([
     activeModel ? setSetting(MODEL_SETTING_KEY, activeModel.trim()) : Promise.resolve(),
     generateTimeoutMs !== undefined ? setSetting(GENERATE_TIMEOUT_SETTING_KEY, String(generateTimeoutMs)) : Promise.resolve(),
     healthTimeoutMs !== undefined ? setSetting(HEALTH_TIMEOUT_SETTING_KEY, String(healthTimeoutMs)) : Promise.resolve(),
     tagPrompt !== undefined ? setSetting(TAG_PROMPT_SETTING_KEY, tagPrompt.trim() || DEFAULT_TAG_PROMPT) : Promise.resolve(),
+    weightPrompt !== undefined ? setSetting(WEIGHT_PROMPT_SETTING_KEY, weightPrompt.trim() || DEFAULT_WEIGHT_PROMPT) : Promise.resolve(),
   ])
 }
 
@@ -143,6 +159,11 @@ export async function ensureOllamaDefaults() {
     where: { key: TAG_PROMPT_SETTING_KEY },
     update: {},
     create: { key: TAG_PROMPT_SETTING_KEY, value: DEFAULT_TAG_PROMPT },
+  })
+  await prisma.systemSetting.upsert({
+    where: { key: WEIGHT_PROMPT_SETTING_KEY },
+    update: {},
+    create: { key: WEIGHT_PROMPT_SETTING_KEY, value: DEFAULT_WEIGHT_PROMPT },
   })
 }
 
@@ -280,6 +301,13 @@ async function recordHealthResult(endpoint: EndpointCandidate, latencyMs: number
   }
 }
 
+function parseWeightG(rawText: string): number | null {
+  const match = rawText.trim().match(/(\d+)/)
+  if (!match) return null
+  const value = parseInt(match[1], 10)
+  return value >= 1 && value <= 1_000_000 ? value : null
+}
+
 function parseEnglishTags(rawText: string): string[] {
   const tags = rawText
     .replace(/```[\s\S]*?```/g, ' ')
@@ -307,12 +335,13 @@ function orderedEndpoints(endpoints: EndpointCandidate[]) {
 }
 
 export async function analyzeImageWithOllama(imageBuffer: Buffer): Promise<OllamaAnalysisResult> {
-  const [base64Image, model, endpoints, timeouts, tagPrompt] = await Promise.all([
+  const [base64Image, model, endpoints, timeouts, tagPrompt, weightPrompt] = await Promise.all([
     prepareImage(imageBuffer),
     getActiveOllamaModel(),
     getEnabledEndpoints(),
     getOllamaTimeouts(),
     getTagPrompt(),
+    getWeightPrompt(),
   ])
 
   if (endpoints.length === 0) {
@@ -337,8 +366,20 @@ export async function analyzeImageWithOllama(imageBuffer: Buffer): Promise<Ollam
       const latencyMs = Date.now() - startedAt
       await recordGenerateResult(endpoint, latencyMs)
       const raw = response.data.response.trim()
+
+      let weightG: number | null = null
+      try {
+        const weightResponse = await axios.post<{ response: string }>(
+          `${normalizeBaseUrl(endpoint.baseUrl)}/api/generate`,
+          { model, prompt: weightPrompt, images: [base64Image], stream: false },
+          { timeout: timeouts.generateTimeoutMs }
+        )
+        weightG = parseWeightG(weightResponse.data.response)
+      } catch { /* weight estimation is best-effort */ }
+
       return {
         tags: parseEnglishTags(raw),
+        weightG,
         raw,
         model,
         endpoint: endpoint.baseUrl,
@@ -356,11 +397,12 @@ export async function analyzeImageWithOllama(imageBuffer: Buffer): Promise<Ollam
 
 export async function listOllamaModelStatus() {
   await ensureOllamaDefaults()
-  const [activeModel, endpoints, timeouts, tagPrompt] = await Promise.all([
+  const [activeModel, endpoints, timeouts, tagPrompt, weightPrompt] = await Promise.all([
     getActiveOllamaModel(),
     prisma.ollamaEndpoint.findMany({ orderBy: { createdAt: 'asc' } }),
     getOllamaTimeouts(),
     getTagPrompt(),
+    getWeightPrompt(),
   ])
 
   const statuses = await Promise.all(
@@ -394,5 +436,5 @@ export async function listOllamaModelStatus() {
   )
 
   const models = [...new Set(statuses.flatMap((endpoint) => endpoint.models))].sort()
-  return { activeModel, ...timeouts, tagPrompt, defaultTagPrompt: DEFAULT_TAG_PROMPT, models, endpoints: statuses }
+  return { activeModel, ...timeouts, tagPrompt, defaultTagPrompt: DEFAULT_TAG_PROMPT, weightPrompt, defaultWeightPrompt: DEFAULT_WEIGHT_PROMPT, models, endpoints: statuses }
 }
