@@ -9,6 +9,6 @@
     "db:studio": "pnpm --filter api db:studio"
   },
   "devDependencies": {
-    "concurrently": "^8.2.2"
+    "concurrently": "^9.2.1"
   }
 }
