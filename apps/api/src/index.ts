@@ -24,7 +24,7 @@ import { getAppConfig, initRuntimeSecrets } from './services/runtime-config'
 const PORT = parseInt(process.env.PORT ?? '8080', 10)
 
 async function build() {
-  const app = Fastify({ logger: { level: 'info' } })
+  const app = Fastify({ logger: { level: 'info' }, trustProxy: true })
   const secrets = await initRuntimeSecrets()
 
   app.setErrorHandler((error, request, reply) => {

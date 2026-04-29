@@ -88,22 +88,29 @@ export async function requireAdminOrAdminSecret(request: FastifyRequest, reply: 
   await requireAdmin(request, reply)
 }
 
-function cookieSecure(): boolean {
-  // Off by default — most deployments are LAN over plain HTTP. Opt in to
-  // Secure cookies only when you actually have TLS (e.g. behind a reverse
-  // proxy with HTTPS) by setting COOKIE_SECURE=true.
-  return process.env.COOKIE_SECURE === 'true'
+// Decide Secure flag per-request: HTTPS connections get Secure (required for
+// PWA cookie persistence on Android Chrome); plain-HTTP LAN/IP access still
+// works because non-Secure cookies are set normally.
+export function cookieSecureFor(request: FastifyRequest): boolean {
+  const xfProto = (request.headers['x-forwarded-proto'] as string | undefined)
+    ?.split(',')[0]
+    ?.trim()
+  const proto = xfProto || request.protocol
+  return proto === 'https'
 }
 
-export async function setAuthCookie(reply: FastifyReply, userId: string, role: string) {
+export async function setAuthCookie(
+  request: FastifyRequest,
+  reply: FastifyReply,
+  userId: string,
+  role: string,
+) {
   const token = signToken({ userId, role })
   reply.setCookie('packman_token', token, {
     httpOnly: true,
-    secure: cookieSecure(),
+    secure: cookieSecureFor(request),
     sameSite: 'lax',
     path: '/',
     maxAge: 60 * 60 * 24 * 7, // 7 days
   })
 }
-
-export { cookieSecure }

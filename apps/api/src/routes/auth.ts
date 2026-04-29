@@ -1,7 +1,7 @@
 import { FastifyInstance } from 'fastify'
 import axios from 'axios'
 import { prisma } from '../plugins/prisma'
-import { cookieSecure, requireAuth, setAuthCookie, signToken, verifyToken } from '../plugins/auth'
+import { cookieSecureFor, requireAuth, setAuthCookie, signToken, verifyToken } from '../plugins/auth'
 import { AdminAccountSchema } from '@packman/shared'
 import {
   createInitialAdminAccount,
@@ -134,7 +134,7 @@ export async function authRoutes(app: FastifyInstance) {
           },
         })
 
-        await setAuthCookie(reply, user.id, user.role)
+        await setAuthCookie(request, reply, user.id, user.role)
         reply.redirect(appUrl)
       } catch (err) {
         app.log.error(err)
@@ -174,7 +174,7 @@ export async function authRoutes(app: FastifyInstance) {
       const token = signToken({ userId: '__admin__', role: 'ADMIN_PANEL' }, '1d')
       reply.setCookie('packman_admin_token', token, {
         httpOnly: true,
-        secure: cookieSecure(),
+        secure: cookieSecureFor(request),
         sameSite: 'lax',
         path: '/',
         maxAge: 60 * 60 * 24,
