@@ -89,7 +89,7 @@ export function Select<T extends string>({
             left: rect.left,
             minWidth: Math.max(rect.width, 140),
             maxHeight,
-            zIndex: 40,
+            zIndex: 60,
             WebkitOverflowScrolling: 'touch',
             overscrollBehavior: 'contain',
             touchAction: 'pan-y',
