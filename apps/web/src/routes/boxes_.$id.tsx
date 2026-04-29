@@ -1,4 +1,4 @@
-import { createFileRoute, useNavigate } from '@tanstack/react-router'
+import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useState, useEffect, useRef } from 'react'
 import { ArrowLeft, Download, Eye, CheckSquare, Square } from 'lucide-react'
@@ -144,10 +144,24 @@ function BoxDetailPage() {
         <button onClick={() => navigate({ to: '/boxes' })} className="rounded-2xl p-2 text-muted transition-colors hover:bg-white/10 hover:text-app">
           <ArrowLeft className="h-5 w-5" />
         </button>
-        <div className="flex-1">
-          <div className="flex items-center gap-2">
-            <h1 className="page-title">{box.label}</h1>
-            <span className="badge bg-black/10 text-app dark:bg-white/10">{SHIPPING_LABELS[box.shippingMethod]}</span>
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+            <h1 className="page-title truncate">{box.label}</h1>
+            <span className="badge shrink-0 bg-black/10 text-app dark:bg-white/10">{SHIPPING_LABELS[box.shippingMethod]}</span>
+            <span className="ml-1 text-sm text-muted">{packedCount}/{items.length}</span>
+            {isAdmin
+              ? <Select
+                  value={box.status}
+                  onChange={(v) => updateBox.mutate({ status: v as PackingStatus })}
+                  triggerClassName={cn('badge cursor-pointer border-0', STATUS_COLORS[box.status])}
+                  options={[
+                    { value: 'NOT_PACKED', label: '尚未裝箱' },
+                    { value: 'PACKED', label: '已裝箱' },
+                    { value: 'SEALED', label: '已封箱' },
+                  ]}
+                />
+              : <span className={cn('badge shrink-0', STATUS_COLORS[box.status])}>{STATUS_LABELS[box.status]}</span>
+            }
           </div>
           {isAdmin ? (
             <div className="mt-2 grid max-w-xs grid-cols-[5.5rem_1fr] items-center gap-2">
@@ -166,7 +180,7 @@ function BoxDetailPage() {
 
       {/* Actions */}
       <div className="card space-y-2 p-4">
-        {/* Row 1: size selector + status */}
+        {/* Row 1: size selector */}
         <div className="flex items-center gap-2">
           <span className="shrink-0 text-sm font-semibold text-muted">貼紙尺寸</span>
           <Select
@@ -180,22 +194,6 @@ function BoxDetailPage() {
               { value: 'A4_SHEET', label: 'A4 (2×4 格)' },
             ]}
           />
-          <div className="flex shrink-0 items-center gap-2">
-            <span className="text-sm text-muted">{packedCount}/{items.length}</span>
-            {isAdmin
-              ? <Select
-                  value={box.status}
-                  onChange={(v) => updateBox.mutate({ status: v as PackingStatus })}
-                  triggerClassName={cn('badge cursor-pointer border-0', STATUS_COLORS[box.status])}
-                  options={[
-                    { value: 'NOT_PACKED', label: '尚未裝箱' },
-                    { value: 'PACKED', label: '已裝箱' },
-                    { value: 'SEALED', label: '已封箱' },
-                  ]}
-                />
-              : <span className={cn('badge', STATUS_COLORS[box.status])}>{STATUS_LABELS[box.status]}</span>
-            }
-          </div>
         </div>
         {/* Row 2: action buttons */}
         <div className="flex gap-2">
@@ -245,21 +243,27 @@ function BoxDetailPage() {
               {items.map((item) => {
                 const isPacked = item.status !== 'NOT_PACKED'
                 return (
-                  <li key={item.id}>
+                  <li key={item.id} className="flex items-center gap-1 pr-2 active:bg-white/5">
                     <button
+                      type="button"
+                      aria-label={isPacked ? '標記為尚未裝箱' : '標記為已裝箱'}
                       onClick={() =>
                         updateItem.mutate({
                           itemId: item.id,
                           status: isPacked ? 'NOT_PACKED' : 'PACKED',
                         })
                       }
-                      className="flex w-full items-center gap-3 px-4 py-4 text-left active:bg-white/5"
+                      className="flex-shrink-0 rounded-2xl p-3 text-muted transition-colors hover:bg-white/10"
                     >
-                      <span className="flex-shrink-0">
-                        {isPacked
-                          ? <CheckSquare className="h-6 w-6 text-brand-500" />
-                          : <Square className="h-6 w-6 text-muted" />}
-                      </span>
+                      {isPacked
+                        ? <CheckSquare className="h-6 w-6 text-brand-500" />
+                        : <Square className="h-6 w-6 text-muted" />}
+                    </button>
+                    <Link
+                      to="/items/$id"
+                      params={{ id: item.id }}
+                      className="flex min-w-0 flex-1 items-center gap-3 py-4 pr-2 text-left"
+                    >
                       <span className="min-w-0 flex-1">
                         <span className={cn('block font-medium', isPacked && 'text-muted line-through')}>
                           {item.name}
@@ -275,10 +279,10 @@ function BoxDetailPage() {
                           <span>數量: {item.quantity}</span>
                         </span>
                       </span>
-                      <span className={cn('badge text-xs', STATUS_COLORS[item.status])}>
+                      <span className={cn('badge shrink-0 text-xs', STATUS_COLORS[item.status])}>
                         {STATUS_LABELS[item.status]}
                       </span>
-                    </button>
+                    </Link>
                   </li>
                 )
               })}

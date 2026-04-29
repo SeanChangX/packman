@@ -1,12 +1,22 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { Sun, Moon, Monitor } from 'lucide-react'
 import { groupsApi, usersApi } from '../lib/api'
 import { useAuth } from '../lib/auth-context'
+import { useTheme, type ThemePreference } from '../lib/theme-context'
 import { Select } from '../lib/select'
+import { cn } from '../lib/utils'
+
+const themeOptions: { value: ThemePreference; label: string; icon: React.ElementType }[] = [
+  { value: 'light', label: '淺色', icon: Sun },
+  { value: 'dark', label: '深色', icon: Moon },
+  { value: 'system', label: '系統', icon: Monitor },
+]
 
 function ProfilePage() {
   const { user, refetch } = useAuth()
   const qc = useQueryClient()
+  const { preference, setPreference } = useTheme()
   const { data: groups } = useQuery({ queryKey: ['groups'], queryFn: groupsApi.list })
 
   const updateGroup = useMutation({
@@ -58,6 +68,30 @@ function ProfilePage() {
             </p>
           )}
         </div>
+      </div>
+
+      <div className="card p-6">
+        <h2 className="mb-4 font-semibold">外觀</h2>
+        <label className="label">主題</label>
+        <div className="mt-1 flex rounded-2xl border border-black/10 bg-black/5 p-1 dark:border-white/10 dark:bg-white/5">
+          {themeOptions.map(({ value, label, icon: Icon }) => (
+            <button
+              key={value}
+              type="button"
+              onClick={() => setPreference(value)}
+              className={cn(
+                'flex flex-1 items-center justify-center gap-1.5 rounded-xl px-3 py-2 text-sm font-semibold transition-colors',
+                preference === value
+                  ? 'bg-brand-500 text-white'
+                  : 'text-muted hover:bg-white/40 dark:hover:bg-white/10',
+              )}
+            >
+              <Icon className="h-4 w-4" />
+              {label}
+            </button>
+          ))}
+        </div>
+        <p className="mt-2 text-xs text-muted">系統模式會跟隨裝置的深色 / 淺色設定。</p>
       </div>
     </div>
   )

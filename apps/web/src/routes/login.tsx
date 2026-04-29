@@ -21,8 +21,8 @@ function Login() {
             <Package className="h-8 w-8 text-white" />
           </div>
         </div>
-        <h1 className="mb-2 text-3xl font-bold text-app">Packman</h1>
-        <p className="mb-6 text-sm font-medium text-muted">行李管理系統 - 讓打包更 Elegant</p>
+        <h1 className="mb-2 text-3xl font-bold text-white">Packman</h1>
+        <p className="mb-6 text-sm font-medium text-white/70">行李管理系統 - 讓打包更 Elegant</p>
 
         {error && (
           <div className="mb-4 rounded-2xl border border-red-500/15 bg-red-500/10 p-3 text-sm font-semibold text-brand-600">
@@ -46,7 +46,7 @@ function Login() {
             target="_blank"
             rel="noopener noreferrer"
             title="GitHub"
-            className="group text-muted transition-all duration-200 hover:text-app"
+            className="group text-white/60 transition-all duration-200 hover:text-white"
           >
             <svg
               className="h-5 w-5 transition-transform duration-200 group-hover:scale-110"
@@ -61,7 +61,7 @@ function Login() {
             target="_blank"
             rel="noopener noreferrer"
             title="Buy Me a Coffee"
-            className="group text-muted transition-all duration-200 hover:text-yellow-400"
+            className="group text-white/60 transition-all duration-200 hover:text-yellow-400"
           >
             <svg
               className="h-5 w-5 transition-transform duration-200 group-hover:scale-110"

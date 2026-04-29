@@ -14,6 +14,17 @@
     <meta name="apple-mobile-web-app-title" content="Packman" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <title>Packman</title>
+    <script>
+      (function () {
+        try {
+          var pref = localStorage.getItem('packman-theme') || 'dark';
+          var dark = pref === 'dark' || (pref === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+          document.documentElement.classList.add(dark ? 'dark' : 'light');
+        } catch (e) {
+          document.documentElement.classList.add('dark');
+        }
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

@@ -17,17 +17,20 @@
     --app-shadow: 0 18px 55px rgba(0, 0, 0, 0.08);
   }
 
-  @media (prefers-color-scheme: dark) {
-    :root {
-      --app-bg: #050505;
-      --app-surface: rgba(28, 28, 30, 0.82);
-      --app-surface-solid: #151517;
-      --app-elevated: rgba(44, 44, 46, 0.72);
-      --app-border: rgba(255, 255, 255, 0.14);
-      --app-text: #f5f5f7;
-      --app-muted: #a1a1a6;
-      --app-shadow: 0 24px 70px rgba(0, 0, 0, 0.45);
-    }
+  html.dark {
+    color-scheme: dark;
+    --app-bg: #050505;
+    --app-surface: rgba(28, 28, 30, 0.82);
+    --app-surface-solid: #151517;
+    --app-elevated: rgba(44, 44, 46, 0.72);
+    --app-border: rgba(255, 255, 255, 0.14);
+    --app-text: #f5f5f7;
+    --app-muted: #a1a1a6;
+    --app-shadow: 0 24px 70px rgba(0, 0, 0, 0.45);
+  }
+
+  html.light {
+    color-scheme: light;
   }
 
   html {
