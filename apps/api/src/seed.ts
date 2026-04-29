@@ -125,6 +125,11 @@ export async function seedDefaultData() {
   }
 
   await prisma.systemSetting.upsert({
+    where: { key: 'ollama.enabled' },
+    update: {},
+    create: { key: 'ollama.enabled', value: 'true' },
+  })
+  await prisma.systemSetting.upsert({
     where: { key: 'ollama.visionModel' },
     update: {},
     create: {

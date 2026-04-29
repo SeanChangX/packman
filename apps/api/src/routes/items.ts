@@ -5,6 +5,7 @@ import { requireAuth, requireAdmin } from '../plugins/auth'
 import { CreateItemSchema, UpdateItemSchema } from '@packman/shared'
 import { uploadToMinio, getPresignedUrl, deleteObject, getObjectBuffer, objectNameFromUrl } from '../services/minio'
 import { enqueueAiTagJob } from '../services/ai-tag-queue'
+import { isAiTaggingEnabled } from '../services/ollama'
 import { getAppConfig } from '../services/runtime-config'
 import { getActiveEventId } from '../services/events'
 
@@ -186,13 +187,14 @@ export async function itemRoutes(app: FastifyInstance) {
 
       const photoUrl = await getPresignedUrl(objectName)
       const previousObjectName = objectNameFromUrl(item.photoUrl)
+      const aiEnabled = await isAiTaggingEnabled()
 
       await prisma.item.update({
         where: { id: item.id },
-        data: { photoUrl, aiTagStatus: 'PENDING' },
+        data: { photoUrl, aiTagStatus: aiEnabled ? 'PENDING' : 'NONE' },
       })
 
-      await enqueueAiTagJob(item.id, objectName)
+      if (aiEnabled) await enqueueAiTagJob(item.id, objectName)
       if (previousObjectName && previousObjectName !== objectName) {
         deleteObject(previousObjectName).catch((err) =>
           app.log.warn({ err, itemId: item.id, objectName: previousObjectName }, 'Old item photo cleanup failed')
@@ -212,6 +214,10 @@ export async function itemRoutes(app: FastifyInstance) {
 
       const objectName = objectNameFromUrl(item.photoUrl)
       if (!objectName) return reply.status(400).send({ message: '此物品尚無可辨識的照片' })
+
+      if (!(await isAiTaggingEnabled())) {
+        return reply.status(409).send({ message: 'AI 辨識目前已停用' })
+      }
 
       await prisma.item.update({
         where: { id: item.id },

@@ -75,6 +75,13 @@ async function ollamaConfigWithJobStats() {
 
 const brandLogoUrl = '/api/admin/settings/brand/logo'
 
+// When preserveSecrets is on we only skip the admin login (username +
+// passwordHash). Everything else — JWT/cookie secrets, Slack client secret,
+// brand, app URLs — is restored as part of the backup.
+function isSecretSettingKey(key: string): boolean {
+  return key.startsWith('admin.')
+}
+
 function brandPayload(brand: { name: string; logoObjectName: string | null; logoData: string | null }) {
   return {
     name: brand.name,
@@ -452,7 +459,8 @@ export async function adminRoutes(app: FastifyInstance) {
     await archive.finalize()
   })
 
-  app.post('/import/backup', async (request, reply) => {
+  app.post<{ Querystring: { preserveSecrets?: string } }>('/import/backup', async (request, reply) => {
+    const preserveSecrets = request.query.preserveSecrets === '1' || request.query.preserveSecrets === 'true'
     const data = await request.file()
     if (!data) return reply.status(400).send({ message: '請上傳備份檔' })
 
@@ -550,6 +558,7 @@ export async function adminRoutes(app: FastifyInstance) {
 
           if (Array.isArray(payload.systemSettings)) {
             for (const s of payload.systemSettings) {
+              if (preserveSecrets && isSecretSettingKey(s.key)) continue
               await tx.systemSetting.upsert({
                 where: { key: s.key },
                 update: { value: s.value },

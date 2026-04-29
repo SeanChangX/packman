@@ -147,6 +147,7 @@ export interface OllamaEndpointStatus extends OllamaEndpoint {
 }
 
 export interface OllamaConfig {
+  enabled: boolean
   activeModel: string
   generateTimeoutMs: number
   healthTimeoutMs: number

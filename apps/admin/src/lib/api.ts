@@ -122,14 +122,18 @@ export const adminApi = {
   exportBackup: () => window.open('/api/admin/export/backup', '_blank'),
   importBackup: (
     file: File,
-    onProgress?: (loaded: number, total: number) => void,
+    options?: { preserveSecrets?: boolean; onProgress?: (loaded: number, total: number) => void },
   ): Promise<{ ok: boolean; photoOk: number; photoFail: number }> => {
     return new Promise((resolve, reject) => {
       const form = new FormData()
       form.append('file', file)
       const xhr = new XMLHttpRequest()
-      xhr.open('POST', '/api/admin/import/backup', true)
+      const url = options?.preserveSecrets
+        ? '/api/admin/import/backup?preserveSecrets=1'
+        : '/api/admin/import/backup'
+      xhr.open('POST', url, true)
       xhr.withCredentials = true
+      const onProgress = options?.onProgress
       if (onProgress) {
         xhr.upload.onprogress = (e) => {
           if (e.lengthComputable) onProgress(e.loaded, e.total)
@@ -160,7 +164,7 @@ export const adminApi = {
     req<void>(`/api/admin/select-options/${id}`, { method: 'DELETE' }),
 
   ollamaConfig: () => req<OllamaConfig>('/api/admin/ollama-config'),
-  updateOllamaConfig: (data: { activeModel?: string; generateTimeoutMs?: number; healthTimeoutMs?: number; tagPrompt?: string }) =>
+  updateOllamaConfig: (data: { enabled?: boolean; activeModel?: string; generateTimeoutMs?: number; healthTimeoutMs?: number; tagPrompt?: string; weightPrompt?: string }) =>
     req<OllamaConfig>('/api/admin/ollama-config', { method: 'PATCH', body: JSON.stringify(data) }),
   createOllamaEndpoint: (data: { baseUrl: string; enabled?: boolean }) =>
     req<OllamaEndpoint>('/api/admin/ollama-endpoints', { method: 'POST', body: JSON.stringify(data) }),

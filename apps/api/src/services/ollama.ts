@@ -2,12 +2,14 @@ import axios from 'axios'
 import sharp from 'sharp'
 import { prisma } from '../plugins/prisma'
 
+const ENABLED_SETTING_KEY = 'ollama.enabled'
 const MODEL_SETTING_KEY = 'ollama.visionModel'
 const GENERATE_TIMEOUT_SETTING_KEY = 'ollama.generateTimeoutMs'
 const HEALTH_TIMEOUT_SETTING_KEY = 'ollama.healthTimeoutMs'
 const TAG_PROMPT_SETTING_KEY = 'ollama.tagPrompt'
 const WEIGHT_PROMPT_SETTING_KEY = 'ollama.weightPrompt'
 const DEFAULT_MODEL = 'llava'
+const DEFAULT_ENABLED = true
 const DEFAULT_GENERATE_TIMEOUT_MS = 60_000
 const DEFAULT_HEALTH_TIMEOUT_MS = 5_000
 
@@ -74,6 +76,12 @@ export async function getActiveOllamaModel(): Promise<string> {
   return setting?.value ?? DEFAULT_MODEL
 }
 
+export async function isAiTaggingEnabled(): Promise<boolean> {
+  const setting = await prisma.systemSetting.findUnique({ where: { key: ENABLED_SETTING_KEY } })
+  if (!setting) return DEFAULT_ENABLED
+  return setting.value === 'true'
+}
+
 async function getNumberSetting(key: string, fallback: number): Promise<number> {
   const setting = await prisma.systemSetting.findUnique({ where: { key } })
   const value = setting ? Number(setting.value) : NaN
@@ -107,12 +115,14 @@ async function setSetting(key: string, value: string) {
 }
 
 export async function updateOllamaConfig({
+  enabled,
   activeModel,
   generateTimeoutMs,
   healthTimeoutMs,
   tagPrompt,
   weightPrompt,
 }: {
+  enabled?: boolean
   activeModel?: string
   generateTimeoutMs?: number
   healthTimeoutMs?: number
@@ -120,6 +130,7 @@ export async function updateOllamaConfig({
   weightPrompt?: string
 }) {
   await Promise.all([
+    enabled !== undefined ? setSetting(ENABLED_SETTING_KEY, enabled ? 'true' : 'false') : Promise.resolve(),
     activeModel ? setSetting(MODEL_SETTING_KEY, activeModel.trim()) : Promise.resolve(),
     generateTimeoutMs !== undefined ? setSetting(GENERATE_TIMEOUT_SETTING_KEY, String(generateTimeoutMs)) : Promise.resolve(),
     healthTimeoutMs !== undefined ? setSetting(HEALTH_TIMEOUT_SETTING_KEY, String(healthTimeoutMs)) : Promise.resolve(),
@@ -140,6 +151,11 @@ export async function ensureOllamaDefaults() {
     }
   }
 
+  await prisma.systemSetting.upsert({
+    where: { key: ENABLED_SETTING_KEY },
+    update: {},
+    create: { key: ENABLED_SETTING_KEY, value: DEFAULT_ENABLED ? 'true' : 'false' },
+  })
   await prisma.systemSetting.upsert({
     where: { key: MODEL_SETTING_KEY },
     update: {},
@@ -397,7 +413,8 @@ export async function analyzeImageWithOllama(imageBuffer: Buffer): Promise<Ollam
 
 export async function listOllamaModelStatus() {
   await ensureOllamaDefaults()
-  const [activeModel, endpoints, timeouts, tagPrompt, weightPrompt] = await Promise.all([
+  const [enabled, activeModel, endpoints, timeouts, tagPrompt, weightPrompt] = await Promise.all([
+    isAiTaggingEnabled(),
     getActiveOllamaModel(),
     prisma.ollamaEndpoint.findMany({ orderBy: { createdAt: 'asc' } }),
     getOllamaTimeouts(),
@@ -436,5 +453,5 @@ export async function listOllamaModelStatus() {
   )
 
   const models = [...new Set(statuses.flatMap((endpoint) => endpoint.models))].sort()
-  return { activeModel, ...timeouts, tagPrompt, defaultTagPrompt: DEFAULT_TAG_PROMPT, weightPrompt, defaultWeightPrompt: DEFAULT_WEIGHT_PROMPT, models, endpoints: statuses }
+  return { enabled, activeModel, ...timeouts, tagPrompt, defaultTagPrompt: DEFAULT_TAG_PROMPT, weightPrompt, defaultWeightPrompt: DEFAULT_WEIGHT_PROMPT, models, endpoints: statuses }
 }

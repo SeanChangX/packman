@@ -2,7 +2,7 @@ import type { FastifyInstance } from 'fastify'
 import { randomUUID } from 'crypto'
 import { prisma } from '../plugins/prisma'
 import { getObjectBuffer } from './minio'
-import { analyzeImageWithOllama } from './ollama'
+import { analyzeImageWithOllama, isAiTaggingEnabled } from './ollama'
 
 const WORKER_ID = `ai-tag-${process.pid}-${randomUUID()}`
 const POLL_INTERVAL_MS = 2000
@@ -206,6 +206,9 @@ export function startAiTagQueueWorker(app: FastifyInstance) {
   const tick = async () => {
     if (stopped) return
     try {
+      // Skip the entire tick when AI tagging is disabled. Existing QUEUED jobs
+      // are left untouched so they resume automatically once re-enabled.
+      if (!(await isAiTaggingEnabled())) return
       await reclaimStaleJobs()
       await syncFailedItems()
       const limit = await concurrencyLimit()

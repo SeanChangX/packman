@@ -53,6 +53,15 @@ function OllamaTest() {
 
   const refreshConfig = () => qc.invalidateQueries({ queryKey: ['ollama-config'] })
 
+  const updateEnabled = useMutation({
+    mutationFn: (enabled: boolean) => adminApi.updateOllamaConfig({ enabled }),
+    onSuccess: (_data, enabled) => {
+      refreshConfig()
+      showToast(enabled ? 'AI 辨識已啟用' : 'AI 辨識已停用', 'success')
+    },
+    onError: (e: unknown) => showToast((e as Error)?.message ?? '更新失敗', 'error'),
+  })
+
   const updateModel = useMutation({
     mutationFn: (activeModel: string) => adminApi.updateOllamaConfig({ activeModel }),
     onSuccess: () => {
@@ -191,9 +200,19 @@ function OllamaTest() {
       </div>
 
       {config && (
-        <div className={`card p-4 ${ok ? 'border-green-500/20 bg-green-500/5' : 'border-red-500/20 bg-red-500/5'}`}>
+        <div className={`card p-4 ${
+          !config.enabled
+            ? 'border-amber-500/30 bg-amber-500/5'
+            : ok
+              ? 'border-green-500/20 bg-green-500/5'
+              : 'border-red-500/20 bg-red-500/5'
+        }`}>
           <p className="text-sm font-semibold text-app">
-            {ok ? `Ollama 可用 - 目前模型：${config.activeModel}` : '沒有可用的 Ollama endpoint'}
+            {!config.enabled
+              ? 'AI 辨識已停用，新照片不會自動辨識'
+              : ok
+                ? `Ollama 可用 - 目前模型：${config.activeModel}`
+                : '沒有可用的 Ollama endpoint'}
           </p>
           <p className="mt-1 text-xs text-muted">
             已啟用 {config.endpoints.filter((endpoint) => endpoint.enabled).length} / {config.endpoints.length} 個 URL
@@ -221,6 +240,36 @@ function OllamaTest() {
       <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(26rem,0.9fr)]">
         <div className="space-y-5">
           <div className="card p-5">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="min-w-0">
+                <h2 className="text-sm font-bold text-app">AI 辨識</h2>
+                <p className="text-xs text-muted">
+                  停用後新照片不會排入辨識佇列，worker 也會暫停。已排入的 PENDING job 會保留，啟用後自動繼續。
+                </p>
+              </div>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={config?.enabled ?? false}
+                disabled={updateEnabled.isPending || !config}
+                onClick={() => config && updateEnabled.mutate(!config.enabled)}
+                className={[
+                  'relative inline-flex h-7 w-12 shrink-0 items-center rounded-full transition-colors',
+                  config?.enabled ? 'bg-brand-500' : 'bg-white/15',
+                  updateEnabled.isPending ? 'opacity-60' : '',
+                ].join(' ')}
+              >
+                <span
+                  className={[
+                    'inline-block h-5 w-5 rounded-full bg-white shadow transition-transform',
+                    config?.enabled ? 'translate-x-6' : 'translate-x-1',
+                  ].join(' ')}
+                />
+              </button>
+            </div>
+          </div>
+
+          <div className={`card p-5 ${config && !config.enabled ? 'opacity-60' : ''}`}>
             <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
               <div>
                 <h2 className="text-sm font-bold text-app">模型</h2>

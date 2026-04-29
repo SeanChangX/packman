@@ -14,25 +14,32 @@ function formatBytes(bytes: number): string {
 function ExportPage() {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [importing, setImporting] = useState(false)
+  const [preserveSecrets, setPreserveSecrets] = useState(true)
   const { showToast, updateToast, dismissToast } = useToast()
 
   const handleImport = async (file: File) => {
-    if (!confirm('還原備份會清除目前所有資料並覆蓋為備份內容，確定繼續？')) return
+    const warning = preserveSecrets
+      ? '還原備份會清除目前所有資料並覆蓋為備份內容（保留目前 admin 帳密與 secrets），確定繼續？'
+      : '還原備份會清除目前所有資料並覆蓋為備份內容，包含 admin 帳密與 secrets，確定繼續？'
+    if (!confirm(warning)) return
     setImporting(true)
     const toastId = showToast(`上傳備份中… 0%`, 'info', { sticky: true, progress: 0 })
     let serverPhase = false
     try {
-      const result = await adminApi.importBackup(file, (loaded, total) => {
-        const ratio = total ? loaded / total : 0
-        if (ratio >= 1 && !serverPhase) {
-          serverPhase = true
-          updateToast(toastId, { message: '伺服器解壓並還原中…', progress: undefined, sticky: true })
-        } else if (!serverPhase) {
-          updateToast(toastId, {
-            message: `上傳備份中… ${Math.floor(ratio * 100)}% (${formatBytes(loaded)} / ${formatBytes(total)})`,
-            progress: ratio,
-          })
-        }
+      const result = await adminApi.importBackup(file, {
+        preserveSecrets,
+        onProgress: (loaded, total) => {
+          const ratio = total ? loaded / total : 0
+          if (ratio >= 1 && !serverPhase) {
+            serverPhase = true
+            updateToast(toastId, { message: '伺服器解壓並還原中…', progress: undefined, sticky: true })
+          } else if (!serverPhase) {
+            updateToast(toastId, {
+              message: `上傳備份中… ${Math.floor(ratio * 100)}% (${formatBytes(loaded)} / ${formatBytes(total)})`,
+              progress: ratio,
+            })
+          }
+        },
       })
       dismissToast(toastId)
       showToast(
@@ -73,9 +80,19 @@ function ExportPage() {
               <p className="text-sm text-muted">匯出所有物品資料 (CSV)</p>
             </div>
           </div>
-          <p className="mb-4 flex-1 text-xs text-muted">
-            包含：品項名稱、負責人、組別、箱子、運送方式、數量、狀態、標籤、說明
-          </p>
+          <div className="mb-4 flex-1 space-y-3">
+            <div>
+              <p className="mb-2 text-xs font-semibold text-muted">包含欄位</p>
+              <div className="flex flex-wrap gap-1.5">
+              {['品項名稱', '負責人', '組別', '箱子', '運送方式', '數量', '狀態', '標籤', '說明'].map((field) => (
+                <span key={field} className="rounded-full bg-white/5 px-2.5 py-1 text-[11px] text-app/80 ring-1 ring-white/10">
+                  {field}
+                </span>
+              ))}
+              </div>
+            </div>
+            <p className="text-[11px] text-muted/80">UTF-8 編碼，可直接以 Excel／Numbers 開啟</p>
+          </div>
           <button className="btn-primary mt-auto w-full gap-2" onClick={adminApi.exportItems}>
             <Download className="h-4 w-4" /> 下載 items.csv
           </button>
@@ -91,9 +108,19 @@ function ExportPage() {
               <p className="text-sm text-muted">匯出電池分配資料 (CSV)</p>
             </div>
           </div>
-          <p className="mb-4 flex-1 text-xs text-muted">
-            包含：電池編號、種類、負責人、說明
-          </p>
+          <div className="mb-4 flex-1 space-y-3">
+            <div>
+              <p className="mb-2 text-xs font-semibold text-muted">包含欄位</p>
+              <div className="flex flex-wrap gap-1.5">
+              {['電池編號', '種類', '負責人', '說明'].map((field) => (
+                <span key={field} className="rounded-full bg-white/5 px-2.5 py-1 text-[11px] text-app/80 ring-1 ring-white/10">
+                  {field}
+                </span>
+              ))}
+              </div>
+            </div>
+            <p className="text-[11px] text-muted/80">UTF-8 編碼，可直接以 Excel／Numbers 開啟</p>
+          </div>
           <button className="btn-primary mt-auto w-full gap-2" onClick={adminApi.exportBatteries}>
             <Download className="h-4 w-4" /> 下載 batteries.csv
           </button>
@@ -109,10 +136,38 @@ function ExportPage() {
               <p className="text-sm text-muted">資料庫與照片 (ZIP)</p>
             </div>
           </div>
-          <p className="mb-4 flex-1 text-xs text-muted">
+          <p className="mb-3 flex-1 text-xs text-muted">
             包含所有活動、物品、箱子、電池、用戶、組別、選項以及 MinIO 中的所有照片。
             <span className="mt-1 block text-amber-400">⚠️ 還原會清除目前所有資料並完整覆蓋</span>
           </p>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={preserveSecrets}
+            disabled={importing}
+            onClick={() => setPreserveSecrets((v) => !v)}
+            className={[
+              'mb-3 flex w-full items-center justify-between gap-3 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-left transition-colors',
+              importing ? 'opacity-60' : 'hover:bg-white/[0.07]',
+            ].join(' ')}
+          >
+            <span className="min-w-0 text-xs font-semibold text-app">
+              還原時保留目前的 admin 帳密
+            </span>
+            <span
+              className={[
+                'relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors',
+                preserveSecrets ? 'bg-brand-500' : 'bg-white/15',
+              ].join(' ')}
+            >
+              <span
+                className={[
+                  'inline-block h-4 w-4 rounded-full bg-white shadow transition-transform',
+                  preserveSecrets ? 'translate-x-6' : 'translate-x-1',
+                ].join(' ')}
+              />
+            </span>
+          </button>
           <input
             ref={fileInputRef}
             type="file"
