@@ -19,7 +19,7 @@
     "@fastify/static": "^7.0.4",
     "@packman/shared": "workspace:*",
     "@prisma/client": "^5.14.0",
-    "adm-zip": "^0.5.16",
+    "archiver": "^7.0.1",
     "axios": "^1.7.2",
     "fastify": "^4.29.1",
     "fastify-plugin": "^4.5.1",
@@ -29,14 +29,16 @@
     "prisma": "^5.14.0",
     "qrcode": "^1.5.4",
     "sharp": "^0.33.4",
+    "unzipper": "^0.12.3",
     "zod": "^3.23.8"
   },
   "devDependencies": {
-    "@types/adm-zip": "^0.5.7",
+    "@types/archiver": "^6.0.2",
     "@types/jsonwebtoken": "^9.0.6",
     "@types/node": "^20.14.2",
     "@types/pdfkit": "^0.13.4",
     "@types/qrcode": "^1.5.5",
+    "@types/unzipper": "^0.10.10",
     "tsx": "^4.15.6",
     "typescript": "^5.4.5"
   }

@@ -30,8 +30,20 @@ import {
   setBrandLogoData,
   setBrandLogoObjectName,
 } from '../services/runtime-config'
-import { deleteObject, getObjectBuffer, listAllObjectNames, uploadToMinio } from '../services/minio'
-import AdmZip from 'adm-zip'
+import {
+  deleteObject,
+  getObjectBuffer,
+  getObjectStream,
+  listAllObjectNames,
+  uploadStreamToMinio,
+  uploadToMinio,
+} from '../services/minio'
+import archiver from 'archiver'
+import unzipper from 'unzipper'
+import { promises as fsp, createWriteStream } from 'fs'
+import { tmpdir } from 'os'
+import { join as pathJoin } from 'path'
+import { pipeline } from 'stream/promises'
 import { invalidate } from '../services/cache'
 import sharp from 'sharp'
 import { getActiveEventId } from '../services/events'
@@ -384,7 +396,6 @@ export async function adminRoutes(app: FastifyInstance) {
   })
 
   app.get('/export/backup', async (request, reply) => {
-    void request
     const [events, activeEventId, items, boxes, batteries, groups, users, selectOptions, batteryRegulations, systemSettings, ollamaEndpoints] = await Promise.all([
       prisma.event.findMany({ orderBy: { createdAt: 'asc' } }),
       getActiveEventId().catch(() => null),
@@ -399,25 +410,46 @@ export async function adminRoutes(app: FastifyInstance) {
       prisma.ollamaEndpoint.findMany({ orderBy: { createdAt: 'asc' } }),
     ])
 
-    const zip = new AdmZip()
     const data = { exportedAt: new Date().toISOString(), version: '1.2', activeEventId, events, items, boxes, batteries, groups, users, selectOptions, batteryRegulations, systemSettings, ollamaEndpoints }
-    zip.addFile('data.json', Buffer.from(JSON.stringify(data, null, 2), 'utf-8'))
+    const date = new Date().toISOString().slice(0, 10)
+
+    // Stream the archive directly to the client. zlib level 0 (store) avoids
+    // wasting CPU compressing photos that are already JPEG/PNG.
+    const archive = archiver('zip', { zlib: { level: 0 } })
+
+    reply.raw.setHeader('Content-Type', 'application/zip')
+    reply.raw.setHeader('Content-Disposition', `attachment; filename="packman-backup-${date}.zip"`)
+    reply.hijack()
+
+    archive.on('warning', (err) => request.log.warn({ err }, 'archiver warning'))
+    archive.on('error', (err) => {
+      request.log.error({ err }, 'archiver error')
+      reply.raw.destroy(err)
+    })
+    archive.pipe(reply.raw)
+
+    // data.json is appended first so streaming readers can find it before any photo entry.
+    archive.append(JSON.stringify(data, null, 2), { name: 'data.json' })
 
     const objectNames = await listAllObjectNames().catch(() => [] as string[])
+
+    // Process photos sequentially: open one MinIO read stream at a time and wait
+    // for archiver to finish each entry before starting the next. This keeps memory
+    // usage flat and avoids exhausting MinIO connections regardless of photo count.
     for (const name of objectNames) {
       try {
-        const buf = await getObjectBuffer(name)
-        zip.addFile(`photos/${name}`, buf)
+        const stream = await getObjectStream(name)
+        archive.append(stream, { name: `photos/${name}` })
+        await new Promise<void>((resolve, reject) => {
+          archive.once('entry', () => resolve())
+          archive.once('error', reject)
+        })
       } catch (err) {
         request.log.warn({ err, name }, 'Backup: skipped unreadable object')
       }
     }
 
-    const date = new Date().toISOString().slice(0, 10)
-    reply
-      .header('Content-Type', 'application/zip')
-      .header('Content-Disposition', `attachment; filename="packman-backup-${date}.zip"`)
-      .send(zip.toBuffer())
+    await archive.finalize()
   })
 
   app.post('/import/backup', async (request, reply) => {
@@ -429,114 +461,142 @@ export async function adminRoutes(app: FastifyInstance) {
       return reply.status(400).send({ message: '請上傳 .zip 備份檔' })
     }
 
-    const buf = await data.toBuffer()
-    if (buf.length < 4 || buf[0] !== 0x50 || buf[1] !== 0x4b) {
-      return reply.status(400).send({ message: '檔案不是有效的 ZIP 格式' })
+    // Spool the upload to a temp file on disk so we can random-access the ZIP
+    // central directory without holding the whole archive in memory. Backups
+    // can be tens of GB once they include all photos.
+    const tmpPath = pathJoin(tmpdir(), `packman-backup-${Date.now()}-${randomBytes(6).toString('hex')}.zip`)
+    try {
+      await pipeline(data.file, createWriteStream(tmpPath))
+    } catch (err: any) {
+      await fsp.unlink(tmpPath).catch(() => {})
+      return reply.status(500).send({ message: `上傳失敗：${err?.message ?? '未知錯誤'}` })
     }
-
-    let zip: AdmZip
-    try { zip = new AdmZip(buf) } catch { return reply.status(400).send({ message: '無法讀取 ZIP 檔' }) }
-
-    const dataEntry = zip.getEntry('data.json')
-    if (!dataEntry) return reply.status(400).send({ message: '備份檔缺少 data.json' })
-
-    let payload: any
-    try { payload = JSON.parse(dataEntry.getData().toString('utf-8')) }
-    catch { return reply.status(400).send({ message: 'data.json 格式錯誤' }) }
-
-    if (!payload || typeof payload !== 'object') {
-      return reply.status(400).send({ message: 'data.json 內容無效' })
-    }
-    if (typeof payload.version !== 'string' || !/^1\./.test(payload.version)) {
-      return reply.status(400).send({ message: `不支援的備份版本：${payload.version ?? '未知'}（需 1.x）` })
-    }
-    const requiredArrays = ['events', 'users', 'groups', 'boxes', 'items', 'batteries', 'selectOptions', 'batteryRegulations', 'systemSettings']
-    for (const key of requiredArrays) {
-      if (!Array.isArray(payload[key])) {
-        return reply.status(400).send({ message: `data.json 缺少欄位或格式錯誤：${key}` })
-      }
-    }
-    if (payload.events.length === 0) {
-      return reply.status(400).send({ message: '備份至少需包含一個 Event' })
-    }
-
-    const ALLOWED_PHOTO_EXT = new Set(['jpg', 'jpeg', 'png', 'webp', 'gif', 'heic', 'heif'])
-    const photoEntries = zip.getEntries().filter((e) => {
-      if (e.isDirectory) return false
-      const name = e.entryName
-      if (!name.startsWith('photos/')) return false
-      if (name.includes('..') || name.startsWith('/')) return false
-      const ext = name.split('.').pop()?.toLowerCase() ?? ''
-      return ALLOWED_PHOTO_EXT.has(ext)
-    })
 
     try {
-      await prisma.$transaction(async (tx) => {
-        await tx.aiTagJob.deleteMany({})
-        await tx.item.deleteMany({})
-        await tx.box.deleteMany({})
-        await tx.battery.deleteMany({})
-        await tx.batteryRegulation.deleteMany({})
-        await tx.selectOption.deleteMany({})
-        await tx.ollamaEndpoint.deleteMany({})
-        await tx.user.deleteMany({})
-        await tx.group.deleteMany({})
-        await tx.event.deleteMany({})
+      // Magic-byte check on the spooled file (PK\x03\x04).
+      const head = Buffer.alloc(4)
+      const fh = await fsp.open(tmpPath, 'r')
+      try { await fh.read(head, 0, 4, 0) } finally { await fh.close() }
+      if (head[0] !== 0x50 || head[1] !== 0x4b) {
+        return reply.status(400).send({ message: '檔案不是有效的 ZIP 格式' })
+      }
 
-        if (Array.isArray(payload.events)) await tx.event.createMany({ data: payload.events, skipDuplicates: true })
-        if (Array.isArray(payload.groups)) await tx.group.createMany({ data: payload.groups, skipDuplicates: true })
-        if (Array.isArray(payload.users)) await tx.user.createMany({ data: payload.users, skipDuplicates: true })
-        if (Array.isArray(payload.boxes)) await tx.box.createMany({ data: payload.boxes, skipDuplicates: true })
-        if (Array.isArray(payload.items)) await tx.item.createMany({ data: payload.items, skipDuplicates: true })
-        if (Array.isArray(payload.batteries)) await tx.battery.createMany({ data: payload.batteries, skipDuplicates: true })
-        if (Array.isArray(payload.selectOptions)) await tx.selectOption.createMany({ data: payload.selectOptions, skipDuplicates: true })
-        if (Array.isArray(payload.batteryRegulations)) await tx.batteryRegulation.createMany({ data: payload.batteryRegulations, skipDuplicates: true })
-        if (Array.isArray(payload.ollamaEndpoints)) await tx.ollamaEndpoint.createMany({ data: payload.ollamaEndpoints, skipDuplicates: true })
+      let directory: Awaited<ReturnType<typeof unzipper.Open.file>>
+      try {
+        directory = await unzipper.Open.file(tmpPath)
+      } catch {
+        return reply.status(400).send({ message: '無法讀取 ZIP 檔' })
+      }
 
-        if (Array.isArray(payload.systemSettings)) {
-          for (const s of payload.systemSettings) {
+      const dataFile = directory.files.find((f) => f.path === 'data.json' && f.type === 'File')
+      if (!dataFile) return reply.status(400).send({ message: '備份檔缺少 data.json' })
+
+      let payload: any
+      try {
+        const dataBuf = await dataFile.buffer()
+        payload = JSON.parse(dataBuf.toString('utf-8'))
+      } catch {
+        return reply.status(400).send({ message: 'data.json 格式錯誤' })
+      }
+
+      if (!payload || typeof payload !== 'object') {
+        return reply.status(400).send({ message: 'data.json 內容無效' })
+      }
+      if (typeof payload.version !== 'string' || !/^1\./.test(payload.version)) {
+        return reply.status(400).send({ message: `不支援的備份版本：${payload.version ?? '未知'}（需 1.x）` })
+      }
+      const requiredArrays = ['events', 'users', 'groups', 'boxes', 'items', 'batteries', 'selectOptions', 'batteryRegulations', 'systemSettings']
+      for (const key of requiredArrays) {
+        if (!Array.isArray(payload[key])) {
+          return reply.status(400).send({ message: `data.json 缺少欄位或格式錯誤：${key}` })
+        }
+      }
+      if (payload.events.length === 0) {
+        return reply.status(400).send({ message: '備份至少需包含一個 Event' })
+      }
+
+      const ALLOWED_PHOTO_EXT = new Set(['jpg', 'jpeg', 'png', 'webp', 'gif', 'heic', 'heif'])
+      const photoEntries = directory.files.filter((f) => {
+        if (f.type !== 'File') return false
+        const name = f.path
+        if (!name.startsWith('photos/')) return false
+        if (name.includes('..') || name.startsWith('/')) return false
+        const ext = name.split('.').pop()?.toLowerCase() ?? ''
+        return ALLOWED_PHOTO_EXT.has(ext)
+      })
+
+      try {
+        await prisma.$transaction(async (tx) => {
+          await tx.aiTagJob.deleteMany({})
+          await tx.item.deleteMany({})
+          await tx.box.deleteMany({})
+          await tx.battery.deleteMany({})
+          await tx.batteryRegulation.deleteMany({})
+          await tx.selectOption.deleteMany({})
+          await tx.ollamaEndpoint.deleteMany({})
+          await tx.user.deleteMany({})
+          await tx.group.deleteMany({})
+          await tx.event.deleteMany({})
+
+          if (Array.isArray(payload.events)) await tx.event.createMany({ data: payload.events, skipDuplicates: true })
+          if (Array.isArray(payload.groups)) await tx.group.createMany({ data: payload.groups, skipDuplicates: true })
+          if (Array.isArray(payload.users)) await tx.user.createMany({ data: payload.users, skipDuplicates: true })
+          if (Array.isArray(payload.boxes)) await tx.box.createMany({ data: payload.boxes, skipDuplicates: true })
+          if (Array.isArray(payload.items)) await tx.item.createMany({ data: payload.items, skipDuplicates: true })
+          if (Array.isArray(payload.batteries)) await tx.battery.createMany({ data: payload.batteries, skipDuplicates: true })
+          if (Array.isArray(payload.selectOptions)) await tx.selectOption.createMany({ data: payload.selectOptions, skipDuplicates: true })
+          if (Array.isArray(payload.batteryRegulations)) await tx.batteryRegulation.createMany({ data: payload.batteryRegulations, skipDuplicates: true })
+          if (Array.isArray(payload.ollamaEndpoints)) await tx.ollamaEndpoint.createMany({ data: payload.ollamaEndpoints, skipDuplicates: true })
+
+          if (Array.isArray(payload.systemSettings)) {
+            for (const s of payload.systemSettings) {
+              await tx.systemSetting.upsert({
+                where: { key: s.key },
+                update: { value: s.value },
+                create: { key: s.key, value: s.value },
+              })
+            }
+          }
+          if (payload.activeEventId) {
             await tx.systemSetting.upsert({
-              where: { key: s.key },
-              update: { value: s.value },
-              create: { key: s.key, value: s.value },
+              where: { key: 'activeEventId' },
+              update: { value: payload.activeEventId },
+              create: { key: 'activeEventId', value: payload.activeEventId },
             })
           }
-        }
-        if (payload.activeEventId) {
-          await tx.systemSetting.upsert({
-            where: { key: 'activeEventId' },
-            update: { value: payload.activeEventId },
-            create: { key: 'activeEventId', value: payload.activeEventId },
-          })
-        }
-      })
-    } catch (err: any) {
-      return reply.status(500).send({ message: `資料還原失敗：${err?.message ?? '未知錯誤'}` })
-    }
-
-    invalidate('groups:all')
-    invalidate('selectOptions')
-
-    let photoOk = 0
-    let photoFail = 0
-    for (const entry of photoEntries) {
-      const objectName = entry.entryName.slice('photos/'.length)
-      const ext = objectName.split('.').pop()?.toLowerCase()
-      const contentType = ext === 'png' ? 'image/png'
-        : ext === 'webp' ? 'image/webp'
-        : ext === 'gif' ? 'image/gif'
-        : ext === 'heic' ? 'image/heic'
-        : ext === 'heif' ? 'image/heif'
-        : 'image/jpeg'
-      try {
-        await uploadToMinio(objectName, entry.getData(), contentType)
-        photoOk++
-      } catch (err) {
-        photoFail++
-        request.log.warn({ err, objectName }, 'Restore: photo upload failed')
+        })
+      } catch (err: any) {
+        return reply.status(500).send({ message: `資料還原失敗：${err?.message ?? '未知錯誤'}` })
       }
-    }
 
-    return { ok: true, photoOk, photoFail }
+      invalidate('groups:all')
+      invalidate('selectOptions')
+
+      let photoOk = 0
+      let photoFail = 0
+      // Stream each photo from the temp ZIP straight to MinIO. Sequential keeps
+      // memory and connection counts bounded.
+      for (const entry of photoEntries) {
+        const objectName = entry.path.slice('photos/'.length)
+        const ext = objectName.split('.').pop()?.toLowerCase()
+        const contentType = ext === 'png' ? 'image/png'
+          : ext === 'webp' ? 'image/webp'
+          : ext === 'gif' ? 'image/gif'
+          : ext === 'heic' ? 'image/heic'
+          : ext === 'heif' ? 'image/heif'
+          : 'image/jpeg'
+        try {
+          await uploadStreamToMinio(objectName, entry.stream(), entry.uncompressedSize, contentType)
+          photoOk++
+        } catch (err) {
+          photoFail++
+          request.log.warn({ err, objectName }, 'Restore: photo upload failed')
+        }
+      }
+
+      return { ok: true, photoOk, photoFail }
+    } finally {
+      await fsp.unlink(tmpPath).catch(() => {})
+    }
   })
 }

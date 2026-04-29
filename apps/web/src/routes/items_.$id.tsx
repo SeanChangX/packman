@@ -13,7 +13,7 @@ function ItemDetailPage() {
   const { id } = Route.useParams()
   const navigate = useNavigate()
   const qc = useQueryClient()
-  const { showToast } = useToast()
+  const { showToast, updateToast, dismissToast } = useToast()
   const fileRef = useRef<HTMLInputElement>(null)
   const [editing, setEditing] = useState(false)
   const [tags, setTags] = useState<string[]>([])
@@ -69,10 +69,41 @@ function ItemDetailPage() {
     onError: (e: unknown) => showToast(formatApiError(e), 'error'),
   })
 
+  const uploadToastIdRef = useRef<number | null>(null)
   const uploadPhoto = useMutation({
-    mutationFn: (file: File) => itemsApi.uploadPhoto(id, file),
-    onSuccess: () => refetch(),
-    onError: (e: unknown) => showToast(formatApiError(e), 'error'),
+    mutationFn: (file: File) => {
+      uploadToastIdRef.current = showToast('上傳照片中… 0%', 'info', { sticky: true, progress: 0 })
+      let serverPhase = false
+      return itemsApi.uploadPhoto(id, file, (loaded, total) => {
+        const tid = uploadToastIdRef.current
+        if (tid === null) return
+        const ratio = total ? loaded / total : 0
+        if (ratio >= 1 && !serverPhase) {
+          serverPhase = true
+          updateToast(tid, { message: '伺服器處理中…', progress: undefined, sticky: true })
+        } else if (!serverPhase) {
+          updateToast(tid, {
+            message: `上傳照片中… ${Math.floor(ratio * 100)}%`,
+            progress: ratio,
+          })
+        }
+      })
+    },
+    onSuccess: () => {
+      if (uploadToastIdRef.current !== null) {
+        dismissToast(uploadToastIdRef.current)
+        uploadToastIdRef.current = null
+      }
+      showToast('照片已上傳', 'success')
+      refetch()
+    },
+    onError: (e: unknown) => {
+      if (uploadToastIdRef.current !== null) {
+        dismissToast(uploadToastIdRef.current)
+        uploadToastIdRef.current = null
+      }
+      showToast(formatApiError(e), 'error')
+    },
   })
 
   const reanalyzePhoto = useMutation({

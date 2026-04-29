@@ -120,12 +120,35 @@ export const adminApi = {
   exportItems: () => window.open('/api/admin/export/items', '_blank'),
   exportBatteries: () => window.open('/api/admin/export/batteries', '_blank'),
   exportBackup: () => window.open('/api/admin/export/backup', '_blank'),
-  importBackup: async (file: File): Promise<{ ok: boolean; photoOk: number; photoFail: number }> => {
-    const form = new FormData()
-    form.append('file', file)
-    const res = await fetch('/api/admin/import/backup', { method: 'POST', credentials: 'include', body: form })
-    if (!res.ok) throw new Error(await responseError(res, '備份還原失敗'))
-    return res.json()
+  importBackup: (
+    file: File,
+    onProgress?: (loaded: number, total: number) => void,
+  ): Promise<{ ok: boolean; photoOk: number; photoFail: number }> => {
+    return new Promise((resolve, reject) => {
+      const form = new FormData()
+      form.append('file', file)
+      const xhr = new XMLHttpRequest()
+      xhr.open('POST', '/api/admin/import/backup', true)
+      xhr.withCredentials = true
+      if (onProgress) {
+        xhr.upload.onprogress = (e) => {
+          if (e.lengthComputable) onProgress(e.loaded, e.total)
+        }
+      }
+      xhr.onload = () => {
+        if (xhr.status >= 200 && xhr.status < 300) {
+          try { resolve(JSON.parse(xhr.responseText)) }
+          catch { reject(new Error('回應格式錯誤')) }
+        } else {
+          let message = '備份還原失敗'
+          try { message = JSON.parse(xhr.responseText)?.message ?? message } catch {}
+          reject(new Error(message))
+        }
+      }
+      xhr.onerror = () => reject(new Error('備份還原失敗（網路錯誤）'))
+      xhr.onabort = () => reject(new Error('備份還原已取消'))
+      xhr.send(form)
+    })
   },
 
   selectOptions: () => req<SelectOption[]>('/api/admin/select-options'),

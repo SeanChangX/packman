@@ -1,4 +1,5 @@
 import { Client } from 'minio'
+import { Readable } from 'stream'
 
 const BUCKET = process.env.MINIO_BUCKET ?? 'packman-items'
 
@@ -40,6 +41,25 @@ export async function uploadToMinio(
   await minioClient.putObject(BUCKET, objectName, buffer, buffer.length, {
     'Content-Type': contentType,
   })
+}
+
+export async function uploadStreamToMinio(
+  objectName: string,
+  source: NodeJS.ReadableStream,
+  size: number,
+  contentType: string
+): Promise<void> {
+  // The MinIO SDK types insist on stream.Readable. unzipper's entry.stream()
+  // returns a Node Readable in practice, but some callers may pass a plain
+  // ReadableStream — wrap it so the type is satisfied without copying buffers.
+  const readable = source instanceof Readable ? source : Readable.from(source as any)
+  await minioClient.putObject(BUCKET, objectName, readable, size, {
+    'Content-Type': contentType,
+  })
+}
+
+export async function getObjectStream(objectName: string): Promise<Readable> {
+  return minioClient.getObject(BUCKET, objectName)
 }
 
 export async function getPresignedUrl(objectName: string): Promise<string> {

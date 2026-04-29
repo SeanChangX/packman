@@ -12,7 +12,7 @@ import type { CreateItemInput } from '@packman/shared'
 function NewItemPage() {
   const navigate = useNavigate()
   const qc = useQueryClient()
-  const { showToast } = useToast()
+  const { showToast, updateToast, dismissToast } = useToast()
   const [photoFile, setPhotoFile] = useState<File | null>(null)
   const [photoPreview, setPhotoPreview] = useState('')
   const { data: groups } = useQuery({ queryKey: ['groups'], queryFn: groupsApi.list })
@@ -40,9 +40,24 @@ function NewItemPage() {
       const item = await itemsApi.create(data)
       if (!photoFile) return { item }
 
+      const toastId = showToast('上傳照片中… 0%', 'info', { sticky: true, progress: 0 })
+      let serverPhase = false
       try {
-        await itemsApi.uploadPhoto(item.id, photoFile)
+        await itemsApi.uploadPhoto(item.id, photoFile, (loaded, total) => {
+          const ratio = total ? loaded / total : 0
+          if (ratio >= 1 && !serverPhase) {
+            serverPhase = true
+            updateToast(toastId, { message: '伺服器處理中…', progress: undefined, sticky: true })
+          } else if (!serverPhase) {
+            updateToast(toastId, {
+              message: `上傳照片中… ${Math.floor(ratio * 100)}%`,
+              progress: ratio,
+            })
+          }
+        })
+        dismissToast(toastId)
       } catch (error) {
+        dismissToast(toastId)
         return { item, photoError: formatApiError(error) }
       }
 

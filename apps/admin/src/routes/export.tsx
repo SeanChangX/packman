@@ -1,29 +1,56 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { Download, Package, Battery, DatabaseBackup, Upload } from 'lucide-react'
 import { useRef, useState } from 'react'
+import { useToast } from '@packman/ui'
 import { adminApi } from '../lib/api'
+
+function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+  if (bytes < 1024 * 1024 * 1024) return `${(bytes / 1024 / 1024).toFixed(1)} MB`
+  return `${(bytes / 1024 / 1024 / 1024).toFixed(2)} GB`
+}
 
 function ExportPage() {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [importing, setImporting] = useState(false)
-  const [importMsg, setImportMsg] = useState<{ type: 'ok' | 'err'; text: string } | null>(null)
+  const { showToast, updateToast, dismissToast } = useToast()
 
   const handleImport = async (file: File) => {
     if (!confirm('還原備份會清除目前所有資料並覆蓋為備份內容，確定繼續？')) return
     setImporting(true)
-    setImportMsg(null)
+    const toastId = showToast(`上傳備份中… 0%`, 'info', { sticky: true, progress: 0 })
+    let serverPhase = false
     try {
-      const result = await adminApi.importBackup(file)
-      setImportMsg({
-        type: 'ok',
-        text: `還原完成：照片 ${result.photoOk} 張成功${result.photoFail ? `、${result.photoFail} 張失敗` : ''}`,
+      const result = await adminApi.importBackup(file, (loaded, total) => {
+        const ratio = total ? loaded / total : 0
+        if (ratio >= 1 && !serverPhase) {
+          serverPhase = true
+          updateToast(toastId, { message: '伺服器解壓並還原中…', progress: undefined, sticky: true })
+        } else if (!serverPhase) {
+          updateToast(toastId, {
+            message: `上傳備份中… ${Math.floor(ratio * 100)}% (${formatBytes(loaded)} / ${formatBytes(total)})`,
+            progress: ratio,
+          })
+        }
       })
+      dismissToast(toastId)
+      showToast(
+        `還原完成：照片 ${result.photoOk} 張成功${result.photoFail ? `、${result.photoFail} 張失敗` : ''}`,
+        result.photoFail ? 'error' : 'success',
+      )
     } catch (e: any) {
-      setImportMsg({ type: 'err', text: e.message })
+      dismissToast(toastId)
+      showToast(e?.message ?? '備份還原失敗', 'error')
     } finally {
       setImporting(false)
       if (fileInputRef.current) fileInputRef.current.value = ''
     }
+  }
+
+  const handleExport = () => {
+    adminApi.exportBackup()
+    showToast('備份下載已開始，請在瀏覽器下載列查看進度', 'info')
   }
 
   return (
@@ -34,16 +61,6 @@ function ExportPage() {
           <p className="page-subtitle">下載 CSV 供盤點與備份</p>
         </div>
       </div>
-
-      {importMsg && (
-        <div className={`rounded-2xl border px-4 py-3 text-sm ${
-          importMsg.type === 'ok'
-            ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-400'
-            : 'border-red-500/30 bg-red-500/10 text-red-400'
-        }`}>
-          {importMsg.text}
-        </div>
-      )}
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <div className="card flex flex-col p-6">
@@ -107,7 +124,7 @@ function ExportPage() {
             }}
           />
           <div className="mt-auto flex gap-2">
-            <button className="btn-primary flex-1 gap-2" onClick={adminApi.exportBackup} disabled={importing}>
+            <button className="btn-primary flex-1 gap-2" onClick={handleExport} disabled={importing}>
               <Download className="h-4 w-4" /> 備份
             </button>
             <button

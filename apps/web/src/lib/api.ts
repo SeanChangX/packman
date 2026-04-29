@@ -120,16 +120,39 @@ export const itemsApi = {
     request<void>(`${BASE}/items/${id}`, { method: 'DELETE' }),
   batchDelete: (ids: string[]) =>
     request<void>(`${BASE}/items/batch-delete`, { method: 'POST', body: JSON.stringify({ ids }) }),
-  uploadPhoto: async (id: string, file: File) => {
-    const form = new FormData()
-    form.append('file', file)
-    const res = await fetch(`${BASE}/items/${id}/photo`, {
-      method: 'POST',
-      credentials: 'include',
-      body: form,
+  uploadPhoto: (
+    id: string,
+    file: File,
+    onProgress?: (loaded: number, total: number) => void,
+  ): Promise<{ photoUrl: string }> => {
+    return new Promise((resolve, reject) => {
+      const form = new FormData()
+      form.append('file', file)
+      const xhr = new XMLHttpRequest()
+      xhr.open('POST', `${BASE}/items/${id}/photo`, true)
+      xhr.withCredentials = true
+      if (onProgress) {
+        xhr.upload.onprogress = (e) => {
+          if (e.lengthComputable) onProgress(e.loaded, e.total)
+        }
+      }
+      xhr.onload = () => {
+        if (xhr.status >= 200 && xhr.status < 300) {
+          try { resolve(JSON.parse(xhr.responseText)) }
+          catch { reject(new Error('回應格式錯誤')) }
+        } else if (xhr.status === 401) {
+          if (window.location.pathname !== '/login') window.location.href = '/login'
+          reject(new Error('Unauthorized'))
+        } else {
+          let message = '照片上傳失敗'
+          try { message = JSON.parse(xhr.responseText)?.message ?? message } catch {}
+          reject(new Error(message))
+        }
+      }
+      xhr.onerror = () => reject(new Error('照片上傳失敗（網路錯誤）'))
+      xhr.onabort = () => reject(new Error('照片上傳已取消'))
+      xhr.send(form)
     })
-    if (!res.ok) throw new Error(await errorMessage(res, '照片上傳失敗'))
-    return res.json() as Promise<{ photoUrl: string }>
   },
   reanalyzePhoto: (id: string) =>
     request<{ ok: boolean }>(`${BASE}/items/${id}/retag`, { method: 'POST' }),
