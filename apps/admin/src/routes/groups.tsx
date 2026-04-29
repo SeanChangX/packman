@@ -64,7 +64,7 @@ function GroupModal({ initial, onClose }: { initial?: { id: string; name: string
                 value={color.toUpperCase()}
                 onChange={(e) => {
                   const v = e.target.value
-                  if (/^#[0-9a-fA-F]{0,6}$/.test(v)) setValue('color', v.toLowerCase())
+                  if (/^#[0-9a-fA-F]{0,6}$/.test(v)) setValue('color', v.toUpperCase())
                 }}
                 className="w-full bg-transparent px-2 font-mono text-xs focus:outline-none"
                 placeholder="#000000"
@@ -133,7 +133,7 @@ function GroupsPage() {
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
                         <span className="inline-block h-5 w-5 rounded-full" style={{ backgroundColor: g.color }} />
-                        <code className="text-xs text-muted">{g.color}</code>
+                        <code className="text-xs text-muted">{g.color.toUpperCase()}</code>
                       </div>
                     </td>
                     <td className="px-4 py-3 flex gap-2">
