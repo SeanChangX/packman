@@ -61,6 +61,13 @@ export function Select<T extends string>({
     setOpen((next) => !next)
   }
 
+  const GAP = 8
+  const MARGIN = 16
+  const spaceBelow = rect ? window.innerHeight - rect.bottom - MARGIN : 0
+  const spaceAbove = rect ? rect.top - MARGIN : 0
+  const placeAbove = !!rect && spaceBelow < 200 && spaceAbove > spaceBelow
+  const maxHeight = placeAbove ? spaceAbove - GAP : spaceBelow - GAP
+
   return (
     <div ref={ref} className={cn('relative', className)}>
       <button
@@ -75,8 +82,19 @@ export function Select<T extends string>({
       {open && rect && createPortal(
         <div
           ref={dropdownRef}
-          style={{ position: 'fixed', top: rect.bottom + 8, left: rect.left, minWidth: Math.max(rect.width, 140), zIndex: 40 }}
-          className="overflow-hidden rounded-2xl border border-black/10 bg-[#151517] p-1 shadow-2xl dark:border-white/10"
+          style={{
+            position: 'fixed',
+            top: placeAbove ? undefined : rect.bottom + GAP,
+            bottom: placeAbove ? window.innerHeight - rect.top + GAP : undefined,
+            left: rect.left,
+            minWidth: Math.max(rect.width, 140),
+            maxHeight,
+            zIndex: 40,
+            WebkitOverflowScrolling: 'touch',
+            overscrollBehavior: 'contain',
+            touchAction: 'pan-y',
+          }}
+          className="overflow-y-auto rounded-2xl border border-black/10 bg-[#151517] p-1 shadow-2xl dark:border-white/10"
         >
           {options.map((option) => (
             <button

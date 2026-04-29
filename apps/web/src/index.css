@@ -64,6 +64,23 @@
     padding-bottom: max(1rem, env(safe-area-inset-bottom));
   }
 
+  .safe-top {
+    padding-top: max(0.75rem, env(safe-area-inset-top));
+  }
+
+  .mobile-header {
+    padding-top: max(0.75rem, env(safe-area-inset-top));
+    padding-bottom: 0.75rem;
+  }
+
+  .mobile-header-spacer {
+    height: calc(61px + env(safe-area-inset-top));
+  }
+
+  .mobile-menu-top {
+    top: calc(69px + env(safe-area-inset-top));
+  }
+
   .page {
     @apply mx-auto w-full max-w-7xl space-y-5 px-4 py-4 sm:px-5 lg:px-8 lg:py-7;
     padding-bottom: max(6.5rem, env(safe-area-inset-bottom));

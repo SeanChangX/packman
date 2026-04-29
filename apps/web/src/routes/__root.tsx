@@ -144,7 +144,7 @@ function Layout() {
       </aside>
 
       <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
-        <header className="glass-nav fixed inset-x-0 top-0 z-50 flex items-center justify-between border-b px-4 py-3 md:hidden">
+        <header className="glass-nav mobile-header fixed inset-x-0 top-0 z-50 flex items-center justify-between border-b px-4 md:hidden">
           <Link to="/" className="flex items-center gap-2" onClick={() => setMobileOpen(false)}>
             <div className="flex h-9 w-9 items-center justify-center rounded-2xl bg-brand-500">
               <Package className="h-5 w-5 text-white" />
@@ -155,10 +155,10 @@ function Layout() {
             {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
           </button>
         </header>
-        <div className="h-[61px] shrink-0 md:hidden" aria-hidden="true" />
+        <div className="mobile-header-spacer shrink-0 md:hidden" aria-hidden="true" />
 
         {mobileOpen && (
-          <div className="glass-nav fixed inset-x-3 top-[69px] z-50 rounded-[28px] border p-3 md:hidden">
+          <div className="glass-nav mobile-menu-top fixed inset-x-3 z-50 rounded-[28px] border p-3 md:hidden">
             <div className="p-4">{mobileNav}</div>
             <button
               onClick={logout}
