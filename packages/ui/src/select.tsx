@@ -17,7 +17,7 @@ export function Select<T extends string>({
   options,
   onChange,
   className,
-  placeholder = '請選擇',
+  placeholder = '',
   triggerClassName,
 }: {
   value: T

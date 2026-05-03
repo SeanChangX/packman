@@ -8,6 +8,7 @@ import { batteriesApi, batteryRegulationsApi, usersApi, selectOptionsApi } from 
 import { getLabelFromOptions, formatApiError } from '../lib/utils'
 import { Select, SelectController } from '../lib/select'
 import { useAuth } from '../lib/auth-context'
+import { useT } from '../lib/i18n'
 import type { CreateBatteryInput, UpdateBatteryInput, SelectOption } from '@packman/shared'
 
 const BATTERY_COLORS: Record<string, string> = {
@@ -17,6 +18,7 @@ const BATTERY_COLORS: Record<string, string> = {
 }
 
 function BatteryRegulations() {
+  const t = useT()
   const { data: regulations } = useQuery({
     queryKey: ['battery-regulations'],
     queryFn: batteryRegulationsApi.list,
@@ -26,7 +28,7 @@ function BatteryRegulations() {
     <div className="card border-brand-500/20 bg-brand-500/10 p-4">
       <div className="mb-3 flex items-center gap-2 font-semibold text-brand-600">
         <AlertTriangle className="h-5 w-5" />
-        電池航空規定提醒
+        {t('batteries.regulations')}
       </div>
       <div className="grid gap-4 text-sm md:grid-cols-2">
         {(regulations ?? []).map((regulation) => (
@@ -45,6 +47,7 @@ function BatteryRegulations() {
 }
 
 function NewBatteryModal({ onClose, batteryTypeOpts }: { onClose: () => void; batteryTypeOpts: SelectOption[] }) {
+  const t = useT()
   const qc = useQueryClient()
   const { data: users } = useQuery({ queryKey: ['users'], queryFn: usersApi.list })
   const { register, handleSubmit, control } = useForm<CreateBatteryInput>()
@@ -58,47 +61,47 @@ function NewBatteryModal({ onClose, batteryTypeOpts }: { onClose: () => void; ba
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
       <div className="card w-full max-w-md p-6">
         <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-lg font-bold">新增電池</h2>
+          <h2 className="text-lg font-bold">{t('batteries.new.title')}</h2>
           <button onClick={onClose} className="rounded-2xl p-2 hover:bg-black/5 dark:hover:bg-white/10"><X className="h-4 w-4" /></button>
         </div>
         <form className="space-y-3" onSubmit={handleSubmit((d) => create.mutate(d))}>
           <div>
-            <label className="label">電池編號 *</label>
-            <input className="input mt-1" placeholder="例: 18V-01-2024Q1" {...register('batteryId', { required: true })} />
+            <label className="label">{t('batteries.new.batteryId')}</label>
+            <input className="input mt-1" placeholder={t('batteries.new.batteryIdPlaceholder')} {...register('batteryId', { required: true })} />
           </div>
           <div>
-            <label className="label">電池種類 *</label>
+            <label className="label">{t('batteries.new.type')}</label>
             <SelectController
               name="batteryType"
               control={control}
               className="mt-1"
-              placeholder="— 請選擇 —"
+              placeholder={t('common.placeholder.select')}
               options={batteryTypeOpts.map((o) => ({ value: o.value, label: o.label }))}
             />
           </div>
           <div>
-            <label className="label">負責人</label>
+            <label className="label">{t('batteries.new.owner')}</label>
             <SelectController
               name="ownerId"
               control={control}
               className="mt-1"
-              placeholder="— 請選擇 —"
+              placeholder={t('common.placeholder.select')}
               options={[
-                { value: '', label: '— 請選擇 —' },
+                { value: '', label: t('common.placeholder.select') },
                 ...(users?.map((u) => ({ value: u.id, label: u.name })) ?? []),
               ]}
             />
           </div>
           <div>
-            <label className="label">說明</label>
+            <label className="label">{t('batteries.new.notes')}</label>
             <input className="input mt-1" {...register('notes')} />
           </div>
           {create.isError && (
-            <p className="text-sm text-red-500">{formatApiError(create.error)}</p>
+            <p className="text-sm text-red-500">{formatApiError(create.error, t('common.opFailed'), t('common.requiredHint'))}</p>
           )}
           <div className="flex justify-end gap-2">
-            <button type="button" className="btn-secondary" onClick={onClose}>取消</button>
-            <button type="submit" className="btn-primary" disabled={create.isPending}>新增</button>
+            <button type="button" className="btn-secondary" onClick={onClose}>{t('common.cancel')}</button>
+            <button type="submit" className="btn-primary" disabled={create.isPending}>{t('batteries.new.submit')}</button>
           </div>
         </form>
       </div>
@@ -117,6 +120,7 @@ function BatteryRow({
   batteryTypeOpts: SelectOption[]
   onDelete?: (id: string) => void
 }) {
+  const t = useT()
   const qc = useQueryClient()
   const { showToast } = useToast()
   const [editing, setEditing] = useState(false)
@@ -133,9 +137,9 @@ function BatteryRow({
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['batteries'] })
       setEditing(false)
-      showToast('電池已更新', 'success')
+      showToast(t('batteries.action.updated'), 'success')
     },
-    onError: (e: unknown) => showToast(formatApiError(e), 'error'),
+    onError: (e: unknown) => showToast(formatApiError(e, t('common.opFailed'), t('common.requiredHint')), 'error'),
   })
 
   if (editing) {
@@ -153,17 +157,17 @@ function BatteryRow({
           <SelectController
             name="ownerId"
             control={control}
-            placeholder="— 請選擇 —"
+            placeholder={t('common.placeholder.select')}
             emptyValue="null"
             options={[
-              { value: '', label: '— 無 —' },
+              { value: '', label: t('batteries.row.empty') },
               ...(users?.map((u) => ({ value: u.id, label: u.name })) ?? []),
             ]}
           />
         </td>
         <td className="px-4 py-2" colSpan={2}>
           <div className="flex items-center gap-2">
-            <input className="input" placeholder="說明" {...register('notes')} />
+            <input className="input" placeholder={t('batteries.row.notesPlaceholder')} {...register('notes')} />
             <button
               type="button"
               className="btn-primary px-3 py-2"
@@ -213,9 +217,9 @@ function BatteryRow({
           {onDelete && (
             <button
               className="text-xs font-semibold text-brand-600 hover:text-brand-700"
-              onClick={() => { if (confirm('確定刪除？')) onDelete(b.id) }}
+              onClick={() => { if (confirm(t('batteries.deleteConfirm'))) onDelete(b.id) }}
             >
-              刪除
+              {t('common.delete')}
             </button>
           )}
         </div>
@@ -225,6 +229,7 @@ function BatteryRow({
 }
 
 function BatteriesPage() {
+  const t = useT()
   const [showNew, setShowNew] = useState(false)
   const [typeFilter, setTypeFilter] = useState('')
   const qc = useQueryClient()
@@ -243,20 +248,20 @@ function BatteriesPage() {
     mutationFn: batteriesApi.delete,
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['batteries'] })
-      showToast('電池已刪除', 'success')
+      showToast(t('batteries.action.deleted'), 'success')
     },
-    onError: (e: unknown) => showToast(formatApiError(e), 'error'),
+    onError: (e: unknown) => showToast(formatApiError(e, t('common.opFailed'), t('common.requiredHint')), 'error'),
   })
 
   return (
     <div className="space-y-6">
       <div className="page-header">
         <div>
-          <h1 className="page-title">電池分配</h1>
-          <p className="page-subtitle">登機攜帶電池與負責人</p>
+          <h1 className="page-title">{t('batteries.title')}</h1>
+          <p className="page-subtitle">{t('batteries.subtitle')}</p>
         </div>
         <button className="btn-primary gap-1" onClick={() => setShowNew(true)}>
-          <Plus className="h-4 w-4" /> 新增電池
+          <Plus className="h-4 w-4" /> {t('batteries.add')}
         </button>
       </div>
 
@@ -264,13 +269,13 @@ function BatteriesPage() {
 
       <div className="card table-shell">
         <div className="flex flex-col gap-3 border-b border-black/10 p-4 sm:flex-row sm:items-center sm:justify-between dark:border-white/10">
-          <span className="font-semibold">電池清單 ({batteries?.length ?? 0})</span>
+          <span className="font-semibold">{t('batteries.list', { n: batteries?.length ?? 0 })}</span>
           <Select
             className="w-full sm:w-48"
             value={typeFilter}
             onChange={setTypeFilter}
             options={[
-              { value: '', label: '全部種類' },
+              { value: '', label: t('batteries.filter.allTypes') },
               ...batteryTypeOpts.map((o) => ({ value: o.value, label: o.label })),
             ]}
           />
@@ -279,8 +284,14 @@ function BatteriesPage() {
         <table className="w-full text-sm">
           <thead className="border-b border-black/10 bg-black/5 dark:border-white/10 dark:bg-white/5">
             <tr>
-              {['電池編號', '種類', '負責人', '說明', ''].map((h) => (
-                <th key={h} className="px-4 py-3 text-left text-xs font-semibold uppercase text-muted">{h}</th>
+              {[
+                t('batteries.col.id'),
+                t('batteries.col.type'),
+                t('batteries.col.owner'),
+                t('batteries.col.notes'),
+                '',
+              ].map((h, idx) => (
+                <th key={h || `empty-${idx}`} className="px-4 py-3 text-left text-xs font-semibold uppercase text-muted">{h}</th>
               ))}
             </tr>
           </thead>

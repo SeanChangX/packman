@@ -5,11 +5,13 @@ import { useState, useRef, useEffect } from 'react'
 import { ArrowLeft, RefreshCw, Tag, Trash2, Upload, X } from 'lucide-react'
 import { useToast } from '@packman/ui'
 import { itemsApi, groupsApi, boxesApi, usersApi, selectOptionsApi } from '../lib/api'
-import { STATUS_LABELS, STATUS_COLORS, getLabelFromOptions, optionsToSelectItems, cn, formatApiError } from '../lib/utils'
+import { STATUS_LABEL_KEYS, STATUS_COLORS, getLabelFromOptions, optionsToSelectItems, cn, formatApiError } from '../lib/utils'
 import { SelectController } from '../lib/select'
+import { useT } from '../lib/i18n'
 import type { UpdateItemInput, PackingStatus } from '@packman/shared'
 
 function ItemDetailPage() {
+  const t = useT()
   const { id } = Route.useParams()
   const navigate = useNavigate()
   const qc = useQueryClient()
@@ -64,15 +66,15 @@ function ItemDetailPage() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['item', id] })
       setEditing(false)
-      showToast('物品已更新', 'success')
+      showToast(t('items.action.updated'), 'success')
     },
-    onError: (e: unknown) => showToast(formatApiError(e), 'error'),
+    onError: (e: unknown) => showToast(formatApiError(e, t('common.opFailed'), t('common.requiredHint')), 'error'),
   })
 
   const uploadToastIdRef = useRef<number | null>(null)
   const uploadPhoto = useMutation({
     mutationFn: (file: File) => {
-      uploadToastIdRef.current = showToast('上傳照片中… 0%', 'info', { sticky: true, progress: 0 })
+      uploadToastIdRef.current = showToast(t('items.upload.uploadingPct', { pct: 0 }), 'info', { sticky: true, progress: 0 })
       let serverPhase = false
       return itemsApi.uploadPhoto(id, file, (loaded, total) => {
         const tid = uploadToastIdRef.current
@@ -80,10 +82,10 @@ function ItemDetailPage() {
         const ratio = total ? loaded / total : 0
         if (ratio >= 1 && !serverPhase) {
           serverPhase = true
-          updateToast(tid, { message: '伺服器處理中…', progress: undefined, sticky: true })
+          updateToast(tid, { message: t('items.upload.serverProcessing'), progress: undefined, sticky: true })
         } else if (!serverPhase) {
           updateToast(tid, {
-            message: `上傳照片中… ${Math.floor(ratio * 100)}%`,
+            message: t('items.upload.uploadingPct', { pct: Math.floor(ratio * 100) }),
             progress: ratio,
           })
         }
@@ -94,7 +96,7 @@ function ItemDetailPage() {
         dismissToast(uploadToastIdRef.current)
         uploadToastIdRef.current = null
       }
-      showToast('照片已上傳', 'success')
+      showToast(t('items.upload.success'), 'success')
       refetch()
     },
     onError: (e: unknown) => {
@@ -102,7 +104,7 @@ function ItemDetailPage() {
         dismissToast(uploadToastIdRef.current)
         uploadToastIdRef.current = null
       }
-      showToast(formatApiError(e), 'error')
+      showToast(formatApiError(e, t('common.opFailed'), t('common.requiredHint')), 'error')
     },
   })
 
@@ -110,18 +112,18 @@ function ItemDetailPage() {
     mutationFn: () => itemsApi.reanalyzePhoto(id),
     onSuccess: () => {
       refetch()
-      showToast('已加入辨識佇列', 'success')
+      showToast(t('items.action.queuedReanalyze'), 'success')
     },
-    onError: (e: unknown) => showToast(formatApiError(e), 'error'),
+    onError: (e: unknown) => showToast(formatApiError(e, t('common.opFailed'), t('common.requiredHint')), 'error'),
   })
 
   const deleteItem = useMutation({
     mutationFn: () => itemsApi.delete(id),
     onSuccess: () => {
-      showToast('物品已刪除', 'success')
+      showToast(t('items.action.deleted'), 'success')
       navigate({ to: '/items' })
     },
-    onError: (e: unknown) => showToast(formatApiError(e), 'error'),
+    onError: (e: unknown) => showToast(formatApiError(e, t('common.opFailed'), t('common.requiredHint')), 'error'),
   })
 
   if (!item) return <div className="flex justify-center py-12"><div className="h-8 w-8 animate-spin rounded-full border-4 border-brand-500 border-t-transparent" /></div>
@@ -129,12 +131,12 @@ function ItemDetailPage() {
   const latestJob = item.aiTagJobs?.[0]
   const aiStatusLabel = (() => {
     if (item.aiTagStatus === 'PENDING') {
-      if (latestJob?.status === 'RUNNING') return '辨識中...'
-      if (latestJob?.status === 'QUEUED' && latestJob.attempts > 0) return `等待重試 (${latestJob.attempts}/${latestJob.maxAttempts})`
-      return '等待辨識...'
+      if (latestJob?.status === 'RUNNING') return t('items.detail.aiRunning')
+      if (latestJob?.status === 'QUEUED' && latestJob.attempts > 0) return t('items.detail.aiQueued', { attempts: latestJob.attempts, maxAttempts: latestJob.maxAttempts })
+      return t('items.detail.aiPending')
     }
-    if (item.aiTagStatus === 'FAILED') return '辨識失敗'
-    if (item.aiTagStatus === 'DONE') return '已辨識'
+    if (item.aiTagStatus === 'FAILED') return t('items.detail.aiFailed')
+    if (item.aiTagStatus === 'DONE') return t('items.detail.aiDone')
     return ''
   })()
 
@@ -147,14 +149,14 @@ function ItemDetailPage() {
         <div className="flex-1">
           <h1 className="page-title">{item.name}</h1>
           <div className="mt-1 flex gap-2">
-            <span className={cn('badge', STATUS_COLORS[item.status])}>{STATUS_LABELS[item.status]}</span>
+            <span className={cn('badge', STATUS_COLORS[item.status])}>{t(STATUS_LABEL_KEYS[item.status])}</span>
             {item.shippingMethod && <span className="badge bg-black/10 text-app dark:bg-white/10">{getLabelFromOptions(shippingOpts, item.shippingMethod)}</span>}
           </div>
         </div>
         <button
-          onClick={() => { if (confirm(`確定刪除「${item.name}」？`)) deleteItem.mutate() }}
+          onClick={() => { if (confirm(t('items.detail.deleteConfirm', { name: item.name }))) deleteItem.mutate() }}
           className="rounded-2xl p-2 text-brand-500 transition-colors hover:bg-brand-500/10"
-          title="刪除"
+          title={t('items.detail.delete')}
         >
           <Trash2 className="h-5 w-5" />
         </button>
@@ -180,7 +182,7 @@ function ItemDetailPage() {
                 />
               )
               : <div className="flex h-full items-center justify-center px-4 text-center text-sm text-muted">
-                  {photoLoadError ? '照片載入失敗，請重新上傳' : '尚無照片'}
+                  {photoLoadError ? t('items.detail.photoLoadFailed') : t('items.detail.noPhoto')}
                 </div>
             }
           </div>
@@ -192,7 +194,7 @@ function ItemDetailPage() {
               disabled={uploadPhoto.isPending}
             >
               <Upload className="h-4 w-4" />
-              {uploadPhoto.isPending ? '上傳中...' : '上傳照片'}
+              {uploadPhoto.isPending ? t('items.detail.uploading') : t('items.detail.uploadPhoto')}
             </button>
             <button
               className="btn-secondary w-full gap-1"
@@ -200,7 +202,7 @@ function ItemDetailPage() {
               disabled={!item.photoUrl || reanalyzePhoto.isPending}
             >
               <RefreshCw className={cn('h-4 w-4', reanalyzePhoto.isPending && 'animate-spin')} />
-              重新辨識
+              {t('items.detail.reanalyze')}
             </button>
           </div>
           <input
@@ -218,7 +220,7 @@ function ItemDetailPage() {
           <div>
             <div className="flex items-center gap-1 text-sm font-semibold text-app">
               <Tag className="h-4 w-4" />
-              <span>搜尋標籤</span>
+              <span>{t('items.detail.searchTags')}</span>
               {aiStatusLabel && (
                 <span className={cn(
                   'ml-1 text-xs',
@@ -232,9 +234,9 @@ function ItemDetailPage() {
             </div>
             {item.tags.length > 0
               ? <div className="mt-2 flex flex-wrap gap-1">
-                  {item.tags.map((t) => <span key={t} className="badge bg-black/5 text-muted dark:bg-white/10">{t}</span>)}
+                  {item.tags.map((tag) => <span key={tag} className="badge bg-black/5 text-muted dark:bg-white/10">{tag}</span>)}
                 </div>
-              : <p className="mt-1 text-xs text-muted">上傳照片後自動辨識，也可以手動新增</p>
+              : <p className="mt-1 text-xs text-muted">{t('items.detail.tagsHint')}</p>
             }
           </div>
 
@@ -248,63 +250,63 @@ function ItemDetailPage() {
             ? (
               <form className="space-y-3" onSubmit={handleSubmit((data) => update.mutate({ ...data, tags }))}>
                 <div>
-                  <label className="label">品項名稱</label>
+                  <label className="label">{t('items.detail.name')}</label>
                   <input className="input mt-1" {...register('name')} />
                 </div>
                 <div>
-                  <label className="label">狀態</label>
+                  <label className="label">{t('items.detail.status')}</label>
                   <SelectController
                     name="status"
                     control={control}
                     className="mt-1"
                     options={[
-                      { value: 'NOT_PACKED', label: '尚未裝箱' },
-                      { value: 'PACKED', label: '已裝箱' },
+                      { value: 'NOT_PACKED', label: t('status.NOT_PACKED') },
+                      { value: 'PACKED', label: t('status.PACKED') },
                     ]}
                   />
                 </div>
                 <div>
-                  <label className="label">負責人</label>
+                  <label className="label">{t('items.detail.owner')}</label>
                   <SelectController
                     name="ownerId"
                     control={control}
                     className="mt-1"
-                    placeholder="— 請選擇 —"
+                    placeholder={t('common.placeholder.select')}
                     emptyValue="null"
                     options={[
-                      { value: '', label: '— 請選擇 —' },
+                      { value: '', label: t('common.placeholder.select') },
                       ...(users?.map((u) => ({ value: u.id, label: u.name })) ?? []),
                     ]}
                   />
                 </div>
                 <div>
-                  <label className="label">組別</label>
+                  <label className="label">{t('items.detail.group')}</label>
                   <SelectController
                     name="groupId"
                     control={control}
                     className="mt-1"
-                    placeholder="— 請選擇 —"
+                    placeholder={t('common.placeholder.select')}
                     emptyValue="null"
                     options={[
-                      { value: '', label: '— 請選擇 —' },
+                      { value: '', label: t('common.placeholder.select') },
                       ...(groups?.map((g) => ({ value: g.id, label: g.name })) ?? []),
                     ]}
                   />
                 </div>
                 <div>
-                  <label className="label">運送方式</label>
+                  <label className="label">{t('items.detail.shipping')}</label>
                   <SelectController
                     name="shippingMethod"
                     control={control}
                     className="mt-1"
-                    placeholder="— 請選擇 —"
+                    placeholder={t('common.placeholder.select')}
                     emptyValue="null"
                     options={optionsToSelectItems(shippingOpts ?? [])}
                   />
                 </div>
                 <div className="grid grid-cols-2 gap-2">
                   <div>
-                    <label className="label">數量</label>
+                    <label className="label">{t('items.detail.quantity')}</label>
                     <input
                       type="number"
                       min={1}
@@ -316,17 +318,17 @@ function ItemDetailPage() {
                       max: 9999,
                       })}
                     />
-                  <p className="mt-1 text-xs text-muted">可輸入 1-9999</p>
-                  {errors.quantity && <p className="mt-1 text-xs text-red-500">數量需介於 1-9999</p>}
+                  <p className="mt-1 text-xs text-muted">{t('items.new.qtyHint')}</p>
+                  {errors.quantity && <p className="mt-1 text-xs text-red-500">{t('items.new.qtyError')}</p>}
                   </div>
                   <div>
-                    <label className="label">重量（g）</label>
+                    <label className="label">{t('items.detail.weight')}</label>
                     <input
                       type="number"
                       min={1}
                       max={1000000}
                       className="input mt-1"
-                      placeholder="例: 250"
+                      placeholder={t('items.new.weightPlaceholder')}
                       {...register('weightG', {
                         valueAsNumber: true,
                         min: 1,
@@ -334,44 +336,44 @@ function ItemDetailPage() {
                         setValueAs: (v) => (v === '' || isNaN(Number(v)) ? null : Number(v)),
                       })}
                     />
-                    {errors.weightG && <p className="mt-1 text-xs text-red-500">重量需介於 1-1,000,000 g</p>}
+                    {errors.weightG && <p className="mt-1 text-xs text-red-500">{t('items.new.weightError')}</p>}
                   </div>
                 </div>
                 <div>
-                    <label className="label">指定箱子</label>
+                    <label className="label">{t('items.detail.box')}</label>
                     <SelectController
                       name="boxId"
                       control={control}
                       className="mt-1"
-                      placeholder="— 未指定 —"
+                      placeholder={t('items.new.placeholderUnassigned')}
                       emptyValue="null"
                       options={[
-                        { value: '', label: '— 未指定 —' },
+                        { value: '', label: t('items.new.placeholderUnassigned') },
                         ...(boxes?.map((b) => ({ value: b.id, label: b.label })) ?? []),
                       ]}
                     />
                 </div>
                 <div>
-                  <label className="label">說明</label>
+                  <label className="label">{t('items.detail.notes')}</label>
                   <textarea className="input mt-1" rows={2} {...register('notes')} />
                 </div>
                 <div>
-                  <label className="label">須留意之處</label>
+                  <label className="label">{t('items.detail.specialNotes')}</label>
                   <textarea className="input mt-1" rows={2} {...register('specialNotes')} />
                 </div>
                 <div>
-                  <label className="label">用途分類</label>
+                  <label className="label">{t('items.detail.useCategory')}</label>
                   <SelectController
                     name="useCategory"
                     control={control}
                     className="mt-1"
-                    placeholder="— 請選擇 —"
+                    placeholder={t('common.placeholder.select')}
                     emptyValue="null"
                     options={optionsToSelectItems(categoryOpts ?? [])}
                   />
                 </div>
                 <div>
-                  <label className="label">搜尋標籤</label>
+                  <label className="label">{t('items.detail.searchTags')}</label>
                   <div className="mt-1 flex flex-wrap items-center gap-1.5 rounded-xl border border-white/10 bg-black/5 p-2 dark:bg-white/5">
                     {tags.map((tag) => (
                       <button
@@ -398,31 +400,31 @@ function ItemDetailPage() {
                         }
                       }}
                       onBlur={() => addTag(tagDraft)}
-                      placeholder="例: 筆電、充電器、易碎"
+                      placeholder={t('items.detail.tagsPlaceholder')}
                     />
                   </div>
                   <p className="mt-1 text-xs text-muted">
-                    Enter 或逗號新增，點 tag 可刪除。
+                    {t('items.detail.tagsInputHint')}
                   </p>
                 </div>
                 <div className="flex justify-end gap-2">
-                  <button type="button" className="btn-secondary" onClick={() => setEditing(false)}>取消</button>
-                  <button type="submit" className="btn-primary" disabled={update.isPending}>儲存</button>
+                  <button type="button" className="btn-secondary" onClick={() => setEditing(false)}>{t('common.cancel')}</button>
+                  <button type="submit" className="btn-primary" disabled={update.isPending}>{t('common.save')}</button>
                 </div>
               </form>
             )
             : (
               <dl className="space-y-3 text-sm">
                 {[
-                  ['負責人', item.owner?.name ?? '—'],
-                  ['組別', item.group?.name ?? '—'],
-                  ['數量', item.quantity],
-                  ['重量', item.weightG != null ? `${item.weightG.toLocaleString()} g` : '—'],
-                  ['運送方式', item.shippingMethod ? getLabelFromOptions(shippingOpts, item.shippingMethod) : '—'],
-                  ['箱子', item.box?.label ?? '—'],
-                  ['用途分類', item.useCategory ? getLabelFromOptions(categoryOpts, item.useCategory) : '—'],
-                  ['說明', item.notes ?? '—'],
-                  ['須留意之處', item.specialNotes ?? '—'],
+                  [t('items.detail.field.owner'), item.owner?.name ?? '—'],
+                  [t('items.detail.field.group'), item.group?.name ?? '—'],
+                  [t('items.detail.field.quantity'), item.quantity],
+                  [t('items.detail.field.weight'), item.weightG != null ? `${item.weightG.toLocaleString()} g` : '—'],
+                  [t('items.detail.field.shipping'), item.shippingMethod ? getLabelFromOptions(shippingOpts, item.shippingMethod) : '—'],
+                  [t('items.detail.field.box'), item.box?.label ?? '—'],
+                  [t('items.detail.field.useCategory'), item.useCategory ? getLabelFromOptions(categoryOpts, item.useCategory) : '—'],
+                  [t('items.detail.field.notes'), item.notes ?? '—'],
+                  [t('items.detail.field.specialNotes'), item.specialNotes ?? '—'],
                 ].map(([label, value]) => (
                   <div key={String(label)} className="flex justify-between">
                     <dt className="font-medium text-muted">{label}</dt>
@@ -430,7 +432,7 @@ function ItemDetailPage() {
                   </div>
                 ))}
                 <button className="btn-secondary mt-4 w-full" onClick={() => setEditing(true)}>
-                  編輯
+                  {t('common.edit')}
                 </button>
               </dl>
             )

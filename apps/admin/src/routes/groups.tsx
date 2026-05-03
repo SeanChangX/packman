@@ -5,6 +5,7 @@ import { useState } from 'react'
 import { Plus, Pencil, Trash2, X } from 'lucide-react'
 import { useToast } from '@packman/ui'
 import { adminApi } from '../lib/api'
+import { useT } from '../lib/i18n'
 
 const PRESET_COLORS = [
   '#EF4444', // red
@@ -20,6 +21,7 @@ const PRESET_COLORS = [
 ]
 
 function GroupModal({ initial, onClose }: { initial?: { id: string; name: string; color: string }; onClose: () => void }) {
+  const t = useT()
   const qc = useQueryClient()
   const { register, handleSubmit, watch, setValue } = useForm({
     defaultValues: { name: initial?.name ?? '', color: initial?.color ?? '#EF4444' },
@@ -36,16 +38,16 @@ function GroupModal({ initial, onClose }: { initial?: { id: string; name: string
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
       <div className="card w-full max-w-sm p-6">
         <div className="mb-4 flex items-center justify-between">
-          <h2 className="font-bold">{initial ? '編輯組別' : '新增組別'}</h2>
+          <h2 className="font-bold">{initial ? t('groups.modal.editTitle') : t('groups.modal.addTitle')}</h2>
           <button onClick={onClose}><X className="h-4 w-4" /></button>
         </div>
         <form className="space-y-4" onSubmit={handleSubmit((d) => save.mutate(d))}>
           <div>
-            <label className="label">組別名稱</label>
+            <label className="label">{t('groups.field.name')}</label>
             <input className="input mt-1" {...register('name', { required: true })} />
           </div>
           <div>
-            <label className="label">顏色</label>
+            <label className="label">{t('groups.field.color')}</label>
             <div className="mt-2 flex gap-2">
               {PRESET_COLORS.map((c) => (
                 <button
@@ -77,8 +79,8 @@ function GroupModal({ initial, onClose }: { initial?: { id: string; name: string
             <p className="text-sm text-red-500">{(save.error as Error).message}</p>
           )}
           <div className="flex justify-end gap-2">
-            <button type="button" className="btn-secondary" onClick={onClose}>取消</button>
-            <button type="submit" className="btn-primary" disabled={save.isPending}>儲存</button>
+            <button type="button" className="btn-secondary" onClick={onClose}>{t('common.cancel')}</button>
+            <button type="submit" className="btn-primary" disabled={save.isPending}>{t('common.save')}</button>
           </div>
         </form>
       </div>
@@ -87,6 +89,7 @@ function GroupModal({ initial, onClose }: { initial?: { id: string; name: string
 }
 
 function GroupsPage() {
+  const t = useT()
   const qc = useQueryClient()
   const { showToast } = useToast()
   const [modal, setModal] = useState<{ id?: string; name?: string; color?: string } | null>(null)
@@ -94,19 +97,19 @@ function GroupsPage() {
 
   const del = useMutation({
     mutationFn: adminApi.deleteGroup,
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['admin-groups'] }); showToast('組別已刪除', 'success') },
-    onError: (e: unknown) => showToast((e as Error)?.message ?? '組別刪除失敗', 'error'),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['admin-groups'] }); showToast(t('groups.delete.saved'), 'success') },
+    onError: (e: unknown) => showToast((e as Error)?.message ?? t('groups.delete.failed'), 'error'),
   })
 
   return (
     <div className="space-y-4">
       <div className="page-header">
         <div>
-          <h1 className="page-title">組別管理</h1>
-          <p className="page-subtitle">團隊分類與標籤色彩</p>
+          <h1 className="page-title">{t('groups.title')}</h1>
+          <p className="page-subtitle">{t('groups.subtitle')}</p>
         </div>
         <button className="btn-primary gap-1" onClick={() => setModal({})}>
-          <Plus className="h-4 w-4" /> 新增組別
+          <Plus className="h-4 w-4" /> {t('groups.add')}
         </button>
       </div>
 
@@ -115,7 +118,7 @@ function GroupsPage() {
         <table className="w-full text-sm">
           <thead className="border-b border-black/10 bg-black/5 dark:border-white/10 dark:bg-white/5">
             <tr>
-              {['組別', '顏色', '操作'].map((h) => (
+              {[t('groups.column.group'), t('groups.column.color'), t('common.actions')].map((h) => (
                 <th key={h} className="px-4 py-3 text-left text-xs font-semibold uppercase text-muted">{h}</th>
               ))}
             </tr>
@@ -138,13 +141,13 @@ function GroupsPage() {
                     </td>
                     <td className="px-4 py-3 flex gap-2">
                       <button className="btn-secondary px-2 py-1 text-xs gap-1" onClick={() => setModal(g)}>
-                        <Pencil className="h-3 w-3" /> 編輯
+                        <Pencil className="h-3 w-3" /> {t('common.edit')}
                       </button>
                       <button
                         className="btn-danger px-2 py-1 text-xs gap-1"
-                        onClick={() => { if (confirm(`確定刪除組別 ${g.name}？`)) del.mutate(g.id) }}
+                        onClick={() => { if (confirm(t('groups.delete.confirm', { name: g.name }))) del.mutate(g.id) }}
                       >
-                        <Trash2 className="h-3 w-3" /> 刪除
+                        <Trash2 className="h-3 w-3" /> {t('common.delete')}
                       </button>
                     </td>
                   </tr>

@@ -1,5 +1,6 @@
 import { randomBytes, scrypt as scryptCb, timingSafeEqual, type ScryptOptions } from 'crypto'
 import { prisma } from '../plugins/prisma'
+import { MultiKeyError } from '../lib/i18n'
 
 function scrypt(password: string, salt: string, keylen: number, options: ScryptOptions): Promise<Buffer> {
   return new Promise((resolve, reject) => {
@@ -149,11 +150,11 @@ export async function getAdminAuthStatus() {
 
 function passwordProblems(username: string, password: string): string[] {
   const problems: string[] = []
-  if (username.trim().length < 3) problems.push('帳號至少需要 3 個字元')
-  if (password.length < 12) problems.push('密碼至少需要 12 個字元')
-  if (password.length > 128) problems.push('密碼不可超過 128 個字元')
+  if (username.trim().length < 3) problems.push('password.error.usernameTooShort')
+  if (password.length < 12) problems.push('password.error.passwordTooShort')
+  if (password.length > 128) problems.push('password.error.passwordTooLong')
   if (username && password.toLowerCase().includes(username.toLowerCase())) {
-    problems.push('密碼不可包含帳號')
+    problems.push('password.error.containsUsername')
   }
 
   const classes = [
@@ -162,11 +163,11 @@ function passwordProblems(username: string, password: string): string[] {
     /[0-9]/.test(password),
     /[^a-zA-Z0-9]/.test(password),
   ].filter(Boolean).length
-  if (classes < 3) problems.push('密碼需包含大小寫字母、數字、符號其中至少 3 類')
+  if (classes < 3) problems.push('password.error.notEnoughClasses')
 
   const weak = ['password', 'admin', 'packman', 'changeme', 'qwerty', '123456']
   if (weak.some((word) => password.toLowerCase().includes(word))) {
-    problems.push('密碼不可包含常見弱密碼字詞')
+    problems.push('password.error.weakWord')
   }
   return problems
 }
@@ -211,10 +212,10 @@ export async function updateAdminAccount(input: { username: string; password?: s
   const username = input.username.trim()
   const password = input.password ?? ''
   const problems = input.password !== undefined ? passwordProblems(username, password) : (
-    username.length < 3 ? ['帳號至少需要 3 個字元'] : []
+    username.length < 3 ? ['password.error.usernameTooShort'] : []
   )
   if (problems.length > 0) {
-    throw Object.assign(new Error(problems.join('、')), { statusCode: 400 })
+    throw new MultiKeyError(problems, 400)
   }
 
   await setSetting(SETTINGS.adminUsername, username)

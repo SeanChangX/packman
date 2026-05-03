@@ -4,13 +4,8 @@ import { useState } from 'react'
 import { Plus, Pencil, Trash2, Check, X, ChevronUp, ChevronDown } from 'lucide-react'
 import { useToast } from '@packman/ui'
 import { adminApi } from '../lib/api'
+import { useT } from '../lib/i18n'
 import type { SelectOption, SelectOptionType } from '@packman/shared'
-
-const TYPE_LABELS: Record<SelectOptionType, string> = {
-  SHIPPING_METHOD: '運送方式',
-  USE_CATEGORY: '物品用途分類',
-  BATTERY_TYPE: '電池種類',
-}
 
 const TYPES: SelectOptionType[] = ['SHIPPING_METHOD', 'USE_CATEGORY', 'BATTERY_TYPE']
 
@@ -31,6 +26,7 @@ function OptionRow({
   onMove: (id: string, direction: 'up' | 'down') => Promise<void>
   moving: boolean
 }) {
+  const t = useT()
   const [editing, setEditing] = useState(false)
   const [label, setLabel] = useState(opt.label)
   const [saving, setSaving] = useState(false)
@@ -100,7 +96,7 @@ function OptionRow({
             <Pencil className="h-3.5 w-3.5" />
           </button>
           <button
-            onClick={() => { if (confirm(`確定刪除「${opt.label}」？`)) onDelete(opt.id) }}
+            onClick={() => { if (confirm(t('selectOptions.delete.confirm', { label: opt.label }))) onDelete(opt.id) }}
             className="text-brand-600 hover:text-brand-700"
           >
             <Trash2 className="h-3.5 w-3.5" />
@@ -120,13 +116,14 @@ function AddOptionRow({
   maxOrder: number
   onAdd: () => void
 }) {
+  const t = useT()
   const [open, setOpen] = useState(false)
   const [label, setLabel] = useState('')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
 
   const handleAdd = async () => {
-    if (!label.trim()) { setError('顯示名稱為必填'); return }
+    if (!label.trim()) { setError(t('selectOptions.label.required')); return }
     setSaving(true)
     setError('')
     try {
@@ -135,7 +132,7 @@ function AddOptionRow({
       setOpen(false)
       onAdd()
     } catch (e: any) {
-      setError(e.message ?? '新增失敗')
+      setError(e.message ?? t('selectOptions.create.failed'))
     } finally {
       setSaving(false)
     }
@@ -146,7 +143,7 @@ function AddOptionRow({
       <tr>
         <td colSpan={2} className="px-4 py-2">
           <button onClick={() => setOpen(true)} className="flex items-center gap-1.5 text-sm font-semibold text-brand-600 hover:text-brand-700">
-            <Plus className="h-4 w-4" /> 新增選項
+            <Plus className="h-4 w-4" /> {t('selectOptions.add')}
           </button>
         </td>
       </tr>
@@ -158,7 +155,7 @@ function AddOptionRow({
       <td className="min-w-0 px-4 py-2">
         <input
           className="input py-1.5 text-sm"
-          placeholder="顯示名稱"
+          placeholder={t('selectOptions.placeholder.label')}
           value={label}
           onChange={(e) => setLabel(e.target.value)}
           autoFocus
@@ -181,6 +178,13 @@ function AddOptionRow({
 }
 
 function SelectOptionsPage() {
+  const t = useT()
+  const TYPE_LABELS: Record<SelectOptionType, string> = {
+    SHIPPING_METHOD: t('selectOptions.type.shippingMethod'),
+    USE_CATEGORY: t('selectOptions.type.useCategory'),
+    BATTERY_TYPE: t('selectOptions.type.batteryType'),
+  }
+
   const qc = useQueryClient()
   const { showToast } = useToast()
   const { data: options = [], isLoading } = useQuery({
@@ -193,14 +197,14 @@ function SelectOptionsPage() {
   const updateOption = useMutation({
     mutationFn: ({ id, label }: { id: string; label: string }) =>
       adminApi.updateSelectOption(id, { label }),
-    onSuccess: () => { invalidateOptions(); showToast('選項已更新', 'success') },
-    onError: (e: unknown) => showToast((e as Error)?.message ?? '選項更新失敗', 'error'),
+    onSuccess: () => { invalidateOptions(); showToast(t('selectOptions.update.saved'), 'success') },
+    onError: (e: unknown) => showToast((e as Error)?.message ?? t('selectOptions.update.failed'), 'error'),
   })
 
   const deleteOption = useMutation({
     mutationFn: adminApi.deleteSelectOption,
-    onSuccess: () => { invalidateOptions(); showToast('選項已刪除', 'success') },
-    onError: (e: unknown) => showToast((e as Error)?.message ?? '選項刪除失敗', 'error'),
+    onSuccess: () => { invalidateOptions(); showToast(t('selectOptions.delete.saved'), 'success') },
+    onError: (e: unknown) => showToast((e as Error)?.message ?? t('selectOptions.delete.failed'), 'error'),
   })
 
   const moveOption = useMutation({
@@ -216,7 +220,7 @@ function SelectOptionsPage() {
       ])
     },
     onSuccess: invalidateOptions,
-    onError: (e: unknown) => showToast((e as Error)?.message ?? '排序更新失敗', 'error'),
+    onError: (e: unknown) => showToast((e as Error)?.message ?? t('selectOptions.sort.failed'), 'error'),
   })
 
   const handleSave = (id: string, label: string) =>
@@ -232,8 +236,8 @@ function SelectOptionsPage() {
     <div className="space-y-6">
       <div className="page-header">
         <div>
-          <h1 className="page-title">選項管理</h1>
-          <p className="page-subtitle">管理下拉選單的選項，新增後立即在 App 生效</p>
+          <h1 className="page-title">{t('selectOptions.title')}</h1>
+          <p className="page-subtitle">{t('selectOptions.subtitle')}</p>
         </div>
       </div>
 
@@ -255,8 +259,8 @@ function SelectOptionsPage() {
               <table className="w-full min-w-0 table-fixed text-sm">
                 <thead className="border-b border-white/10 bg-white/5">
                   <tr>
-                    <th className="px-4 py-2 text-left text-xs font-semibold uppercase text-muted">顯示名稱</th>
-                    <th className="w-36 px-4 py-2 text-right text-xs font-semibold uppercase text-muted">操作</th>
+                    <th className="px-4 py-2 text-left text-xs font-semibold uppercase text-muted">{t('selectOptions.column.label')}</th>
+                    <th className="w-36 px-4 py-2 text-right text-xs font-semibold uppercase text-muted">{t('common.actions')}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-white/5">

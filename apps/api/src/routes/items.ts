@@ -8,6 +8,7 @@ import { enqueueAiTagJob } from '../services/ai-tag-queue'
 import { isAiTaggingEnabled } from '../services/ollama'
 import { getAppConfig } from '../services/runtime-config'
 import { getActiveEventId } from '../services/events'
+import { t } from '../lib/i18n'
 
 const itemInclude = {
   owner: { select: { id: true, name: true, avatarUrl: true } },
@@ -213,10 +214,10 @@ export async function itemRoutes(app: FastifyInstance) {
       if (!item) return reply.status(404).send({ message: 'Item not found' })
 
       const objectName = objectNameFromUrl(item.photoUrl)
-      if (!objectName) return reply.status(400).send({ message: '此物品尚無可辨識的照片' })
+      if (!objectName) return reply.status(400).send({ message: t(request, 'items.error.noPhotoForAnalysis') })
 
       if (!(await isAiTaggingEnabled())) {
-        return reply.status(409).send({ message: 'AI 辨識目前已停用' })
+        return reply.status(409).send({ message: t(request, 'items.error.aiDisabled') })
       }
 
       await prisma.item.update({

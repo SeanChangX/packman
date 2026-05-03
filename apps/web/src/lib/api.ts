@@ -9,6 +9,7 @@ import type {
   CreateBatteryInput, UpdateBatteryInput,
   UpdateUserInput, StickerRequest,
 } from '@packman/shared'
+import { getLocale, translate as t } from './i18n'
 
 const BASE = '/api'
 
@@ -16,6 +17,9 @@ function buildHeaders(options?: RequestInit): Headers {
   const headers = new Headers(options?.headers)
   if (options?.body !== undefined && !(options.body instanceof FormData) && !headers.has('Content-Type')) {
     headers.set('Content-Type', 'application/json')
+  }
+  if (!headers.has('Accept-Language')) {
+    headers.set('Accept-Language', getLocale())
   }
   return headers
 }
@@ -131,6 +135,7 @@ export const itemsApi = {
       const xhr = new XMLHttpRequest()
       xhr.open('POST', `${BASE}/items/${id}/photo`, true)
       xhr.withCredentials = true
+      xhr.setRequestHeader('Accept-Language', getLocale())
       if (onProgress) {
         xhr.upload.onprogress = (e) => {
           if (e.lengthComputable) onProgress(e.loaded, e.total)
@@ -139,18 +144,18 @@ export const itemsApi = {
       xhr.onload = () => {
         if (xhr.status >= 200 && xhr.status < 300) {
           try { resolve(JSON.parse(xhr.responseText)) }
-          catch { reject(new Error('回應格式錯誤')) }
+          catch { reject(new Error(t('api.error.responseFormat'))) }
         } else if (xhr.status === 401) {
           if (window.location.pathname !== '/login') window.location.href = '/login'
           reject(new Error('Unauthorized'))
         } else {
-          let message = '照片上傳失敗'
+          let message = t('api.error.photoUpload')
           try { message = JSON.parse(xhr.responseText)?.message ?? message } catch {}
           reject(new Error(message))
         }
       }
-      xhr.onerror = () => reject(new Error('照片上傳失敗（網路錯誤）'))
-      xhr.onabort = () => reject(new Error('照片上傳已取消'))
+      xhr.onerror = () => reject(new Error(t('api.error.photoNetwork')))
+      xhr.onabort = () => reject(new Error(t('api.error.photoAborted')))
       xhr.send(form)
     })
   },
@@ -190,10 +195,10 @@ export const stickersApi = {
     const res = await fetch(`${BASE}/stickers/items`, {
       method: 'POST',
       credentials: 'include',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'Accept-Language': getLocale() },
       body: JSON.stringify(data),
     })
-    if (!res.ok) throw new Error(await errorMessage(res, '貼紙生成失敗'))
+    if (!res.ok) throw new Error(await errorMessage(res, t('api.error.stickerGenerate')))
     const blob = await res.blob()
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
@@ -206,10 +211,10 @@ export const stickersApi = {
     const res = await fetch(`${BASE}/stickers/boxes`, {
       method: 'POST',
       credentials: 'include',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'Accept-Language': getLocale() },
       body: JSON.stringify(data),
     })
-    if (!res.ok) throw new Error(await errorMessage(res, '貼紙生成失敗'))
+    if (!res.ok) throw new Error(await errorMessage(res, t('api.error.stickerGenerate')))
     const blob = await res.blob()
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')

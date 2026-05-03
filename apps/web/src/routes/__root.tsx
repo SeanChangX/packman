@@ -3,41 +3,51 @@ import {
   Package, ClipboardList, Battery, Printer, QrCode,
   LayoutDashboard, LogOut, Menu, X, UserCircle, AlertTriangle, RotateCcw,
 } from 'lucide-react'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, type ElementType } from 'react'
 import { useAuth } from '../lib/auth-context'
 import { authApi, eventsApi } from '../lib/api'
 import { cn } from '../lib/utils'
+import { useT } from '../lib/i18n'
 
 function ErrorPage({ error, reset }: { error: Error; reset: () => void }) {
+  const t = useT()
   return (
     <div className="flex min-h-[60vh] flex-col items-center justify-center gap-6 p-8 text-center">
       <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-brand-500/10">
         <AlertTriangle className="h-8 w-8 text-brand-500" />
       </div>
       <div className="space-y-2">
-        <h1 className="text-xl font-bold text-app">發生了一些問題</h1>
+        <h1 className="text-xl font-bold text-app">{t('errors.generic')}</h1>
         <p className="max-w-sm text-sm text-muted">{error.message}</p>
       </div>
       <button onClick={reset} className="btn-secondary gap-2">
         <RotateCcw className="h-4 w-4" />
-        重試
+        {t('errors.retry')}
       </button>
     </div>
   )
 }
 
-const navItems = [
-  { to: '/', icon: LayoutDashboard, label: '總覽' },
-  { to: '/items', icon: ClipboardList, label: '物品清單' },
-  { to: '/boxes', icon: Package, label: '箱子清單' },
-  { to: '/batteries', icon: Battery, label: '電池分配' },
-  { to: '/stickers', icon: Printer, label: '貼紙列印', adminOnly: true },
-  { to: '/profile', icon: UserCircle, label: '關於我' },
+type NavItem = {
+  to: string
+  icon: ElementType
+  tKey: string
+  adminOnly?: boolean
+}
+
+const navItems: NavItem[] = [
+  { to: '/', icon: LayoutDashboard, tKey: 'nav.dashboard' },
+  { to: '/items', icon: ClipboardList, tKey: 'nav.items' },
+  { to: '/boxes', icon: Package, tKey: 'nav.boxes' },
+  { to: '/batteries', icon: Battery, tKey: 'nav.batteries' },
+  { to: '/stickers', icon: Printer, tKey: 'nav.stickers', adminOnly: true },
+  { to: '/profile', icon: UserCircle, tKey: 'nav.profile' },
 ]
 
-function NavLink({ to, icon: Icon, label, compact = false, onClick }: {
-  to: string; icon: React.ElementType; label: string; compact?: boolean; onClick?: () => void
+function NavLink({ to, icon: Icon, tKey, compact = false, onClick }: {
+  to: string; icon: ElementType; tKey: string; compact?: boolean; onClick?: () => void
 }) {
+  const t = useT()
   return (
     <Link
       to={to}
@@ -52,7 +62,7 @@ function NavLink({ to, icon: Icon, label, compact = false, onClick }: {
       )}
     >
       <Icon className={compact ? 'h-5 w-5' : 'h-4 w-4'} />
-      {label}
+      {t(tKey)}
     </Link>
   )
 }
@@ -60,6 +70,7 @@ function NavLink({ to, icon: Icon, label, compact = false, onClick }: {
 function Layout() {
   const { user, loading } = useAuth()
   const location = useLocation()
+  const t = useT()
   const [mobileOpen, setMobileOpen] = useState(false)
   const [activeEventName, setActiveEventName] = useState<string | null>(null)
   const isScanPage = location.pathname === '/scan'
@@ -91,13 +102,13 @@ function Layout() {
 
   const nav = (
     <nav className="flex flex-col gap-1 px-2">
-      {visibleNavItems.map((item) => <NavLink key={item.to} {...item} />)}
+      {visibleNavItems.map(({ adminOnly, ...item }) => <NavLink key={item.to} {...item} />)}
     </nav>
   )
 
   const mobileNav = (
     <nav className="flex flex-col gap-1 px-2">
-      {visibleNavItems.map((item) => <NavLink key={item.to} {...item} onClick={() => setMobileOpen(false)} />)}
+      {visibleNavItems.map(({ adminOnly, ...item }) => <NavLink key={item.to} {...item} onClick={() => setMobileOpen(false)} />)}
     </nav>
   )
 
@@ -109,8 +120,8 @@ function Layout() {
             <Package className="h-5 w-5 text-white" />
           </div>
           <div>
-            <span className="block text-base font-bold text-white">Packman</span>
-            <span className="text-xs font-medium text-white/50">{activeEventName ?? '行李管理系統'}</span>
+            <span className="block text-base font-bold text-white">{t('app.name')}</span>
+            <span className="text-xs font-medium text-white/50">{activeEventName ?? t('common.luggage')}</span>
           </div>
         </Link>
         <div className="flex flex-1 flex-col gap-4 py-4">
@@ -126,7 +137,7 @@ function Layout() {
                 }
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-semibold text-white">{user.name}</p>
-                  <p className="truncate text-xs text-white/50">{user.group?.name ?? '未分組'}</p>
+                  <p className="truncate text-xs text-white/50">{user.group?.name ?? t('common.unassigned')}</p>
                 </div>
               </>
             ) : (
@@ -135,7 +146,7 @@ function Layout() {
             <button
               onClick={logout}
               className="rounded-xl p-2 text-white/50 hover:bg-white/10 hover:text-white"
-              title="登出"
+              title={t('common.signOut')}
             >
               <LogOut className="h-4 w-4" />
             </button>
@@ -149,7 +160,7 @@ function Layout() {
             <div className="flex h-9 w-9 items-center justify-center rounded-2xl bg-brand-500">
               <Package className="h-5 w-5 text-white" />
             </div>
-            <span className="font-bold text-white">Packman</span>
+            <span className="font-bold text-white">{t('app.name')}</span>
           </Link>
           <button onClick={() => setMobileOpen(!mobileOpen)} className="rounded-2xl p-2 text-white/80">
             {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
@@ -165,7 +176,7 @@ function Layout() {
               className="mx-4 mb-3 flex w-[calc(100%-2rem)] items-center justify-center gap-2 rounded-xl border border-white/10 px-3 py-3 text-sm font-semibold text-white/70 hover:bg-white/10 hover:text-white"
             >
               <LogOut className="h-4 w-4" />
-              登出
+              {t('common.signOut')}
             </button>
           </div>
         )}
@@ -183,7 +194,7 @@ function Layout() {
         <Link
           to="/scan"
           className="fixed bottom-5 right-5 z-50 flex h-14 w-14 items-center justify-center rounded-2xl bg-brand-500 text-white transition-transform hover:scale-105 active:scale-95 md:bottom-6 md:right-6"
-          title="掃描 QR Code"
+          title={t('common.scanQr')}
         >
           <QrCode className="h-6 w-6" />
         </Link>

@@ -5,6 +5,7 @@ import multipart from '@fastify/multipart'
 import { Prisma } from '@prisma/client'
 import { ZodError } from 'zod'
 import { authPlugin } from './plugins/auth'
+import { t, isLocalizedError, isMultiKeyError, resolveLocale, tFor } from './lib/i18n'
 import { ensureBucket } from './services/minio'
 import { authRoutes } from './routes/auth'
 import { itemRoutes } from './routes/items'
@@ -30,31 +31,42 @@ async function build() {
   app.setErrorHandler((error, request, reply) => {
     request.log.error(error)
 
+    if (isLocalizedError(error)) {
+      return reply.status(error.statusCode).send({ message: t(request, error.key, error.params) })
+    }
+
+    if (isMultiKeyError(error)) {
+      const tr = tFor(resolveLocale(request))
+      return reply.status(error.statusCode).send({
+        message: error.keys.map((k) => tr(k)).join(error.separator),
+      })
+    }
+
     if (error instanceof ZodError) {
-      return reply.status(400).send({ message: '請確認所有必填欄位已正確填寫' })
+      return reply.status(400).send({ message: t(request, 'server.error.invalidInput') })
     }
 
     if (error instanceof Prisma.PrismaClientKnownRequestError) {
       if (error.code === 'P2002') {
         const target = Array.isArray(error.meta?.target) ? error.meta.target : []
         if (target.includes('label')) {
-          return reply.status(409).send({ message: '箱子編號已存在' })
+          return reply.status(409).send({ message: t(request, 'server.error.duplicateBoxLabel') })
         }
         if (target.includes('name')) {
-          return reply.status(409).send({ message: '名稱已存在' })
+          return reply.status(409).send({ message: t(request, 'server.error.duplicateName') })
         }
         if (target.includes('batteryId')) {
-          return reply.status(409).send({ message: '電池編號已存在' })
+          return reply.status(409).send({ message: t(request, 'server.error.duplicateBatteryId') })
         }
         if (target.includes('baseUrl')) {
-          return reply.status(409).send({ message: 'Ollama URL 已存在' })
+          return reply.status(409).send({ message: t(request, 'server.error.duplicateOllamaUrl') })
         }
-        return reply.status(409).send({ message: '資料已存在，請勿重複建立' })
+        return reply.status(409).send({ message: t(request, 'server.error.duplicateGeneric') })
       }
     }
 
     return reply.status(error.statusCode ?? 500).send({
-      message: error.statusCode && error.statusCode < 500 ? error.message : '伺服器發生錯誤',
+      message: error.statusCode && error.statusCode < 500 ? error.message : t(request, 'server.error.internal'),
     })
   })
 

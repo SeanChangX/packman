@@ -7,9 +7,11 @@ import { useToast } from '@packman/ui'
 import { itemsApi, groupsApi, boxesApi, usersApi, selectOptionsApi } from '../lib/api'
 import { SelectController } from '../lib/select'
 import { cn, formatApiError, optionsToSelectItems } from '../lib/utils'
+import { useT } from '../lib/i18n'
 import type { CreateItemInput } from '@packman/shared'
 
 function NewItemPage() {
+  const t = useT()
   const navigate = useNavigate()
   const qc = useQueryClient()
   const { showToast, updateToast, dismissToast } = useToast()
@@ -40,17 +42,17 @@ function NewItemPage() {
       const item = await itemsApi.create(data)
       if (!photoFile) return { item }
 
-      const toastId = showToast('上傳照片中… 0%', 'info', { sticky: true, progress: 0 })
+      const toastId = showToast(t('items.upload.uploadingPct', { pct: 0 }), 'info', { sticky: true, progress: 0 })
       let serverPhase = false
       try {
         await itemsApi.uploadPhoto(item.id, photoFile, (loaded, total) => {
           const ratio = total ? loaded / total : 0
           if (ratio >= 1 && !serverPhase) {
             serverPhase = true
-            updateToast(toastId, { message: '伺服器處理中…', progress: undefined, sticky: true })
+            updateToast(toastId, { message: t('items.upload.serverProcessing'), progress: undefined, sticky: true })
           } else if (!serverPhase) {
             updateToast(toastId, {
-              message: `上傳照片中… ${Math.floor(ratio * 100)}%`,
+              message: t('items.upload.uploadingPct', { pct: Math.floor(ratio * 100) }),
               progress: ratio,
             })
           }
@@ -58,7 +60,7 @@ function NewItemPage() {
         dismissToast(toastId)
       } catch (error) {
         dismissToast(toastId)
-        return { item, photoError: formatApiError(error) }
+        return { item, photoError: formatApiError(error, t('common.opFailed'), t('common.requiredHint')) }
       }
 
       return { item }
@@ -66,10 +68,10 @@ function NewItemPage() {
     onSuccess: ({ item, photoError }) => {
       qc.invalidateQueries({ queryKey: ['items'] })
       qc.invalidateQueries({ queryKey: ['item', item.id] })
-      if (photoError) showToast(`物品已新增，但照片上傳失敗：${photoError}`, 'error')
+      if (photoError) showToast(t('items.upload.itemAddedPhotoFailed', { error: photoError }), 'error')
       navigate({ to: '/items/$id', params: { id: item.id } })
     },
-    onError: (e: unknown) => showToast(formatApiError(e), 'error'),
+    onError: (e: unknown) => showToast(formatApiError(e, t('common.opFailed'), t('common.requiredHint')), 'error'),
   })
 
   return (
@@ -78,27 +80,27 @@ function NewItemPage() {
         <button onClick={() => navigate({ to: '/items' })} className="rounded-2xl p-2 text-muted transition-colors hover:bg-white/10 hover:text-app">
           <ArrowLeft className="h-5 w-5" />
         </button>
-        <h1 className="page-title">新增物品</h1>
+        <h1 className="page-title">{t('items.new.title')}</h1>
       </div>
 
       <form className="card space-y-4 p-6" onSubmit={handleSubmit((data) => create.mutate(data))}>
         <div>
-          <label className="label">照片</label>
+          <label className="label">{t('items.new.photo')}</label>
           <div className="mt-1 grid gap-3 sm:grid-cols-[11rem_1fr] sm:items-stretch">
             <div className="aspect-square overflow-hidden rounded-[22px] bg-black/5 p-2 dark:bg-white/10">
               {photoPreview
-                ? <img src={photoPreview} alt={photoFile?.name ?? '物品照片預覽'} className="h-full w-full object-contain" />
+                ? <img src={photoPreview} alt={photoFile?.name ?? t('items.new.photoPreviewAlt')} className="h-full w-full object-contain" />
                 : (
                     <div className="flex h-full flex-col items-center justify-center gap-2 px-4 text-center text-sm text-muted">
                       <Upload className="h-6 w-6" />
-                      <span>尚未選擇照片</span>
+                      <span>{t('items.new.noPhotoSelected')}</span>
                     </div>
                   )}
             </div>
             <div className="flex min-w-0 flex-col justify-center gap-2">
               <label className={cn('btn-secondary w-full cursor-pointer gap-2', create.isPending && 'pointer-events-none opacity-60')}>
                 <Upload className="h-4 w-4" />
-                {photoFile ? '更換照片' : '上傳照片'}
+                {photoFile ? t('items.new.replacePhoto') : t('items.new.uploadPhoto')}
                 <input
                   type="file"
                   accept="image/*"
@@ -118,11 +120,11 @@ function NewItemPage() {
                   onClick={() => setPhotoFile(null)}
                 >
                   <X className="h-4 w-4" />
-                  移除照片
+                  {t('items.new.removePhoto')}
                 </button>
               )}
               <p className="text-xs text-muted">
-                建立物品後會自動上傳照片並辨識搜尋標籤。
+                {t('items.new.photoHint')}
               </p>
               {photoFile && <p className="truncate text-xs text-muted">{photoFile.name}</p>}
             </div>
@@ -130,34 +132,34 @@ function NewItemPage() {
         </div>
 
         <div>
-          <label className="label">品項名稱 *</label>
+          <label className="label">{t('items.new.name')}</label>
           <input className="input mt-1" {...register('name', { required: true })} />
-          {errors.name && <p className="mt-1 text-xs text-red-500">必填欄位</p>}
+          {errors.name && <p className="mt-1 text-xs text-red-500">{t('common.requiredField')}</p>}
         </div>
 
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
-            <label className="label">物品負責人</label>
+            <label className="label">{t('items.new.owner')}</label>
             <SelectController
               name="ownerId"
               control={control}
               className="mt-1"
-              placeholder="— 請選擇 —"
+              placeholder={t('common.placeholder.select')}
               options={[
-                { value: '', label: '— 請選擇 —' },
+                { value: '', label: t('common.placeholder.select') },
                 ...(users?.map((u) => ({ value: u.id, label: u.name })) ?? []),
               ]}
             />
           </div>
           <div>
-            <label className="label">物品組別</label>
+            <label className="label">{t('items.new.group')}</label>
             <SelectController
               name="groupId"
               control={control}
               className="mt-1"
-              placeholder="— 請選擇 —"
+              placeholder={t('common.placeholder.select')}
               options={[
-                { value: '', label: '— 請選擇 —' },
+                { value: '', label: t('common.placeholder.select') },
                 ...(groups?.map((g) => ({ value: g.id, label: g.name })) ?? []),
               ]}
             />
@@ -166,17 +168,17 @@ function NewItemPage() {
 
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
-            <label className="label">運送方式</label>
+            <label className="label">{t('items.new.shipping')}</label>
             <SelectController
               name="shippingMethod"
               control={control}
               className="mt-1"
-              placeholder="— 請選擇 —"
+              placeholder={t('common.placeholder.select')}
               options={optionsToSelectItems(shippingOpts ?? [])}
             />
           </div>
           <div>
-            <label className="label">數量</label>
+            <label className="label">{t('items.new.quantity')}</label>
             <input
               type="number"
               min={1}
@@ -188,19 +190,19 @@ function NewItemPage() {
                 max: 9999,
               })}
             />
-            <p className="mt-1 text-xs text-muted">可輸入 1-9999</p>
-            {errors.quantity && <p className="mt-1 text-xs text-red-500">數量需介於 1-9999</p>}
+            <p className="mt-1 text-xs text-muted">{t('items.new.qtyHint')}</p>
+            {errors.quantity && <p className="mt-1 text-xs text-red-500">{t('items.new.qtyError')}</p>}
           </div>
         </div>
 
         <div>
-          <label className="label">重量（g）</label>
+          <label className="label">{t('items.new.weight')}</label>
           <input
             type="number"
             min={1}
             max={1000000}
             className="input mt-1"
-            placeholder="例: 250"
+            placeholder={t('items.new.weightPlaceholder')}
             {...register('weightG', {
               valueAsNumber: true,
               min: 1,
@@ -209,44 +211,44 @@ function NewItemPage() {
             })}
           />
           <p className="mt-1 text-xs text-muted">
-            {photoFile ? '上傳照片後 AI 會自動估算，也可以手動填入' : '可手動填入，或上傳照片後讓 AI 自動估算'}
+            {photoFile ? t('items.new.weightHintWithPhoto') : t('items.new.weightHintNoPhoto')}
           </p>
-          {errors.weightG && <p className="mt-1 text-xs text-red-500">重量需介於 1-1,000,000 g</p>}
+          {errors.weightG && <p className="mt-1 text-xs text-red-500">{t('items.new.weightError')}</p>}
         </div>
 
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
-            <label className="label">指定箱子</label>
+            <label className="label">{t('items.new.box')}</label>
             <SelectController
               name="boxId"
               control={control}
               className="mt-1"
-              placeholder="— 未指定 —"
+              placeholder={t('items.new.placeholderUnassigned')}
               options={[
-                { value: '', label: '— 未指定 —' },
+                { value: '', label: t('items.new.placeholderUnassigned') },
                 ...(boxes?.map((b) => ({ value: b.id, label: b.label })) ?? []),
               ]}
             />
           </div>
           <div>
-            <label className="label">物品用途分類</label>
+            <label className="label">{t('items.new.useCategory')}</label>
             <SelectController
               name="useCategory"
               control={control}
               className="mt-1"
-              placeholder="— 請選擇 —"
+              placeholder={t('common.placeholder.select')}
               options={optionsToSelectItems(categoryOpts ?? [])}
             />
           </div>
         </div>
 
         <div>
-          <label className="label">說明</label>
+          <label className="label">{t('items.new.notes')}</label>
           <textarea className="input mt-1" rows={2} {...register('notes')} />
         </div>
 
         <div>
-          <label className="label">須留意之處</label>
+          <label className="label">{t('items.new.specialNotes')}</label>
           <textarea className="input mt-1" rows={2} {...register('specialNotes')} />
         </div>
 
@@ -256,10 +258,10 @@ function NewItemPage() {
 
         <div className="flex justify-end gap-3">
           <button type="button" onClick={() => navigate({ to: '/items' })} className="btn-secondary">
-            取消
+            {t('common.cancel')}
           </button>
           <button type="submit" className="btn-primary" disabled={create.isPending}>
-            {create.isPending ? (photoFile ? '新增並上傳中...' : '新增中...') : '新增物品'}
+            {create.isPending ? (photoFile ? t('items.new.submittingWithPhoto') : t('items.new.submitting')) : t('items.new.submit')}
           </button>
         </div>
       </form>

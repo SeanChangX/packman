@@ -47,6 +47,7 @@ import { pipeline } from 'stream/promises'
 import { invalidate } from '../services/cache'
 import sharp from 'sharp'
 import { getActiveEventId } from '../services/events'
+import { t } from '../lib/i18n'
 
 function toCsvRow(row: Record<string, unknown>): string {
   return Object.values(row)
@@ -133,11 +134,11 @@ export async function adminRoutes(app: FastifyInstance) {
 
   app.post('/settings/brand/logo', async (request, reply) => {
     const data = await request.file()
-    if (!data) return reply.status(400).send({ message: '請上傳圖片' })
+    if (!data) return reply.status(400).send({ message: t(request, 'admin.error.uploadImage') })
 
     const ALLOWED = ['image/png', 'image/jpeg', 'image/webp', 'image/svg+xml']
     if (!ALLOWED.includes(data.mimetype)) {
-      return reply.status(400).send({ message: '僅支援 PNG、JPG、WebP、SVG' })
+      return reply.status(400).send({ message: t(request, 'admin.error.unsupportedImage') })
     }
 
     const raw = await data.toBuffer()
@@ -287,7 +288,7 @@ export async function adminRoutes(app: FastifyInstance) {
       invalidate('selectOptions')
       return reply.status(201).send(opt)
     } catch {
-      reply.status(409).send({ message: '該類型中已有相同 value' })
+      reply.status(409).send({ message: t(request, 'admin.error.duplicateOptionValue') })
     }
   })
 
@@ -312,17 +313,17 @@ export async function adminRoutes(app: FastifyInstance) {
     }
   })
 
-  app.get('/ollama-status', async (_request, reply) => {
+  app.get('/ollama-status', async (request, reply) => {
     try {
       const status = await ollamaConfigWithJobStats()
       const ok = status.endpoints.some((endpoint) => endpoint.enabled && endpoint.ok)
       return {
         ok,
         ...status,
-        message: ok ? undefined : 'Ollama 無法連線',
+        message: ok ? undefined : t(request, 'admin.error.ollamaUnreachable'),
       }
     } catch (err: any) {
-      return reply.status(503).send({ ok: false, message: err?.message ?? 'Ollama 無法連線' })
+      return reply.status(503).send({ ok: false, message: err?.message ?? t(request, 'admin.error.ollamaUnreachable') })
     }
   })
 
@@ -368,14 +369,14 @@ export async function adminRoutes(app: FastifyInstance) {
 
   app.post('/ollama-test', async (request, reply) => {
     const data = await request.file()
-    if (!data) return reply.status(400).send({ message: '請上傳圖片' })
+    if (!data) return reply.status(400).send({ message: t(request, 'admin.error.uploadImage') })
 
     const raw = await data.toBuffer()
     try {
       const result = await analyzeImageWithOllama(raw)
       return { ok: true, ...result }
     } catch (err: any) {
-      return reply.status(503).send({ ok: false, message: err?.message ?? 'Ollama 請求失敗' })
+      return reply.status(503).send({ ok: false, message: err?.message ?? t(request, 'admin.error.ollamaRequestFailed') })
     }
   })
 
@@ -462,11 +463,11 @@ export async function adminRoutes(app: FastifyInstance) {
   app.post<{ Querystring: { preserveSecrets?: string } }>('/import/backup', async (request, reply) => {
     const preserveSecrets = request.query.preserveSecrets === '1' || request.query.preserveSecrets === 'true'
     const data = await request.file()
-    if (!data) return reply.status(400).send({ message: '請上傳備份檔' })
+    if (!data) return reply.status(400).send({ message: t(request, 'admin.error.uploadBackup') })
 
     const filename = data.filename ?? ''
     if (!filename.toLowerCase().endsWith('.zip') && data.mimetype !== 'application/zip' && data.mimetype !== 'application/x-zip-compressed') {
-      return reply.status(400).send({ message: '請上傳 .zip 備份檔' })
+      return reply.status(400).send({ message: t(request, 'admin.error.uploadZip') })
     }
 
     // Spool the upload to a temp file on disk so we can random-access the ZIP
@@ -477,7 +478,7 @@ export async function adminRoutes(app: FastifyInstance) {
       await pipeline(data.file, createWriteStream(tmpPath))
     } catch (err: any) {
       await fsp.unlink(tmpPath).catch(() => {})
-      return reply.status(500).send({ message: `上傳失敗：${err?.message ?? '未知錯誤'}` })
+      return reply.status(500).send({ message: t(request, 'admin.error.uploadFailed', { message: err?.message ?? t(request, 'admin.error.unknownError') }) })
     }
 
     try {
@@ -486,41 +487,41 @@ export async function adminRoutes(app: FastifyInstance) {
       const fh = await fsp.open(tmpPath, 'r')
       try { await fh.read(head, 0, 4, 0) } finally { await fh.close() }
       if (head[0] !== 0x50 || head[1] !== 0x4b) {
-        return reply.status(400).send({ message: '檔案不是有效的 ZIP 格式' })
+        return reply.status(400).send({ message: t(request, 'admin.error.invalidZip') })
       }
 
       let directory: Awaited<ReturnType<typeof unzipper.Open.file>>
       try {
         directory = await unzipper.Open.file(tmpPath)
       } catch {
-        return reply.status(400).send({ message: '無法讀取 ZIP 檔' })
+        return reply.status(400).send({ message: t(request, 'admin.error.cannotReadZip') })
       }
 
       const dataFile = directory.files.find((f) => f.path === 'data.json' && f.type === 'File')
-      if (!dataFile) return reply.status(400).send({ message: '備份檔缺少 data.json' })
+      if (!dataFile) return reply.status(400).send({ message: t(request, 'admin.error.missingDataJson') })
 
       let payload: any
       try {
         const dataBuf = await dataFile.buffer()
         payload = JSON.parse(dataBuf.toString('utf-8'))
       } catch {
-        return reply.status(400).send({ message: 'data.json 格式錯誤' })
+        return reply.status(400).send({ message: t(request, 'admin.error.dataJsonFormat') })
       }
 
       if (!payload || typeof payload !== 'object') {
-        return reply.status(400).send({ message: 'data.json 內容無效' })
+        return reply.status(400).send({ message: t(request, 'admin.error.dataJsonContent') })
       }
       if (typeof payload.version !== 'string' || !/^1\./.test(payload.version)) {
-        return reply.status(400).send({ message: `不支援的備份版本：${payload.version ?? '未知'}（需 1.x）` })
+        return reply.status(400).send({ message: t(request, 'admin.error.unsupportedBackupVersion', { version: payload.version ?? t(request, 'admin.error.unknown') }) })
       }
       const requiredArrays = ['events', 'users', 'groups', 'boxes', 'items', 'batteries', 'selectOptions', 'batteryRegulations', 'systemSettings']
       for (const key of requiredArrays) {
         if (!Array.isArray(payload[key])) {
-          return reply.status(400).send({ message: `data.json 缺少欄位或格式錯誤：${key}` })
+          return reply.status(400).send({ message: t(request, 'admin.error.dataJsonMissingField', { key }) })
         }
       }
       if (payload.events.length === 0) {
-        return reply.status(400).send({ message: '備份至少需包含一個 Event' })
+        return reply.status(400).send({ message: t(request, 'admin.error.backupNeedsEvent') })
       }
 
       const ALLOWED_PHOTO_EXT = new Set(['jpg', 'jpeg', 'png', 'webp', 'gif', 'heic', 'heif'])
@@ -575,7 +576,7 @@ export async function adminRoutes(app: FastifyInstance) {
           }
         })
       } catch (err: any) {
-        return reply.status(500).send({ message: `資料還原失敗：${err?.message ?? '未知錯誤'}` })
+        return reply.status(500).send({ message: t(request, 'admin.error.restoreFailed', { message: err?.message ?? t(request, 'admin.error.unknownError') }) })
       }
 
       invalidate('groups:all')

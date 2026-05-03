@@ -5,14 +5,16 @@ import { ArrowLeft, Download, Eye, CheckSquare, Square } from 'lucide-react'
 import * as pdfjsLib from 'pdfjs-dist'
 import pdfjsWorker from 'pdfjs-dist/build/pdf.worker.mjs?url'
 import { boxesApi, itemsApi, usersApi } from '../lib/api'
-import { STATUS_LABELS, STATUS_COLORS, SHIPPING_LABELS, cn } from '../lib/utils'
+import { STATUS_LABEL_KEYS, STATUS_COLORS, SHIPPING_LABEL_KEYS, cn } from '../lib/utils'
 import { Select } from '../lib/select'
+import { useT } from '../lib/i18n'
 import { useAuth } from '../lib/auth-context'
 import type { PackingStatus, UpdateBoxInput, User } from '@packman/shared'
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker
 
 function BoxDetailPage() {
+  const t = useT()
   const { id } = Route.useParams()
   const navigate = useNavigate()
   const qc = useQueryClient()
@@ -68,7 +70,7 @@ function BoxDetailPage() {
 
   const fetchStickerBlob = async () => {
     const res = await fetch(boxesApi.stickerUrl(id, stickerSize), { credentials: 'include' })
-    if (!res.ok) throw new Error(`貼紙生成失敗 (${res.status})`)
+    if (!res.ok) throw new Error(t('box.sticker.failGenerate', { status: res.status }))
     return res.blob()
   }
 
@@ -86,7 +88,7 @@ function BoxDetailPage() {
     try {
       setPreviewBlob(await fetchStickerBlob())
     } catch (err) {
-      alert(err instanceof Error ? err.message : '預覽失敗')
+      alert(err instanceof Error ? err.message : t('box.sticker.failPreview'))
     } finally {
       setPreviewing(false)
     }
@@ -105,7 +107,7 @@ function BoxDetailPage() {
       document.body.removeChild(a)
       setTimeout(() => URL.revokeObjectURL(url), 1000)
     } catch (err) {
-      alert(err instanceof Error ? err.message : '下載失敗')
+      alert(err instanceof Error ? err.message : t('box.sticker.failDownload'))
     } finally {
       setDownloading(false)
     }
@@ -126,12 +128,12 @@ function BoxDetailPage() {
   })
 
   if (isLoading) return <div className="flex justify-center py-12"><div className="h-8 w-8 animate-spin rounded-full border-4 border-brand-500 border-t-transparent" /></div>
-  if (!box) return <p>箱子不存在</p>
+  if (!box) return <p>{t('box.detail.notFound')}</p>
 
   const items = box.items ?? []
   const packedCount = items.filter((i) => i.status !== 'NOT_PACKED').length
   const getOwnerOptions = (owner?: Pick<User, 'id' | 'name'>) => [
-    { value: '', label: '— 未指定 —' },
+    { value: '', label: t('common.placeholder.unassigned') },
     ...(owner && !users?.some((u) => u.id === owner.id)
       ? [{ value: owner.id, label: owner.name }]
       : []),
@@ -147,7 +149,7 @@ function BoxDetailPage() {
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
             <h1 className="page-title truncate">{box.label}</h1>
-            <span className="badge shrink-0 bg-black/10 text-app dark:bg-white/10">{SHIPPING_LABELS[box.shippingMethod]}</span>
+            <span className="badge shrink-0 bg-black/10 text-app dark:bg-white/10">{t(SHIPPING_LABEL_KEYS[box.shippingMethod])}</span>
             <span className="ml-1 text-sm text-muted">{packedCount}/{items.length}</span>
             {isAdmin
               ? <Select
@@ -155,17 +157,17 @@ function BoxDetailPage() {
                   onChange={(v) => updateBox.mutate({ status: v as PackingStatus })}
                   triggerClassName={cn('badge cursor-pointer border-0', STATUS_COLORS[box.status])}
                   options={[
-                    { value: 'NOT_PACKED', label: '尚未裝箱' },
-                    { value: 'PACKED', label: '已裝箱' },
-                    { value: 'SEALED', label: '已封箱' },
+                    { value: 'NOT_PACKED', label: t('status.NOT_PACKED') },
+                    { value: 'PACKED', label: t('status.PACKED') },
+                    { value: 'SEALED', label: t('status.SEALED') },
                   ]}
                 />
-              : <span className={cn('badge shrink-0', STATUS_COLORS[box.status])}>{STATUS_LABELS[box.status]}</span>
+              : <span className={cn('badge shrink-0', STATUS_COLORS[box.status])}>{t(STATUS_LABEL_KEYS[box.status])}</span>
             }
           </div>
           {isAdmin ? (
             <div className="mt-2 grid max-w-xs grid-cols-[5.5rem_1fr] items-center gap-2">
-              <span className="text-sm text-muted">整箱負責人</span>
+              <span className="text-sm text-muted">{t('box.detail.boxOwner')}</span>
               <Select
                 value={box.ownerId ?? ''}
                 onChange={(v) => updateBox.mutate({ ownerId: v || null })}
@@ -173,7 +175,7 @@ function BoxDetailPage() {
               />
             </div>
           ) : box.owner && (
-            <p className="text-sm text-muted">整箱負責人: {box.owner.name}</p>
+            <p className="text-sm text-muted">{t('box.detail.boxOwnerLabel', { name: box.owner.name })}</p>
           )}
         </div>
       </div>
@@ -182,26 +184,26 @@ function BoxDetailPage() {
       <div className="card space-y-2 p-4">
         {/* Row 1: size selector */}
         <div className="flex items-center gap-2">
-          <span className="shrink-0 text-sm font-semibold text-muted">貼紙尺寸</span>
+          <span className="shrink-0 text-sm font-semibold text-muted">{t('box.detail.stickerSize')}</span>
           <Select
             className="flex-1"
             value={stickerSize}
             onChange={(v) => setStickerSize(v as typeof stickerSize)}
             options={[
-              { value: 'SMALL', label: '小 (50×30mm)' },
-              { value: 'MEDIUM', label: '中 (100×50mm)' },
-              { value: 'LARGE', label: '大 (150×100mm)' },
-              { value: 'A4_SHEET', label: 'A4 (2×4 格)' },
+              { value: 'SMALL', label: t('stickers.size.SMALL') },
+              { value: 'MEDIUM', label: t('stickers.size.MEDIUM') },
+              { value: 'LARGE', label: t('stickers.size.LARGE') },
+              { value: 'A4_SHEET', label: t('stickers.size.A4_SHEET') },
             ]}
           />
         </div>
         {/* Row 2: action buttons */}
         <div className="flex gap-2">
           <button onClick={previewSticker} disabled={previewing || downloading} className="btn-secondary flex-1 justify-center gap-1">
-            <Eye className="h-4 w-4" /> {previewing ? '生成中...' : previewBlob ? '關閉預覽' : '預覽'}
+            <Eye className="h-4 w-4" /> {previewing ? t('box.detail.generating') : previewBlob ? t('box.detail.closePreview') : t('box.detail.preview')}
           </button>
           <button onClick={downloadSticker} disabled={downloading || previewing} className="btn-secondary flex-1 justify-center gap-1">
-            <Download className="h-4 w-4" /> {downloading ? '生成中...' : '下載'}
+            <Download className="h-4 w-4" /> {downloading ? t('box.detail.generating') : t('box.detail.download')}
           </button>
         </div>
       </div>
@@ -226,18 +228,18 @@ function BoxDetailPage() {
       <div className="card flex items-center gap-4 p-4">
         <img src={boxesApi.qrUrl(id)} alt="QR" className="h-20 w-20 rounded" />
         <div>
-          <p className="font-medium">掃描此 QR Code</p>
-          <p className="text-sm text-muted">開啟箱子清單，勾選已清點物品</p>
+          <p className="font-medium">{t('box.detail.qrTitle')}</p>
+          <p className="text-sm text-muted">{t('box.detail.qrHint')}</p>
         </div>
       </div>
 
       {/* Items checklist */}
       <div className="card">
         <div className="border-b border-black/10 px-4 py-3 dark:border-white/10">
-          <h2 className="font-semibold">物品清單 ({items.length})</h2>
+          <h2 className="font-semibold">{t('box.detail.itemsTitle', { n: items.length })}</h2>
         </div>
         {items.length === 0
-          ? <p className="py-8 text-center text-sm text-muted">此箱子尚無物品</p>
+          ? <p className="py-8 text-center text-sm text-muted">{t('box.detail.empty')}</p>
           : (
             <ul className="divide-y divide-black/5 dark:divide-white/10">
               {items.map((item) => {
@@ -246,7 +248,7 @@ function BoxDetailPage() {
                   <li key={item.id} className="flex items-center gap-1 pr-2 active:bg-white/5">
                     <button
                       type="button"
-                      aria-label={isPacked ? '標記為尚未裝箱' : '標記為已裝箱'}
+                      aria-label={isPacked ? t('box.detail.markNotPacked') : t('box.detail.markPacked')}
                       onClick={() =>
                         updateItem.mutate({
                           itemId: item.id,
@@ -269,18 +271,18 @@ function BoxDetailPage() {
                           {item.name}
                         </span>
                         <span className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted">
-                          <span>負責人: {item.owner?.name ?? '未指定'}</span>
+                          <span>{t('box.detail.itemOwner', { name: item.owner?.name ?? t('common.notSpecified') })}</span>
                           <span>
-                            組別:{' '}
+                            {t('box.detail.itemGroupLabel')}{' '}
                             {item.group
                               ? <span style={{ color: item.group.color }}>{item.group.name}</span>
-                              : '未分組'}
+                              : t('common.ungrouped')}
                           </span>
-                          <span>數量: {item.quantity}</span>
+                          <span>{t('box.detail.itemQty', { n: item.quantity })}</span>
                         </span>
                       </span>
                       <span className={cn('badge shrink-0 text-xs', STATUS_COLORS[item.status])}>
-                        {STATUS_LABELS[item.status]}
+                        {t(STATUS_LABEL_KEYS[item.status])}
                       </span>
                     </Link>
                   </li>

@@ -7,6 +7,7 @@ import { generateBoxStickerPdf } from '../services/pdf'
 import { getAppConfig, getBrandConfig, getBrandLogoBuffer } from '../services/runtime-config'
 import { getObjectBuffer } from '../services/minio'
 import { getActiveEventId } from '../services/events'
+import { resolveLocale } from '../lib/i18n'
 
 const boxInclude = {
   owner: { select: { id: true, name: true, avatarUrl: true } },
@@ -132,7 +133,7 @@ export async function boxRoutes(app: FastifyInstance) {
       const [{ appUrl }, brand] = await Promise.all([getAppConfig(), getBrandConfig()])
       const logoBuffer = await getBrandLogoBuffer()
         ?? (brand.logoObjectName ? await getObjectBuffer(brand.logoObjectName).catch(() => null) : null)
-      const pdfBuffer = await generateBoxStickerPdf([box], appUrl, size, logoBuffer, brand.name)
+      const pdfBuffer = await generateBoxStickerPdf([box], appUrl, size, logoBuffer, brand.name, resolveLocale(request))
 
       reply
         .header('Content-Type', 'application/pdf')

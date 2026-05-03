@@ -1,6 +1,7 @@
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Camera, Flashlight, FlashlightOff, ImageUp, RefreshCcw } from 'lucide-react'
+import { useT } from '../lib/i18n'
 
 type ExtendedTrackCapabilities = MediaTrackCapabilities & { torch?: boolean; focusMode?: string[] }
 type ExtendedTrackConstraintSet = MediaTrackConstraintSet & { torch?: boolean; focusMode?: string }
@@ -195,24 +196,24 @@ async function startHtml5Scanner(
   }
 }
 
-function scanErrorMessage(err: unknown) {
+function scanErrorMessage(err: unknown, t: (key: string, params?: Record<string, string | number>) => string) {
   const raw = err instanceof Error ? err.message : String(err ?? '')
   const message = raw.toLowerCase()
 
   if (!window.isSecureContext) {
-    return '相機需要 HTTPS 或 localhost 才能啟動'
+    return t('scan.error.https')
   }
   if (message.includes('notallowed') || message.includes('permission') || message.includes('denied')) {
-    return '相機權限被拒絕，請在瀏覽器設定允許此網站使用相機'
+    return t('scan.error.permission')
   }
   if (message.includes('notfound') || message.includes('overconstrained') || message.includes('device not found')) {
-    return '找不到可用相機'
+    return t('scan.error.notFound')
   }
   if (message.includes('notreadable') || message.includes('track start')) {
-    return '相機正在被其他程式使用，請關閉其他相機 App 後重試'
+    return t('scan.error.busy')
   }
 
-  return raw || '無法啟動相機'
+  return raw || t('scan.error.generic')
 }
 
 function routeFromQr(decodedText: string) {
@@ -242,6 +243,7 @@ const SCAN_STYLES = `
 `
 
 function ScanPage() {
+  const t = useT()
   const navigate = useNavigate()
   const videoRef = useRef<HTMLVideoElement | null>(null)
   const handleRef = useRef<ScannerHandle | null>(null)
@@ -255,7 +257,7 @@ function ScanPage() {
   const successTimerRef = useRef<number | null>(null)
 
   const [error, setError] = useState('')
-  const [status, setStatus] = useState('啟動相機中...')
+  const [status, setStatus] = useState(() => t('scan.starting'))
   const [isScanning, setIsScanning] = useState(false)
   const [retryKey, setRetryKey] = useState(0)
   const [torchSupported, setTorchSupported] = useState(false)
@@ -310,7 +312,7 @@ function ScanPage() {
 
       lastInvalidTextRef.current = decodedText
       lastInvalidAtRef.current = now
-      setInvalidNotice('這不是 Packman 的箱子或物品 QR Code')
+      setInvalidNotice(t('scan.invalid.qr'))
       if (invalidTimerRef.current !== null) window.clearTimeout(invalidTimerRef.current)
       invalidTimerRef.current = window.setTimeout(() => {
         setInvalidNotice('')
@@ -322,7 +324,7 @@ function ScanPage() {
     hasScannedRef.current = true
     feedbackOnScan()
     setSuccessFlash(true)
-    setStatus('已掃描，正在開啟...')
+    setStatus(t('scan.scanned'))
 
     const instance = html5InstanceRef.current
     try { instance?.pause(true) } catch { /* already stopping */ }
@@ -340,17 +342,17 @@ function ScanPage() {
 
     const start = async () => {
       setError('')
-      setStatus('啟動相機中...')
+      setStatus(t('scan.starting'))
       setIsScanning(false)
       hasScannedRef.current = false
 
       if (!window.isSecureContext) {
-        setError('相機需要 HTTPS 或 localhost 才能啟動')
+        setError(t('scan.error.https'))
         setStatus('')
         return
       }
       if (!navigator.mediaDevices?.getUserMedia) {
-        setError('此瀏覽器不支援相機掃描')
+        setError(t('scan.error.unsupported'))
         setStatus('')
         return
       }
@@ -368,7 +370,7 @@ function ScanPage() {
             handleRef.current = handle
             setEngine('native')
             setIsScanning(true)
-            setStatus('對準箱子或物品上的 QR Code')
+            setStatus(t('scan.aim'))
             setTorchSupported(handle.isTorchSupported())
             return
           } catch (nativeErr) {
@@ -391,11 +393,11 @@ function ScanPage() {
         html5InstanceRef.current = instance
         setEngine('html5')
         setIsScanning(true)
-        setStatus('對準箱子或物品上的 QR Code')
+        setStatus(t('scan.aim'))
         setTorchSupported(handle.isTorchSupported())
       } catch (err) {
         if (!cancelled && runIdRef.current === runId) {
-          setError(scanErrorMessage(err))
+          setError(scanErrorMessage(err, t))
           setStatus('')
           setIsScanning(false)
           await stopAll()
@@ -431,7 +433,7 @@ function ScanPage() {
       // No QR detected in image — show transient notice without disturbing live scanner.
       lastInvalidTextRef.current = ''
       lastInvalidAtRef.current = performance.now()
-      setInvalidNotice('圖片中沒有可辨識的 QR Code')
+      setInvalidNotice(t('scan.invalid.image'))
       if (invalidTimerRef.current !== null) window.clearTimeout(invalidTimerRef.current)
       invalidTimerRef.current = window.setTimeout(() => {
         setInvalidNotice('')
@@ -445,8 +447,8 @@ function ScanPage() {
       <style>{SCAN_STYLES}</style>
 
       <div className="text-center">
-        <h1 className="text-2xl font-bold">掃描 QR Code</h1>
-        <p className="page-subtitle">掃描箱子或物品上的 QR Code</p>
+        <h1 className="text-2xl font-bold">{t('scan.title')}</h1>
+        <p className="page-subtitle">{t('scan.subtitle')}</p>
       </div>
 
       <div className={`card overflow-hidden ${error ? 'hidden' : ''}`}>
@@ -505,7 +507,7 @@ function ScanPage() {
       {isScanning && torchSupported && (
         <button className="btn-secondary flex w-full justify-center gap-2" onClick={() => void toggleTorch()}>
           {torchOn ? <Flashlight className="h-4 w-4" /> : <FlashlightOff className="h-4 w-4" />}
-          {torchOn ? '關閉手電筒' : '開啟手電筒'}
+          {torchOn ? t('scan.torchOff') : t('scan.torchOn')}
         </button>
       )}
 
@@ -513,17 +515,17 @@ function ScanPage() {
         <div className="rounded-2xl border border-brand-500/20 bg-brand-500/10 p-4 text-center text-sm text-brand-500">
           <Camera className="mx-auto mb-2 h-8 w-8" />
           <p className="font-semibold">{error}</p>
-          <p className="mt-1 text-xs text-muted">請允許瀏覽器存取相機，或改用圖片掃描</p>
+          <p className="mt-1 text-xs text-muted">{t('scan.error.hint')}</p>
           <button className="btn-secondary mt-4 w-full gap-2" onClick={() => setRetryKey((key) => key + 1)}>
             <RefreshCcw className="h-4 w-4" />
-            重新啟動相機
+            {t('scan.restart')}
           </button>
         </div>
       )}
 
       <label className="btn-secondary flex w-full cursor-pointer justify-center gap-2">
         <ImageUp className="h-4 w-4" />
-        從圖片掃描
+        {t('scan.fromImage')}
         <input
           type="file"
           accept="image/*"
@@ -535,7 +537,7 @@ function ScanPage() {
       <div id={FILE_SCANNER_ID} className="hidden" />
 
       <p className="text-center text-xs text-muted">
-        {status || '對準箱子或物品上的 QR Code，系統將自動跳轉'}
+        {status || t('scan.aimHint')}
       </p>
     </div>
   )

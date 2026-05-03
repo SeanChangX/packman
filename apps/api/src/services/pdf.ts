@@ -2,6 +2,7 @@ import PDFDocument from 'pdfkit'
 import QRCode from 'qrcode'
 import { existsSync } from 'fs'
 import path from 'path'
+import { tFor, type ApiLocale, DEFAULT_LOCALE } from '../lib/i18n'
 
 type StickerSize = 'SMALL' | 'MEDIUM' | 'LARGE' | 'A4_SHEET'
 
@@ -287,6 +288,7 @@ async function drawBoxLabel(
   brandName: string,
   printDate: string,
   headerFont: string,
+  ownerLabel: string,
 ) {
   const { padding, fontSize, qrSize, headerH } = dim
   const contentY = y + headerH
@@ -314,9 +316,10 @@ async function drawBoxLabel(
   let lineY = contentY + padding + titleH + padding * 0.75
 
   if (box.owner) {
+    const ownerText = `${ownerLabel}  ${box.owner.name}`
     doc.font(REGULAR).fontSize(fontSize.body).fillColor('#374151')
-      .text(`負責人  ${box.owner.name}`, textX, lineY, { width: textW, lineBreak: false, ellipsis: true })
-    const ownerH = doc.heightOfString(`負責人  ${box.owner.name}`, { width: textW, lineBreak: false, lineGap: 0 })
+      .text(ownerText, textX, lineY, { width: textW, lineBreak: false, ellipsis: true })
+    const ownerH = doc.heightOfString(ownerText, { width: textW, lineBreak: false, lineGap: 0 })
     lineY += ownerH + padding * 0.5
   }
 
@@ -342,6 +345,7 @@ async function drawItemLabel(
   brandName: string,
   printDate: string,
   headerFont: string,
+  ownerLabel: string,
 ) {
   const { padding, fontSize, qrSize, headerH } = dim
   const contentY = y + headerH
@@ -364,9 +368,10 @@ async function drawItemLabel(
   let lineY = contentY + padding + titleH + padding * 0.65
 
   if (item.owner) {
+    const ownerText = `${ownerLabel}  ${item.owner.name}`
     doc.font(REGULAR).fontSize(fontSize.body).fillColor('#374151')
-      .text(`負責人  ${item.owner.name}`, textX, lineY, { width: textW, lineBreak: false, ellipsis: true })
-    const ownerH = doc.heightOfString(`負責人  ${item.owner.name}`, { width: textW, lineBreak: false, lineGap: 0 })
+      .text(ownerText, textX, lineY, { width: textW, lineBreak: false, ellipsis: true })
+    const ownerH = doc.heightOfString(ownerText, { width: textW, lineBreak: false, lineGap: 0 })
     lineY += ownerH + padding * 0.45
   }
 
@@ -401,10 +406,12 @@ export async function generateBoxStickerPdf(
   size: StickerSize,
   logoBuffer: Buffer | null = null,
   brandName = '',
+  locale: ApiLocale = DEFAULT_LOCALE,
 ): Promise<Buffer> {
   const dim = SIZES[size]
   const isA4 = size === 'A4_SHEET'
   const printDate = formatPrintDate()
+  const ownerLabel = tFor(locale)('pdf.label.owner')
 
   return new Promise((resolve, reject) => {
     const chunks: Buffer[] = []
@@ -429,13 +436,13 @@ export async function generateBoxStickerPdf(
           for (let j = 0; j < page.length; j++) {
             const col = j % dim.columns
             const row = Math.floor(j / dim.columns)
-            await drawBoxLabel(doc, page[j], appUrl, col * cellW, row * cellH, { ...dim, width: cellW, height: cellH }, logoBuffer, brandName, printDate, headerFont)
+            await drawBoxLabel(doc, page[j], appUrl, col * cellW, row * cellH, { ...dim, width: cellW, height: cellH }, logoBuffer, brandName, printDate, headerFont, ownerLabel)
           }
         }
       } else {
         for (const box of boxes) {
           doc.addPage()
-          await drawBoxLabel(doc, box, appUrl, 0, 0, dim, logoBuffer, brandName, printDate, headerFont)
+          await drawBoxLabel(doc, box, appUrl, 0, 0, dim, logoBuffer, brandName, printDate, headerFont, ownerLabel)
         }
       }
       doc.end()
@@ -450,10 +457,12 @@ export async function generateItemStickerPdf(
   size: StickerSize,
   logoBuffer: Buffer | null = null,
   brandName = '',
+  locale: ApiLocale = DEFAULT_LOCALE,
 ): Promise<Buffer> {
   const dim = SIZES[size]
   const isA4 = size === 'A4_SHEET'
   const printDate = formatPrintDate()
+  const ownerLabel = tFor(locale)('pdf.label.owner')
 
   return new Promise((resolve, reject) => {
     const chunks: Buffer[] = []
@@ -478,13 +487,13 @@ export async function generateItemStickerPdf(
           for (let j = 0; j < page.length; j++) {
             const col = j % dim.columns
             const row = Math.floor(j / dim.columns)
-            await drawItemLabel(doc, page[j], appUrl, col * cellW, row * cellH, { ...dim, width: cellW, height: cellH }, logoBuffer, brandName, printDate, headerFont)
+            await drawItemLabel(doc, page[j], appUrl, col * cellW, row * cellH, { ...dim, width: cellW, height: cellH }, logoBuffer, brandName, printDate, headerFont, ownerLabel)
           }
         }
       } else {
         for (const item of items) {
           doc.addPage()
-          await drawItemLabel(doc, item, appUrl, 0, 0, dim, logoBuffer, brandName, printDate, headerFont)
+          await drawItemLabel(doc, item, appUrl, 0, 0, dim, logoBuffer, brandName, printDate, headerFont, ownerLabel)
         }
       }
       doc.end()

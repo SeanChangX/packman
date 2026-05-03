@@ -2,9 +2,11 @@ import { createFileRoute } from '@tanstack/react-router'
 import { useState, useEffect } from 'react'
 import { Calendar, Plus, Pencil, Trash2, CheckCircle, Circle } from 'lucide-react'
 import { adminApi } from '../lib/api'
+import { useT } from '../lib/i18n'
 import type { Event } from '@packman/shared'
 
 function EventsPage() {
+  const t = useT()
   const [events, setEvents] = useState<Event[]>([])
   const [loading, setLoading] = useState(true)
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -60,7 +62,7 @@ function EventsPage() {
   }
 
   const handleDelete = async (id: string, name: string) => {
-    if (!confirm(`確定刪除「${name}」？此操作無法復原。`)) return
+    if (!confirm(t('events.delete.confirm', { name }))) return
     setError(null)
     try {
       await adminApi.deleteEvent(id)
@@ -74,11 +76,11 @@ function EventsPage() {
     <div className="space-y-6">
       <div className="page-header">
         <div>
-          <h1 className="page-title">活動管理</h1>
-          <p className="page-subtitle">管理不同活動的資料（如年份活動），切換後物品、箱子、電池將顯示對應活動資料</p>
+          <h1 className="page-title">{t('events.title')}</h1>
+          <p className="page-subtitle">{t('events.subtitle')}</p>
         </div>
         <button className="btn-primary gap-2" onClick={() => setShowCreate(true)}>
-          <Plus className="h-4 w-4" /> 新增活動
+          <Plus className="h-4 w-4" /> {t('events.add')}
         </button>
       </div>
 
@@ -90,19 +92,19 @@ function EventsPage() {
 
       {showCreate && (
         <div className="card p-4">
-          <h2 className="mb-3 font-semibold">新增活動</h2>
+          <h2 className="mb-3 font-semibold">{t('events.create.title')}</h2>
           <div className="flex gap-2">
             <input
               type="text"
               className="input flex-1"
-              placeholder="活動名稱（如：Eurobot 2026）"
+              placeholder={t('events.create.placeholder')}
               value={newName}
               onChange={(e) => setNewName(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && handleCreate()}
               autoFocus
             />
-            <button className="btn-primary" onClick={handleCreate}>建立</button>
-            <button className="btn-secondary" onClick={() => { setShowCreate(false); setNewName('') }}>取消</button>
+            <button className="btn-primary" onClick={handleCreate}>{t('events.create.submit')}</button>
+            <button className="btn-secondary" onClick={() => { setShowCreate(false); setNewName('') }}>{t('common.cancel')}</button>
           </div>
         </div>
       )}
@@ -114,7 +116,7 @@ function EventsPage() {
       ) : events.length === 0 ? (
         <div className="card flex flex-col items-center gap-3 py-12 text-center">
           <Calendar className="h-10 w-10 text-muted" />
-          <p className="text-muted">尚無活動，點擊「新增活動」開始</p>
+          <p className="text-muted">{t('events.empty')}</p>
         </div>
       ) : (
         <div className="space-y-3">
@@ -125,7 +127,7 @@ function EventsPage() {
             >
               <button
                 onClick={() => !event.isActive && handleActivate(event.id)}
-                title={event.isActive ? '目前使用中' : '設為使用中'}
+                title={event.isActive ? t('events.activeTooltip') : t('events.activateTooltip')}
                 className={`shrink-0 ${event.isActive ? 'text-brand-500' : 'text-muted hover:text-brand-400'}`}
               >
                 {event.isActive
@@ -148,20 +150,24 @@ function EventsPage() {
                       }}
                       autoFocus
                     />
-                    <button className="btn-primary text-sm" onClick={() => handleRename(event.id)}>儲存</button>
-                    <button className="btn-secondary text-sm" onClick={() => setEditingId(null)}>取消</button>
+                    <button className="btn-primary text-sm" onClick={() => handleRename(event.id)}>{t('common.save')}</button>
+                    <button className="btn-secondary text-sm" onClick={() => setEditingId(null)}>{t('common.cancel')}</button>
                   </div>
                 ) : (
                   <>
                     <div className="flex items-center gap-2">
                       <span className="font-semibold">{event.name}</span>
                       {event.isActive && (
-                        <span className="rounded-full bg-brand-500 px-2 py-0.5 text-xs font-medium text-white">使用中</span>
+                        <span className="rounded-full bg-brand-500 px-2 py-0.5 text-xs font-medium text-white">{t('events.activeBadge')}</span>
                       )}
                     </div>
                     <p className="mt-0.5 text-xs text-muted">
-                      {event.itemCount ?? 0} 項物品・{event.boxCount ?? 0} 個箱子・{event.batteryCount ?? 0} 顆電池
-                      ・建立於 {new Date(event.createdAt).toLocaleDateString('zh-TW')}
+                      {t('events.stats', {
+                        items: event.itemCount ?? 0,
+                        boxes: event.boxCount ?? 0,
+                        batteries: event.batteryCount ?? 0,
+                        date: new Date(event.createdAt).toLocaleDateString('zh-TW'),
+                      })}
                     </p>
                   </>
                 )}
@@ -172,7 +178,7 @@ function EventsPage() {
                   <button
                     className="rounded-xl p-2 text-muted hover:bg-white/10 hover:text-white"
                     onClick={() => { setEditingId(event.id); setEditName(event.name) }}
-                    title="重新命名"
+                    title={t('events.rename')}
                   >
                     <Pencil className="h-4 w-4" />
                   </button>
@@ -180,7 +186,7 @@ function EventsPage() {
                     className="rounded-xl p-2 text-muted hover:bg-red-500/20 hover:text-red-400 disabled:opacity-30"
                     onClick={() => handleDelete(event.id, event.name)}
                     disabled={event.isActive}
-                    title={event.isActive ? '無法刪除使用中的活動' : '刪除活動'}
+                    title={event.isActive ? t('events.deleteDisabled') : t('events.delete')}
                   >
                     <Trash2 className="h-4 w-4" />
                   </button>

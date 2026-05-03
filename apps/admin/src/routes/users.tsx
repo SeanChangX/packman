@@ -3,9 +3,11 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useToast } from '@packman/ui'
 import { adminApi } from '../lib/api'
 import { Select } from '../lib/select'
+import { useT } from '../lib/i18n'
 import type { User } from '@packman/shared'
 
 function UsersPage() {
+  const t = useT()
   const qc = useQueryClient()
   const { showToast } = useToast()
   const { data: users, isLoading } = useQuery({ queryKey: ['admin-users'], queryFn: adminApi.users, staleTime: 30_000 })
@@ -14,22 +16,22 @@ function UsersPage() {
   const updateUser = useMutation({
     mutationFn: ({ id, data }: { id: string; data: { role?: string; groupId?: string | null } }) =>
       adminApi.updateUser(id, data),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['admin-users'] }); showToast('用戶已更新', 'success') },
-    onError: (e: unknown) => showToast((e as Error)?.message ?? '用戶更新失敗', 'error'),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['admin-users'] }); showToast(t('users.update.saved'), 'success') },
+    onError: (e: unknown) => showToast((e as Error)?.message ?? t('users.update.failed'), 'error'),
   })
 
   const deleteUser = useMutation({
     mutationFn: adminApi.deleteUser,
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['admin-users'] }); showToast('用戶已刪除', 'success') },
-    onError: (e: unknown) => showToast((e as Error)?.message ?? '用戶刪除失敗', 'error'),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['admin-users'] }); showToast(t('users.delete.saved'), 'success') },
+    onError: (e: unknown) => showToast((e as Error)?.message ?? t('users.delete.failed'), 'error'),
   })
 
   return (
     <div className="space-y-4">
       <div className="page-header">
         <div>
-          <h1 className="page-title">用戶管理</h1>
-          <p className="page-subtitle">Slack 使用者、組別與角色</p>
+          <h1 className="page-title">{t('users.title')}</h1>
+          <p className="page-subtitle">{t('users.subtitle')}</p>
         </div>
       </div>
 
@@ -38,7 +40,7 @@ function UsersPage() {
           <table className="w-full min-w-[44rem] text-sm">
             <thead className="border-b border-black/10 bg-black/5 dark:border-white/10 dark:bg-white/5">
               <tr>
-                {['用戶', '組別', '角色', '加入時間', '操作'].map((h) => (
+                {[t('users.column.user'), t('users.column.group'), t('users.column.role'), t('users.column.joinedAt'), t('common.actions')].map((h) => (
                   <th key={h} className="whitespace-nowrap px-4 py-3 text-left text-xs font-semibold uppercase text-muted">{h}</th>
                 ))}
               </tr>
@@ -74,7 +76,7 @@ function UsersPage() {
                             id: user.id,
                             data: { groupId: value || null },
                           })}
-                          options={[{ value: '', label: '未分組' }, ...(groups?.map((g) => ({ value: g.id, label: g.name })) ?? [])]}
+                          options={[{ value: '', label: t('users.group.unassigned') }, ...(groups?.map((g) => ({ value: g.id, label: g.name })) ?? [])]}
                         />
                       </td>
                       <td className="px-4 py-3">
@@ -83,8 +85,8 @@ function UsersPage() {
                           value={user.role}
                           onChange={(value) => updateUser.mutate({ id: user.id, data: { role: value } })}
                           options={[
-                            { value: 'MEMBER', label: 'Member' },
-                            { value: 'ADMIN', label: 'Admin' },
+                            { value: 'MEMBER', label: t('users.role.member') },
+                            { value: 'ADMIN', label: t('users.role.admin') },
                           ]}
                         />
                       </td>
@@ -94,9 +96,9 @@ function UsersPage() {
                       <td className="w-20 whitespace-nowrap px-4 py-3">
                         <button
                           className="whitespace-nowrap text-xs font-semibold text-brand-600 hover:text-brand-700"
-                          onClick={() => { if (confirm(`確定刪除用戶 ${user.name}？`)) deleteUser.mutate(user.id) }}
+                          onClick={() => { if (confirm(t('users.delete.confirm', { name: user.name }))) deleteUser.mutate(user.id) }}
                         >
-                          刪除
+                          {t('common.delete')}
                         </button>
                       </td>
                     </tr>

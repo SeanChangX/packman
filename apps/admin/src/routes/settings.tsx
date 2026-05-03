@@ -1,16 +1,20 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type ElementType } from 'react'
 import { Save, ShieldCheck, Slack, Globe2, ImagePlus, Trash2, Sun, Moon, Monitor, Palette } from 'lucide-react'
 import { useToast } from '@packman/ui'
 import { adminApi } from '../lib/api'
 import { useTheme, type ThemePreference } from '../lib/theme-context'
+import { useLocale, useT } from '../lib/i18n'
+import { SUPPORTED_LOCALES, LOCALE_LABELS, type AdminLocale } from '../lib/messages'
+import { Select } from '../lib/select'
 
-const themeOptions: { value: ThemePreference; label: string; icon: React.ElementType }[] = [
-  { value: 'light', label: '淺色', icon: Sun },
-  { value: 'dark', label: '深色', icon: Moon },
-  { value: 'system', label: '系統', icon: Monitor },
-]
+const themeIcons: Record<ThemePreference, ElementType> = {
+  light: Sun,
+  dark: Moon,
+  system: Monitor,
+}
+const themeOrder: ThemePreference[] = ['light', 'dark', 'system']
 
 const MASKED_SECRET = '••••••••••••'
 
@@ -18,6 +22,8 @@ function SettingsPage() {
   const qc = useQueryClient()
   const { showToast } = useToast()
   const { preference, setPreference } = useTheme()
+  const t = useT()
+  const { preference: preferenceLocale, setPreference: setPreferenceLocale } = useLocale()
   const { data: settings, isLoading } = useQuery({
     queryKey: ['admin-settings'],
     queryFn: adminApi.settings,
@@ -59,8 +65,8 @@ function SettingsPage() {
       adminUrl: adminUrl.trim(),
       apiUrl: apiUrl.trim(),
     }),
-    onSuccess: () => { refresh(); showToast('App URLs 已更新', 'success') },
-    onError: (e: unknown) => showToast((e as Error)?.message ?? 'App URLs 更新失敗', 'error'),
+    onSuccess: () => { refresh(); showToast(t('settings.appUrls.saved'), 'success') },
+    onError: (e: unknown) => showToast((e as Error)?.message ?? t('settings.appUrls.failed'), 'error'),
   })
 
   const updateSlack = useMutation({
@@ -72,15 +78,15 @@ function SettingsPage() {
     }),
     onSuccess: () => {
       refresh()
-      showToast('Slack OAuth 已更新', 'success')
+      showToast(t('settings.slack.saved'), 'success')
     },
-    onError: (e: unknown) => showToast((e as Error)?.message ?? 'Slack OAuth 更新失敗', 'error'),
+    onError: (e: unknown) => showToast((e as Error)?.message ?? t('settings.slack.failed'), 'error'),
   })
 
   const updateBrand = useMutation({
     mutationFn: () => adminApi.updateBrandName(brandName),
-    onSuccess: (data: { name: string; logoUrl: string | null }) => { setBrandLogoUrl(data.logoUrl); refresh(); showToast('品牌名稱已更新', 'success') },
-    onError: (e: unknown) => showToast((e as Error)?.message ?? '更新失敗', 'error'),
+    onSuccess: (data: { name: string; logoUrl: string | null }) => { setBrandLogoUrl(data.logoUrl); refresh(); showToast(t('settings.brand.nameSaved'), 'success') },
+    onError: (e: unknown) => showToast((e as Error)?.message ?? t('settings.brand.updateFailed'), 'error'),
   })
 
   const uploadLogo = async (file: File) => {
@@ -89,9 +95,9 @@ function SettingsPage() {
       const data = await adminApi.uploadBrandLogo(file)
       setBrandLogoUrl(data.logoUrl)
       refresh()
-      showToast('Logo 已上傳', 'success')
+      showToast(t('settings.brand.logoUploaded'), 'success')
     } catch (e: unknown) {
-      showToast((e as Error)?.message ?? 'Logo 上傳失敗', 'error')
+      showToast((e as Error)?.message ?? t('settings.brand.logoUploadFailed'), 'error')
     } finally {
       setLogoUploading(false)
     }
@@ -99,14 +105,14 @@ function SettingsPage() {
 
   const deleteLogo = useMutation({
     mutationFn: () => adminApi.deleteBrandLogo(),
-    onSuccess: () => { setBrandLogoUrl(null); refresh(); showToast('Logo 已移除', 'success') },
-    onError: (e: unknown) => showToast((e as Error)?.message ?? '移除失敗', 'error'),
+    onSuccess: () => { setBrandLogoUrl(null); refresh(); showToast(t('settings.brand.logoRemoved'), 'success') },
+    onError: (e: unknown) => showToast((e as Error)?.message ?? t('settings.brand.logoRemoveFailed'), 'error'),
   })
 
   const updateAdmin = useMutation({
     mutationFn: () => {
       if (adminPassword && adminPassword !== adminPasswordConfirm) {
-        throw new Error('兩次密碼不一致')
+        throw new Error(t('settings.admin.passwordMismatch'))
       }
       return adminApi.updateAdminAccount({
         username: adminUsername.trim(),
@@ -117,9 +123,9 @@ function SettingsPage() {
       setAdminPassword('')
       setAdminPasswordConfirm('')
       refresh()
-      showToast('管理員帳號已更新', 'success')
+      showToast(t('settings.admin.saved'), 'success')
     },
-    onError: (e: unknown) => showToast((e as Error)?.message ?? '管理員帳號更新失敗', 'error'),
+    onError: (e: unknown) => showToast((e as Error)?.message ?? t('settings.admin.failed'), 'error'),
   })
 
   if (isLoading) {
@@ -127,8 +133,8 @@ function SettingsPage() {
       <div className="space-y-5">
         <div className="page-header">
           <div>
-            <h1 className="page-title">系統設定</h1>
-            <p className="page-subtitle">載入中</p>
+            <h1 className="page-title">{t('settings.title')}</h1>
+            <p className="page-subtitle">{t('common.loading')}</p>
           </div>
         </div>
         <div className="card h-48 animate-pulse" />
@@ -140,8 +146,8 @@ function SettingsPage() {
     <div className="space-y-5">
       <div className="page-header">
         <div>
-          <h1 className="page-title">系統設定</h1>
-          <p className="page-subtitle">設定登入、Slack OAuth 與對外 URL</p>
+          <h1 className="page-title">{t('settings.title')}</h1>
+          <p className="page-subtitle">{t('settings.subtitle')}</p>
         </div>
       </div>
 
@@ -149,28 +155,43 @@ function SettingsPage() {
         <div className="mb-5 flex items-center gap-3">
           <Palette className="h-5 w-5 text-brand-500" />
           <div>
-            <h2 className="text-base font-bold text-app">外觀</h2>
-            <p className="text-sm text-muted">系統模式會跟隨裝置的深色 / 淺色設定</p>
+            <h2 className="text-base font-bold text-app">{t('settings.appearance.title')}</h2>
+            <p className="text-sm text-muted">{t('settings.appearance.subtitle')}</p>
           </div>
         </div>
-        <label className="label">主題</label>
+        <label className="label">{t('settings.appearance.theme')}</label>
         <div className="mt-1 flex max-w-md rounded-2xl border border-black/10 bg-black/5 p-1 dark:border-white/10 dark:bg-white/5">
-          {themeOptions.map(({ value, label, icon: Icon }) => (
-            <button
-              key={value}
-              type="button"
-              onClick={() => setPreference(value)}
-              className={
-                'flex flex-1 items-center justify-center gap-1.5 rounded-xl px-3 py-2 text-sm font-semibold transition-colors ' +
-                (preference === value
-                  ? 'bg-brand-500 text-white'
-                  : 'text-muted hover:bg-white/40 dark:hover:bg-white/10')
-              }
-            >
-              <Icon className="h-4 w-4" />
-              {label}
-            </button>
-          ))}
+          {themeOrder.map((value) => {
+            const Icon = themeIcons[value]
+            return (
+              <button
+                key={value}
+                type="button"
+                onClick={() => setPreference(value)}
+                className={
+                  'flex flex-1 items-center justify-center gap-1.5 rounded-xl px-3 py-2 text-sm font-semibold transition-colors ' +
+                  (preference === value
+                    ? 'bg-brand-500 text-white'
+                    : 'text-muted hover:bg-white/40 dark:hover:bg-white/10')
+                }
+              >
+                <Icon className="h-4 w-4" />
+                {t(`settings.appearance.theme.${value}`)}
+              </button>
+            )
+          })}
+        </div>
+
+        <label className="label mt-5 block">{t('settings.appearance.language')}</label>
+        <div className="mt-1 max-w-md">
+          <Select
+            value={preferenceLocale}
+            onChange={(v: AdminLocale | 'system') => setPreferenceLocale(v)}
+            options={[
+              { value: 'system', label: t('settings.appearance.language.system') },
+              ...SUPPORTED_LOCALES.map((l) => ({ value: l, label: LOCALE_LABELS[l] })),
+            ]}
+          />
         </div>
       </section>
 
@@ -178,28 +199,28 @@ function SettingsPage() {
         <div className="mb-5 flex items-center gap-3">
           <Globe2 className="h-5 w-5 text-brand-500" />
           <div>
-            <h2 className="text-base font-bold text-app">App URLs</h2>
-            <p className="text-sm text-muted">用於 Slack redirect、QR code、貼紙連結與 CORS 來源</p>
+            <h2 className="text-base font-bold text-app">{t('settings.appUrls.title')}</h2>
+            <p className="text-sm text-muted">{t('settings.appUrls.subtitle')}</p>
           </div>
         </div>
         <div className="grid gap-4 md:grid-cols-3">
           <label className="flex flex-col gap-1.5">
-            <span className="label">Web URL</span>
+            <span className="label">{t('settings.appUrls.web')}</span>
             <input className="input" value={appUrl} onChange={(e) => setAppUrl(e.target.value)} placeholder="http://localhost:3000" />
           </label>
           <label className="flex flex-col gap-1.5">
-            <span className="label">Admin URL</span>
+            <span className="label">{t('settings.appUrls.admin')}</span>
             <input className="input" value={adminUrl} onChange={(e) => setAdminUrl(e.target.value)} placeholder="http://localhost:3001" />
           </label>
           <label className="flex flex-col gap-1.5">
-            <span className="label">API URL</span>
+            <span className="label">{t('settings.appUrls.api')}</span>
             <input className="input" value={apiUrl} onChange={(e) => setApiUrl(e.target.value)} placeholder="http://localhost:8080" />
           </label>
         </div>
         <div className="mt-5 flex justify-end">
           <button onClick={() => updateApp.mutate()} disabled={updateApp.isPending} className="btn-primary">
             <Save className="h-4 w-4" />
-            儲存
+            {t('common.save')}
           </button>
         </div>
       </section>
@@ -208,17 +229,17 @@ function SettingsPage() {
         <div className="mb-5 flex items-center gap-3">
           <Slack className="h-5 w-5 text-brand-500" />
           <div>
-            <h2 className="text-base font-bold text-app">Slack OAuth</h2>
-            <p className="text-sm text-muted">Slack client secret 不會顯示；留空代表不更換</p>
+            <h2 className="text-base font-bold text-app">{t('settings.slack.title')}</h2>
+            <p className="text-sm text-muted">{t('settings.slack.subtitle')}</p>
           </div>
         </div>
         <div className="grid gap-4 md:grid-cols-2">
           <label className="flex flex-col gap-1.5">
-            <span className="label">Client ID</span>
+            <span className="label">{t('settings.slack.clientId')}</span>
             <input className="input" value={slackClientId} onChange={(e) => setSlackClientId(e.target.value)} />
           </label>
           <label className="flex flex-col gap-1.5">
-            <span className="label">Client Secret</span>
+            <span className="label">{t('settings.slack.clientSecret')}</span>
             <input
               className="input"
               type="password"
@@ -228,18 +249,18 @@ function SettingsPage() {
             />
           </label>
           <label className="flex flex-col gap-1.5">
-            <span className="label">Workspace ID</span>
+            <span className="label">{t('settings.slack.workspaceId')}</span>
             <input className="input" value={slackWorkspaceId} onChange={(e) => setSlackWorkspaceId(e.target.value)} placeholder="TXXXXXXXX" />
           </label>
           <label className="flex flex-col gap-1.5">
-            <span className="label">Redirect URI</span>
+            <span className="label">{t('settings.slack.redirectUri')}</span>
             <input className="input" value={slackRedirectUri} onChange={(e) => setSlackRedirectUri(e.target.value)} placeholder="http://localhost:8080/auth/slack/callback" />
           </label>
         </div>
         <div className="mt-5 flex justify-end">
           <button onClick={() => updateSlack.mutate()} disabled={updateSlack.isPending} className="btn-primary">
             <Save className="h-4 w-4" />
-            儲存
+            {t('common.save')}
           </button>
         </div>
       </section>
@@ -248,31 +269,31 @@ function SettingsPage() {
         <div className="mb-5 flex items-center gap-3">
           <ShieldCheck className="h-5 w-5 text-brand-500" />
           <div>
-            <h2 className="text-base font-bold text-app">Admin 帳號</h2>
-            <p className="text-sm text-muted">修改管理控制台登入帳號；密碼留空代表不更換</p>
+            <h2 className="text-base font-bold text-app">{t('settings.admin.title')}</h2>
+            <p className="text-sm text-muted">{t('settings.admin.subtitle')}</p>
           </div>
         </div>
         <div className="grid gap-4 md:grid-cols-3">
           <label className="flex flex-col gap-1.5">
-            <span className="label">帳號</span>
+            <span className="label">{t('settings.admin.username')}</span>
             <input className="input" value={adminUsername} onChange={(e) => setAdminUsername(e.target.value)} autoComplete="username" />
           </label>
           <label className="flex flex-col gap-1.5">
-            <span className="label">新密碼</span>
+            <span className="label">{t('settings.admin.password')}</span>
             <input className="input" type="password" value={adminPassword} onChange={(e) => setAdminPassword(e.target.value)} autoComplete="new-password" />
           </label>
           <label className="flex flex-col gap-1.5">
-            <span className="label">確認新密碼</span>
+            <span className="label">{t('settings.admin.passwordConfirm')}</span>
             <input className="input" type="password" value={adminPasswordConfirm} onChange={(e) => setAdminPasswordConfirm(e.target.value)} autoComplete="new-password" />
           </label>
         </div>
         <p className="mt-3 text-xs font-medium leading-relaxed text-muted">
-          密碼至少 12 字元，需包含大小寫字母、數字、符號其中至少 3 類，且不可包含帳號或常見弱密碼字詞。
+          {t('settings.admin.passwordHint')}
         </p>
         <div className="mt-5 flex justify-end">
           <button onClick={() => updateAdmin.mutate()} disabled={updateAdmin.isPending} className="btn-primary">
             <Save className="h-4 w-4" />
-            儲存
+            {t('common.save')}
           </button>
         </div>
       </section>
@@ -281,15 +302,15 @@ function SettingsPage() {
         <div className="mb-5 flex items-center gap-3">
           <ImagePlus className="h-5 w-5 text-brand-500" />
           <div>
-            <h2 className="text-base font-bold text-app">品牌識別</h2>
-            <p className="text-sm text-muted">Logo 與名稱將顯示在所有貼紙的頂部</p>
+            <h2 className="text-base font-bold text-app">{t('settings.brand.title')}</h2>
+            <p className="text-sm text-muted">{t('settings.brand.subtitle')}</p>
           </div>
         </div>
 
         <div className="grid gap-6 md:grid-cols-2">
           {/* Logo upload */}
           <div className="flex flex-col gap-3">
-            <span className="label">品牌 Logo</span>
+            <span className="label">{t('settings.brand.logo')}</span>
             <div className="flex items-start gap-3">
               {brandLogoUrl ? (
                 <div
@@ -306,13 +327,13 @@ function SettingsPage() {
                 </div>
               ) : (
                 <div className="flex h-24 w-24 items-center justify-center rounded-lg border border-dashed border-black/20 text-xs text-muted dark:border-white/20">
-                  尚未上傳
+                  {t('settings.brand.notUploaded')}
                 </div>
               )}
               <div className="flex min-w-36 flex-col items-stretch gap-2">
                 <label className={`btn-secondary w-full cursor-pointer justify-center gap-1 text-sm ${logoUploading ? 'pointer-events-none opacity-50' : ''}`}>
                   <ImagePlus className="h-4 w-4" />
-                  {logoUploading ? '上傳中...' : '上傳 Logo'}
+                  {logoUploading ? t('settings.brand.uploading') : t('settings.brand.upload')}
                   <input
                     type="file"
                     className="hidden"
@@ -327,31 +348,31 @@ function SettingsPage() {
                     className="btn-secondary w-full justify-center gap-1 border-red-500/20 bg-red-500/10 text-sm text-red-500 hover:bg-red-500/15 hover:text-red-500"
                   >
                     <Trash2 className="h-4 w-4" />
-                    移除
+                    {t('settings.brand.remove')}
                   </button>
                 )}
               </div>
             </div>
-            <p className="text-xs text-muted">支援 PNG、JPG、WebP、SVG，建議橫式，最大顯示 400×200px</p>
+            <p className="text-xs text-muted">{t('settings.brand.fileHint')}</p>
           </div>
 
           {/* Brand name */}
           <label className="flex flex-col gap-1.5">
-            <span className="label">品牌名稱</span>
+            <span className="label">{t('settings.brand.name')}</span>
             <input
               className="input"
               value={brandName}
               onChange={(e) => setBrandName(e.target.value)}
-              placeholder="例如：活動名稱、組織名稱"
+              placeholder={t('settings.brand.namePlaceholder')}
             />
-            <p className="text-xs text-muted">顯示在 Logo 旁邊；若有 Logo 可留空</p>
+            <p className="text-xs text-muted">{t('settings.brand.nameHint')}</p>
           </label>
         </div>
 
         <div className="mt-5 flex justify-end">
           <button onClick={() => updateBrand.mutate()} disabled={updateBrand.isPending} className="btn-primary">
             <Save className="h-4 w-4" />
-            儲存
+            {t('common.save')}
           </button>
         </div>
       </section>

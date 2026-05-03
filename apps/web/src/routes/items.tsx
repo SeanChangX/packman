@@ -4,12 +4,14 @@ import { useState, useEffect, useRef } from 'react'
 import { Plus, Search, Trash2 } from 'lucide-react'
 import { useToast } from '@packman/ui'
 import { itemsApi, groupsApi, selectOptionsApi } from '../lib/api'
-import { STATUS_LABELS, STATUS_COLORS, getLabelFromOptions, cn, formatApiError } from '../lib/utils'
+import { STATUS_COLORS, getLabelFromOptions, cn, formatApiError } from '../lib/utils'
 import { Select } from '../lib/select'
 import { useAuth } from '../lib/auth-context'
+import { useT } from '../lib/i18n'
 import type { PackingStatus } from '@packman/shared'
 
 function ItemsPage() {
+  const t = useT()
   const qc = useQueryClient()
   const { user } = useAuth()
   const { showToast } = useToast()
@@ -65,7 +67,7 @@ function ItemsPage() {
     mutationFn: ({ id, status }: { id: string; status: PackingStatus }) =>
       itemsApi.update(id, { status }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['items'] }),
-    onError: (e: unknown) => showToast(formatApiError(e), 'error'),
+    onError: (e: unknown) => showToast(formatApiError(e, t('common.opFailed'), t('common.requiredHint')), 'error'),
   })
 
   const batchDelete = useMutation({
@@ -73,9 +75,9 @@ function ItemsPage() {
     onSuccess: () => {
       setSelected(new Set())
       qc.invalidateQueries({ queryKey: ['items'] })
-      showToast('已刪除選取物品', 'success')
+      showToast(t('items.batchDelete.success'), 'success')
     },
-    onError: (e: unknown) => showToast(formatApiError(e), 'error'),
+    onError: (e: unknown) => showToast(formatApiError(e, t('common.opFailed'), t('common.requiredHint')), 'error'),
   })
 
   const items = data?.pages.flatMap((p) => p.data) ?? []
@@ -96,7 +98,7 @@ function ItemsPage() {
   }
 
   const handleBatchDelete = () => {
-    if (!confirm(`確定刪除選取的 ${selected.size} 件物品？此操作無法復原。`)) return
+    if (!confirm(t('items.batchDelete.confirm', { n: selected.size }))) return
     batchDelete.mutate([...selected])
   }
 
@@ -104,8 +106,8 @@ function ItemsPage() {
     <div className="space-y-4">
       <div className="page-header">
         <div>
-          <h1 className="page-title">物品清單</h1>
-          <p className="page-subtitle">共 {total} 件物品（已載入 {items.length}）</p>
+          <h1 className="page-title">{t('items.title')}</h1>
+          <p className="page-subtitle">{t('items.subtitle', { total, loaded: items.length })}</p>
         </div>
         <div className="flex gap-2">
           {isAdmin && selected.size > 0 && (
@@ -114,11 +116,11 @@ function ItemsPage() {
               disabled={batchDelete.isPending}
               className="btn-primary gap-1 bg-brand-600 hover:bg-brand-700"
             >
-              <Trash2 className="h-4 w-4" /> 刪除 {selected.size} 件
+              <Trash2 className="h-4 w-4" /> {t('items.delete.count', { n: selected.size })}
             </button>
           )}
           <Link to="/items/new" className="btn-primary gap-1">
-            <Plus className="h-4 w-4" /> 新增物品
+            <Plus className="h-4 w-4" /> {t('items.add')}
           </Link>
         </div>
       </div>
@@ -129,7 +131,7 @@ function ItemsPage() {
           <Search className="absolute left-3 top-3.5 h-4 w-4 text-muted" />
           <input
             className="input pl-9"
-            placeholder="搜尋物品名稱或 tag..."
+            placeholder={t('items.search.placeholder')}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
@@ -139,9 +141,9 @@ function ItemsPage() {
           value={statusFilter}
           onChange={(value) => setStatusFilter(value as PackingStatus | '')}
           options={[
-            { value: '', label: '全部狀態' },
-            { value: 'NOT_PACKED', label: '尚未裝箱' },
-            { value: 'PACKED', label: '已裝箱' },
+            { value: '', label: t('items.filter.allStatus') },
+            { value: 'NOT_PACKED', label: t('status.NOT_PACKED') },
+            { value: 'PACKED', label: t('status.PACKED') },
           ]}
         />
         <Select
@@ -149,7 +151,7 @@ function ItemsPage() {
           value={shippingFilter}
           onChange={setShippingFilter}
           options={[
-            { value: '', label: '全部運送' },
+            { value: '', label: t('items.filter.allShipping') },
             ...shippingOpts.map((o) => ({ value: o.value, label: o.label })),
           ]}
         />
@@ -157,7 +159,7 @@ function ItemsPage() {
           className="w-full lg:w-40"
           value={groupFilter}
           onChange={setGroupFilter}
-          options={[{ value: '', label: '全部組別' }, ...(groups?.map((g) => ({ value: g.id, label: g.name })) ?? [])]}
+          options={[{ value: '', label: t('items.filter.allGroups') }, ...(groups?.map((g) => ({ value: g.id, label: g.name })) ?? [])]}
         />
       </div>
 
@@ -176,7 +178,7 @@ function ItemsPage() {
               </div>
             )
           : items.length === 0
-            ? <div className="p-6 text-center text-sm text-muted">沒有符合條件的物品</div>
+            ? <div className="p-6 text-center text-sm text-muted">{t('items.empty')}</div>
             : (
                 <div className="divide-y divide-black/5 dark:divide-white/10">
                   {items.map((item) => (
@@ -214,8 +216,8 @@ function ItemsPage() {
                                 onChange={(v) => updateStatus.mutate({ id: item.id, status: v as PackingStatus })}
                                 triggerClassName={cn('badge cursor-pointer border-0', STATUS_COLORS[item.status])}
                                 options={[
-                                  { value: 'NOT_PACKED', label: '尚未裝箱' },
-                                  { value: 'PACKED', label: '已裝箱' },
+                                  { value: 'NOT_PACKED', label: t('status.NOT_PACKED') },
+                                  { value: 'PACKED', label: t('status.PACKED') },
                                 ]}
                               />
                             </div>
@@ -223,8 +225,8 @@ function ItemsPage() {
 
                           {item.tags.length > 0 && (
                             <div className="mt-2 flex flex-wrap gap-1.5">
-                              {item.tags.slice(0, 4).map((t) => (
-                                <span key={t} className="badge max-w-[8rem] truncate bg-black/5 text-muted dark:bg-white/10">{t}</span>
+                              {item.tags.slice(0, 4).map((tag) => (
+                                <span key={tag} className="badge max-w-[8rem] truncate bg-black/5 text-muted dark:bg-white/10">{tag}</span>
                               ))}
                               {item.tags.length > 4 && (
                                 <span className="badge bg-black/5 text-muted dark:bg-white/10">+{item.tags.length - 4}</span>
@@ -234,7 +236,7 @@ function ItemsPage() {
 
                           <div className="mt-3 grid grid-cols-2 gap-x-3 gap-y-2 text-sm">
                             <div className="min-w-0">
-                              <p className="text-xs font-semibold text-muted">負責人</p>
+                              <p className="text-xs font-semibold text-muted">{t('items.field.owner')}</p>
                               {item.owner
                                 ? (
                                     <div className="mt-1 flex min-w-0 items-center gap-1.5 text-app">
@@ -245,7 +247,7 @@ function ItemsPage() {
                                 : <p className="mt-1 text-muted">—</p>}
                             </div>
                             <div className="min-w-0">
-                              <p className="text-xs font-semibold text-muted">組別</p>
+                              <p className="text-xs font-semibold text-muted">{t('items.field.group')}</p>
                               <div className="mt-1">
                                 {item.group
                                   ? <span className="badge max-w-full truncate" style={{ backgroundColor: item.group.color + '20', color: item.group.color }}>{item.group.name}</span>
@@ -253,15 +255,15 @@ function ItemsPage() {
                               </div>
                             </div>
                             <div className="min-w-0">
-                              <p className="text-xs font-semibold text-muted">運送</p>
+                              <p className="text-xs font-semibold text-muted">{t('items.field.shipping')}</p>
                               <p className="mt-1 truncate text-app">{item.shippingMethod ? getLabelFromOptions(shippingOpts, item.shippingMethod) : '—'}</p>
                             </div>
                             <div className="min-w-0">
-                              <p className="text-xs font-semibold text-muted">數量 / 箱子</p>
+                              <p className="text-xs font-semibold text-muted">{t('items.field.qtyBox')}</p>
                               <p className="mt-1 truncate text-app">{item.quantity} / {item.box?.label ?? '—'}</p>
                             </div>
                             <div className="min-w-0">
-                              <p className="text-xs font-semibold text-muted">重量</p>
+                              <p className="text-xs font-semibold text-muted">{t('items.field.weight')}</p>
                               <p className="mt-1 truncate text-app">
                                 {item.weightG != null ? `${item.weightG.toLocaleString()} g` : '—'}
                               </p>
@@ -301,8 +303,18 @@ function ItemsPage() {
                     />
                   </th>
                 )}
-                {['品項', '負責人', '組別', '運送方式', '數量', '重量', '箱子', '狀態', ''].map((h) => (
-                  <th key={h} className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted">{h}</th>
+                {[
+                  t('items.col.item'),
+                  t('items.col.owner'),
+                  t('items.col.group'),
+                  t('items.col.shipping'),
+                  t('items.col.quantity'),
+                  t('items.col.weight'),
+                  t('items.col.box'),
+                  t('items.col.status'),
+                  '',
+                ].map((h, idx) => (
+                  <th key={h || `empty-${idx}`} className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted">{h}</th>
                 ))}
               </tr>
             </thead>
@@ -344,8 +356,8 @@ function ItemsPage() {
                         </Link>
                         {item.tags.length > 0 && (
                           <div className="mt-1 flex flex-wrap gap-1">
-                            {item.tags.slice(0, 3).map((t) => (
-                              <span key={t} className="badge bg-black/5 text-muted dark:bg-white/10">{t}</span>
+                            {item.tags.slice(0, 3).map((tag) => (
+                              <span key={tag} className="badge bg-black/5 text-muted dark:bg-white/10">{tag}</span>
                             ))}
                           </div>
                         )}
@@ -379,8 +391,8 @@ function ItemsPage() {
                           onChange={(v) => updateStatus.mutate({ id: item.id, status: v as PackingStatus })}
                           triggerClassName={cn('badge cursor-pointer border-0', STATUS_COLORS[item.status])}
                           options={[
-                            { value: 'NOT_PACKED', label: '尚未裝箱' },
-                            { value: 'PACKED', label: '已裝箱' },
+                            { value: 'NOT_PACKED', label: t('status.NOT_PACKED') },
+                            { value: 'PACKED', label: t('status.PACKED') },
                           ]}
                         />
                       </td>
@@ -390,7 +402,7 @@ function ItemsPage() {
                           params={{ id: item.id }}
                           className="font-semibold text-muted hover:text-brand-600"
                         >
-                          詳細
+                          {t('common.detail')}
                         </Link>
                       </td>
                     </tr>

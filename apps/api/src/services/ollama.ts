@@ -1,6 +1,7 @@
 import axios from 'axios'
 import sharp from 'sharp'
 import { prisma } from '../plugins/prisma'
+import { LocalizedError } from '../lib/i18n'
 
 const ENABLED_SETTING_KEY = 'ollama.enabled'
 const MODEL_SETTING_KEY = 'ollama.visionModel'
@@ -361,12 +362,12 @@ export async function analyzeImageWithOllama(imageBuffer: Buffer): Promise<Ollam
   ])
 
   if (endpoints.length === 0) {
-    throw new Error('沒有可用的 Ollama endpoint')
+    throw new LocalizedError('ollama.error.noEndpoint', 503)
   }
 
   const compatibleEndpoints = await endpointsWithModel(endpoints, model, timeouts.healthTimeoutMs)
   if (compatibleEndpoints.length === 0) {
-    throw new Error(`沒有可用且已下載 ${model} 的 Ollama endpoint`)
+    throw new LocalizedError('ollama.error.noEndpointWithModel', 503, { model })
   }
 
   let lastError: unknown
@@ -408,7 +409,7 @@ export async function analyzeImageWithOllama(imageBuffer: Buffer): Promise<Ollam
     }
   }
 
-  throw lastError instanceof Error ? lastError : new Error('Ollama 請求失敗')
+  throw lastError instanceof Error ? lastError : new LocalizedError('ollama.error.requestFailed', 503)
 }
 
 export async function listOllamaModelStatus() {
@@ -446,7 +447,7 @@ export async function listOllamaModelStatus() {
           ...healthMetrics,
           ok: false,
           models: [],
-          message: error instanceof Error ? error.message : 'Ollama 無法連線',
+          message: error instanceof Error ? error.message : 'Ollama unreachable',
         }
       }
     })

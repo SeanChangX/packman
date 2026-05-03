@@ -5,6 +5,7 @@ import { Check, Pencil, Upload, Zap, RefreshCw, Plus, Trash2, X } from 'lucide-r
 import { useToast } from '@packman/ui'
 import { adminApi } from '../lib/api'
 import { Select } from '../lib/select'
+import { useT } from '../lib/i18n'
 import type { OllamaConfig } from '@packman/shared'
 
 type Result = { ok: boolean; tags: string[]; weightG: number | null; raw: string; model: string; endpoint: string; latencyMs: number }
@@ -20,6 +21,7 @@ function failureRate(endpoint: OllamaConfig['endpoints'][number]) {
 }
 
 function OllamaTest() {
+  const t = useT()
   const qc = useQueryClient()
   const { showToast } = useToast()
   const [image, setImage] = useState<File | null>(null)
@@ -57,18 +59,18 @@ function OllamaTest() {
     mutationFn: (enabled: boolean) => adminApi.updateOllamaConfig({ enabled }),
     onSuccess: (_data, enabled) => {
       refreshConfig()
-      showToast(enabled ? 'AI 辨識已啟用' : 'AI 辨識已停用', 'success')
+      showToast(enabled ? t('ollama.toast.aiEnabled') : t('ollama.toast.aiDisabled'), 'success')
     },
-    onError: (e: unknown) => showToast((e as Error)?.message ?? '更新失敗', 'error'),
+    onError: (e: unknown) => showToast((e as Error)?.message ?? t('ollama.toast.updateFailed'), 'error'),
   })
 
   const updateModel = useMutation({
     mutationFn: (activeModel: string) => adminApi.updateOllamaConfig({ activeModel }),
     onSuccess: () => {
       refreshConfig()
-      showToast('Ollama 模型已更新', 'success')
+      showToast(t('ollama.toast.modelUpdated'), 'success')
     },
-    onError: (e: unknown) => showToast((e as Error)?.message ?? '模型更新失敗', 'error'),
+    onError: (e: unknown) => showToast((e as Error)?.message ?? t('ollama.toast.modelUpdateFailed'), 'error'),
   })
 
   const updateTimeouts = useMutation({
@@ -78,27 +80,27 @@ function OllamaTest() {
     }),
     onSuccess: () => {
       refreshConfig()
-      showToast('Ollama timeout 已更新', 'success')
+      showToast(t('ollama.toast.timeoutUpdated'), 'success')
     },
-    onError: (e: unknown) => showToast((e as Error)?.message ?? 'Timeout 更新失敗', 'error'),
+    onError: (e: unknown) => showToast((e as Error)?.message ?? t('ollama.toast.timeoutUpdateFailed'), 'error'),
   })
 
   const updateTagPrompt = useMutation({
     mutationFn: (prompt: string) => adminApi.updateOllamaConfig({ tagPrompt: prompt }),
     onSuccess: () => {
       refreshConfig()
-      showToast('Tag prompt 已更新', 'success')
+      showToast(t('ollama.toast.tagPromptUpdated'), 'success')
     },
-    onError: (e: unknown) => showToast((e as Error)?.message ?? 'Prompt 更新失敗', 'error'),
+    onError: (e: unknown) => showToast((e as Error)?.message ?? t('ollama.toast.promptUpdateFailed'), 'error'),
   })
 
   const updateWeightPrompt = useMutation({
     mutationFn: (prompt: string) => adminApi.updateOllamaConfig({ weightPrompt: prompt }),
     onSuccess: () => {
       refreshConfig()
-      showToast('Weight prompt 已更新', 'success')
+      showToast(t('ollama.toast.weightPromptUpdated'), 'success')
     },
-    onError: (e: unknown) => showToast((e as Error)?.message ?? 'Prompt 更新失敗', 'error'),
+    onError: (e: unknown) => showToast((e as Error)?.message ?? t('ollama.toast.promptUpdateFailed'), 'error'),
   })
 
   const createEndpoint = useMutation({
@@ -106,9 +108,9 @@ function OllamaTest() {
     onSuccess: () => {
       setBaseUrl('')
       refreshConfig()
-      showToast('Ollama URL 已新增', 'success')
+      showToast(t('ollama.toast.urlAdded'), 'success')
     },
-    onError: (e: unknown) => showToast((e as Error)?.message ?? 'URL 新增失敗', 'error'),
+    onError: (e: unknown) => showToast((e as Error)?.message ?? t('ollama.toast.urlAddFailed'), 'error'),
   })
 
   const updateEndpoint = useMutation({
@@ -119,16 +121,16 @@ function OllamaTest() {
       setEditingBaseUrl('')
       refreshConfig()
     },
-    onError: (e: unknown) => showToast((e as Error)?.message ?? 'URL 更新失敗', 'error'),
+    onError: (e: unknown) => showToast((e as Error)?.message ?? t('ollama.toast.urlUpdateFailed'), 'error'),
   })
 
   const deleteEndpoint = useMutation({
     mutationFn: adminApi.deleteOllamaEndpoint,
     onSuccess: () => {
       refreshConfig()
-      showToast('Ollama URL 已刪除', 'success')
+      showToast(t('ollama.toast.urlDeleted'), 'success')
     },
-    onError: (e: unknown) => showToast((e as Error)?.message ?? 'URL 刪除失敗', 'error'),
+    onError: (e: unknown) => showToast((e as Error)?.message ?? t('ollama.toast.urlDeleteFailed'), 'error'),
   })
 
   const handleFile = (file: File) => {
@@ -152,13 +154,13 @@ function OllamaTest() {
         body: form,
       })
       const json = await res.json()
-      if (!res.ok) setError(json.message ?? '分析失敗')
+      if (!res.ok) setError(json.message ?? t('ollama.test.parseFailed'))
       else {
         setResult(json)
         refreshConfig()
       }
     } catch {
-      setError('請求失敗')
+      setError(t('ollama.test.requestFailed'))
     } finally {
       setLoading(false)
     }
@@ -190,12 +192,12 @@ function OllamaTest() {
     <div className="page space-y-5">
       <div className="page-header">
         <div>
-          <h1 className="page-title">Ollama 設定與測試</h1>
-          <p className="page-subtitle">設定模型與多個辨識端點，測試圖片不會寫入資料庫</p>
+          <h1 className="page-title">{t('ollama.title')}</h1>
+          <p className="page-subtitle">{t('ollama.subtitle')}</p>
         </div>
         <button onClick={() => refetch()} disabled={isFetching} className="btn-secondary">
           {isFetching ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Zap className="h-4 w-4" />}
-          檢查狀態
+          {t('ollama.checkStatus')}
         </button>
       </div>
 
@@ -209,13 +211,16 @@ function OllamaTest() {
         }`}>
           <p className="text-sm font-semibold text-app">
             {!config.enabled
-              ? 'AI 辨識已停用，新照片不會自動辨識'
+              ? t('ollama.status.disabled')
               : ok
-                ? `Ollama 可用 - 目前模型：${config.activeModel}`
-                : '沒有可用的 Ollama endpoint'}
+                ? t('ollama.status.ok', { model: config.activeModel })
+                : t('ollama.status.noEndpoint')}
           </p>
           <p className="mt-1 text-xs text-muted">
-            已啟用 {config.endpoints.filter((endpoint) => endpoint.enabled).length} / {config.endpoints.length} 個 URL
+            {t('ollama.status.endpointCount', {
+              enabled: config.endpoints.filter((endpoint) => endpoint.enabled).length,
+              total: config.endpoints.length,
+            })}
           </p>
         </div>
       )}
@@ -223,11 +228,11 @@ function OllamaTest() {
       {config?.aiTagJobs && (
         <div className="grid gap-3 sm:grid-cols-5">
           {[
-            ['等待', config.aiTagJobs.queued],
-            ['執行中', config.aiTagJobs.running],
-            ['完成', config.aiTagJobs.done],
-            ['失敗', config.aiTagJobs.failed],
-            ['已取消', config.aiTagJobs.cancelled],
+            [t('ollama.jobs.queued'), config.aiTagJobs.queued],
+            [t('ollama.jobs.running'), config.aiTagJobs.running],
+            [t('ollama.jobs.done'), config.aiTagJobs.done],
+            [t('ollama.jobs.failed'), config.aiTagJobs.failed],
+            [t('ollama.jobs.cancelled'), config.aiTagJobs.cancelled],
           ].map(([label, value]) => (
             <div key={String(label)} className="card px-4 py-3">
               <p className="text-xs font-semibold text-muted">{label}</p>
@@ -242,9 +247,9 @@ function OllamaTest() {
           <div className="card p-5">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div className="min-w-0">
-                <h2 className="text-sm font-bold text-app">AI 辨識</h2>
+                <h2 className="text-sm font-bold text-app">{t('ollama.section.ai')}</h2>
                 <p className="text-xs text-muted">
-                  停用後新照片不會排入辨識佇列，worker 也會暫停。已排入的 PENDING job 會保留，啟用後自動繼續。
+                  {t('ollama.section.ai.subtitle')}
                 </p>
               </div>
               <button
@@ -272,8 +277,8 @@ function OllamaTest() {
           <div className={`card p-5 ${config && !config.enabled ? 'opacity-60' : ''}`}>
             <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
               <div>
-                <h2 className="text-sm font-bold text-app">模型</h2>
-                <p className="text-xs text-muted">選擇目前已下載的 vision model</p>
+                <h2 className="text-sm font-bold text-app">{t('ollama.section.model')}</h2>
+                <p className="text-xs text-muted">{t('ollama.section.model.subtitle')}</p>
               </div>
               <Select
                 className="w-full sm:w-72"
@@ -281,24 +286,24 @@ function OllamaTest() {
                 onChange={(model) => updateModel.mutate(model)}
                 options={modelOptions.length > 0
                   ? modelOptions
-                  : [{ value: activeModel, label: activeModel || '尚無模型' }]}
+                  : [{ value: activeModel, label: activeModel || t('ollama.section.model.empty') }]}
               />
             </div>
             {activeModel && enabledEndpointCount > 0 && (
               <p className="text-xs text-muted">
-                建議選擇每台啟用 server 都有的模型；辨識時只會派給已下載該模型的 URL。
+                {t('ollama.section.model.hint')}
               </p>
             )}
           </div>
 
           <div className="card p-5">
             <div className="mb-3">
-              <h2 className="text-sm font-bold text-app">Timeout</h2>
-              <p className="text-xs text-muted">辨識 timeout 用於 /api/generate，健康檢查 timeout 用於 /api/tags</p>
+              <h2 className="text-sm font-bold text-app">{t('ollama.section.timeout')}</h2>
+              <p className="text-xs text-muted">{t('ollama.section.timeout.subtitle')}</p>
             </div>
             <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] sm:items-end">
               <label className="block">
-                <span className="label">辨識 timeout 秒</span>
+                <span className="label">{t('ollama.timeout.generate')}</span>
                 <input
                   className="input mt-1"
                   type="number"
@@ -309,7 +314,7 @@ function OllamaTest() {
                 />
               </label>
               <label className="block">
-                <span className="label">健康檢查 timeout 秒</span>
+                <span className="label">{t('ollama.timeout.health')}</span>
                 <input
                   className="input mt-1"
                   type="number"
@@ -324,18 +329,21 @@ function OllamaTest() {
                 disabled={!generateTimeoutValid || !healthTimeoutValid || updateTimeouts.isPending}
                 onClick={() => updateTimeouts.mutate()}
               >
-                儲存
+                {t('common.save')}
               </button>
             </div>
             <p className="mt-2 text-xs text-muted">
-              目前：辨識 {Math.round((config?.generateTimeoutMs ?? 60_000) / 1000)}s，健康檢查 {Math.round((config?.healthTimeoutMs ?? 5_000) / 1000)}s
+              {t('ollama.timeout.current', {
+                generate: Math.round((config?.generateTimeoutMs ?? 60_000) / 1000),
+                health: Math.round((config?.healthTimeoutMs ?? 5_000) / 1000),
+              })}
             </p>
           </div>
 
           <div className="card p-5">
             <div className="mb-3">
-              <h2 className="text-sm font-bold text-app">Tag Prompt</h2>
-              <p className="text-xs text-muted">用於圖片辨識，輸出仍會由後端清理成 lowercase English tags</p>
+              <h2 className="text-sm font-bold text-app">{t('ollama.section.tagPrompt')}</h2>
+              <p className="text-xs text-muted">{t('ollama.section.tagPrompt.subtitle')}</p>
             </div>
             <textarea
               className="input min-h-40 font-mono text-xs"
@@ -348,14 +356,14 @@ function OllamaTest() {
                 type="button"
                 onClick={() => setTagPrompt(config?.defaultTagPrompt ?? '')}
               >
-                恢復預設
+                {t('ollama.prompt.restoreDefault')}
               </button>
               <button
                 className="btn-primary"
                 disabled={!promptValid || updateTagPrompt.isPending}
                 onClick={() => updateTagPrompt.mutate(tagPrompt.trim())}
               >
-                儲存
+                {t('common.save')}
               </button>
             </div>
             <p className="mt-2 text-xs text-muted">{tagPrompt.length} / 2000</p>
@@ -363,8 +371,8 @@ function OllamaTest() {
 
           <div className="card p-5">
             <div className="mb-3">
-              <h2 className="text-sm font-bold text-app">Weight Prompt</h2>
-              <p className="text-xs text-muted">用於估算物品重量，輸出需為整數（公克），無法解析則不更新重量</p>
+              <h2 className="text-sm font-bold text-app">{t('ollama.section.weightPrompt')}</h2>
+              <p className="text-xs text-muted">{t('ollama.section.weightPrompt.subtitle')}</p>
             </div>
             <textarea
               className="input min-h-28 font-mono text-xs"
@@ -377,14 +385,14 @@ function OllamaTest() {
                 type="button"
                 onClick={() => setWeightPrompt(config?.defaultWeightPrompt ?? '')}
               >
-                恢復預設
+                {t('ollama.prompt.restoreDefault')}
               </button>
               <button
                 className="btn-primary"
                 disabled={!weightPromptValid || updateWeightPrompt.isPending}
                 onClick={() => updateWeightPrompt.mutate(weightPrompt.trim())}
               >
-                儲存
+                {t('common.save')}
               </button>
             </div>
             <p className="mt-2 text-xs text-muted">{weightPrompt.length} / 2000</p>
@@ -392,8 +400,8 @@ function OllamaTest() {
 
           <div className="card overflow-hidden">
             <div className="border-b border-white/10 px-5 py-4">
-              <h2 className="text-sm font-bold text-app">Ollama URLs</h2>
-              <p className="text-xs text-muted">系統會優先使用平均耗時較低、失敗率較低的 URL</p>
+              <h2 className="text-sm font-bold text-app">{t('ollama.section.urls')}</h2>
+              <p className="text-xs text-muted">{t('ollama.section.urls.subtitle')}</p>
             </div>
 
             <div className="divide-y divide-white/10">
@@ -423,17 +431,24 @@ function OllamaTest() {
                         ) : (
                           <p className="truncate text-sm font-semibold text-app">{endpoint.baseUrl}</p>
                         )}
-                        {!endpoint.enabled && <span className="badge bg-white/10 text-muted">停用</span>}
+                        {!endpoint.enabled && <span className="badge bg-white/10 text-muted">{t('ollama.endpoint.disabled')}</span>}
                       </div>
                       <p className="mt-1 text-xs text-muted">
-                        辨識平均 {formatLatency(endpoint.avgLatencyMs)} · 上次 {formatLatency(endpoint.lastLatencyMs)} · 失敗率 {failureRate(endpoint)}
+                        {t('ollama.endpoint.stats', {
+                          avg: formatLatency(endpoint.avgLatencyMs),
+                          last: formatLatency(endpoint.lastLatencyMs),
+                          rate: failureRate(endpoint),
+                        })}
                       </p>
                       <p className="mt-1 text-xs text-muted">
-                        健康檢查 {formatLatency(endpoint.healthAvgLatencyMs)} · 上次 {formatLatency(endpoint.healthLastLatencyMs)}
+                        {t('ollama.endpoint.health', {
+                          avg: formatLatency(endpoint.healthAvgLatencyMs),
+                          last: formatLatency(endpoint.healthLastLatencyMs),
+                        })}
                       </p>
                       {endpoint.message && <p className="mt-1 text-xs text-brand-600">{endpoint.message}</p>}
                       {endpoint.models.length > 0 && (
-                        <p className="mt-1 truncate text-xs text-muted">模型：{endpoint.models.join(', ')}</p>
+                        <p className="mt-1 truncate text-xs text-muted">{t('ollama.endpoint.models', { models: endpoint.models.join(', ') })}</p>
                       )}
                     </div>
                     {editing ? (
@@ -470,11 +485,11 @@ function OllamaTest() {
                           className="btn-secondary px-3 py-1.5 text-xs"
                           onClick={() => updateEndpoint.mutate({ id: endpoint.id, data: { enabled: !endpoint.enabled } })}
                         >
-                          {endpoint.enabled ? '停用' : '啟用'}
+                          {endpoint.enabled ? t('ollama.endpoint.disable') : t('ollama.endpoint.enable')}
                         </button>
                         <button
                           className="btn-danger px-3 py-1.5 text-xs"
-                          onClick={() => { if (confirm(`刪除 ${endpoint.baseUrl}？`)) deleteEndpoint.mutate(endpoint.id) }}
+                          onClick={() => { if (confirm(t('ollama.endpoint.deleteConfirm', { url: endpoint.baseUrl }))) deleteEndpoint.mutate(endpoint.id) }}
                         >
                           <Trash2 className="h-3.5 w-3.5" />
                         </button>
@@ -498,7 +513,7 @@ function OllamaTest() {
                 onClick={() => createEndpoint.mutate()}
               >
                 <Plus className="h-4 w-4" />
-                新增 URL
+                {t('ollama.endpoint.addUrl')}
               </button>
             </div>
           </div>
@@ -506,7 +521,7 @@ function OllamaTest() {
 
         <div className="space-y-5">
           <div className="card p-5">
-            <h2 className="mb-3 text-sm font-bold text-app">上傳圖片</h2>
+            <h2 className="mb-3 text-sm font-bold text-app">{t('ollama.upload.title')}</h2>
             <div
               onClick={() => inputRef.current?.click()}
               onDrop={(e) => {
@@ -522,7 +537,7 @@ function OllamaTest() {
               ) : (
                 <>
                   <Upload className="mb-2 h-8 w-8 text-muted" />
-                  <p className="text-sm text-muted">點擊或拖曳上傳圖片</p>
+                  <p className="text-sm text-muted">{t('ollama.upload.dropHint')}</p>
                 </>
               )}
             </div>
@@ -539,17 +554,17 @@ function OllamaTest() {
             />
             <button onClick={handleTest} disabled={!image || loading} className="btn-primary mt-3 w-full gap-2">
               {loading && <RefreshCw className="h-4 w-4 animate-spin" />}
-              {loading ? '分析中...' : '分析圖片'}
+              {loading ? t('ollama.test.analyzing') : t('ollama.test.analyze')}
             </button>
             {error && <p className="mt-2 text-sm font-semibold text-brand-600">{error}</p>}
           </div>
 
           <div className="card p-5">
-            <h2 className="mb-3 text-sm font-bold text-app">分析結果</h2>
+            <h2 className="mb-3 text-sm font-bold text-app">{t('ollama.result.title')}</h2>
             {result ? (
               <div className="space-y-4">
                 <div>
-                  <p className="mb-2 text-xs font-semibold text-muted">English tags</p>
+                  <p className="mb-2 text-xs font-semibold text-muted">{t('ollama.result.tags')}</p>
                   <div className="flex flex-wrap gap-2">
                     {result.tags.map((tag) => (
                       <span key={tag} className="badge bg-brand-500/10 text-brand-600">
@@ -559,21 +574,21 @@ function OllamaTest() {
                   </div>
                 </div>
                 <div>
-                  <p className="mb-1 text-xs font-semibold text-muted">估算重量</p>
+                  <p className="mb-1 text-xs font-semibold text-muted">{t('ollama.result.weight')}</p>
                   <p className="text-sm font-semibold text-app">
-                    {result.weightG != null ? `${result.weightG.toLocaleString()} g` : '無法估算'}
+                    {result.weightG != null ? `${result.weightG.toLocaleString()} g` : t('ollama.result.weight.none')}
                   </p>
                 </div>
                 <div>
-                  <p className="mb-1 text-xs font-semibold text-muted">原始輸出</p>
+                  <p className="mb-1 text-xs font-semibold text-muted">{t('ollama.result.raw')}</p>
                   <pre className="whitespace-pre-wrap rounded-xl bg-black/20 p-3 text-xs text-app">{result.raw}</pre>
                 </div>
-                <p className="text-xs text-muted">模型：{result.model}</p>
-                <p className="text-xs text-muted">URL：{result.endpoint} · {formatLatency(result.latencyMs)}</p>
+                <p className="text-xs text-muted">{t('ollama.result.model', { model: result.model })}</p>
+                <p className="text-xs text-muted">{t('ollama.result.endpoint', { endpoint: result.endpoint, latency: formatLatency(result.latencyMs) })}</p>
               </div>
             ) : (
               <div className="flex min-h-52 items-center justify-center">
-                <p className="text-sm text-muted">上傳圖片後點擊「分析圖片」</p>
+                <p className="text-sm text-muted">{t('ollama.result.empty')}</p>
               </div>
             )}
           </div>

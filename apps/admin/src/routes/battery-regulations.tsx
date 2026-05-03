@@ -5,9 +5,11 @@ import { useForm } from 'react-hook-form'
 import { Pencil, Plus, Trash2, X, ChevronUp, ChevronDown } from 'lucide-react'
 import { useToast } from '@packman/ui'
 import { adminApi } from '../lib/api'
+import { useT } from '../lib/i18n'
 import type { BatteryRegulation } from '@packman/shared'
 
 function BatteryRegulationsPage() {
+  const t = useT()
   const qc = useQueryClient()
   const { showToast } = useToast()
   const [editing, setEditing] = useState<BatteryRegulation | null>(null)
@@ -22,9 +24,9 @@ function BatteryRegulationsPage() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['admin-battery-regulations'] })
       reset({ title: '', content: '' })
-      showToast('電池規定已新增', 'success')
+      showToast(t('batteryRegulations.create.saved'), 'success')
     },
-    onError: (e: unknown) => showToast((e as Error)?.message ?? '電池規定新增失敗', 'error'),
+    onError: (e: unknown) => showToast((e as Error)?.message ?? t('batteryRegulations.create.failed'), 'error'),
   })
 
   const update = useMutation({
@@ -36,15 +38,15 @@ function BatteryRegulationsPage() {
       qc.invalidateQueries({ queryKey: ['admin-battery-regulations'] })
       setEditing(null)
       reset({ title: '', content: '' })
-      showToast('電池規定已更新', 'success')
+      showToast(t('batteryRegulations.update.saved'), 'success')
     },
-    onError: (e: unknown) => showToast((e as Error)?.message ?? '電池規定更新失敗', 'error'),
+    onError: (e: unknown) => showToast((e as Error)?.message ?? t('batteryRegulations.update.failed'), 'error'),
   })
 
   const del = useMutation({
     mutationFn: adminApi.deleteBatteryRegulation,
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['admin-battery-regulations'] }); showToast('電池規定已刪除', 'success') },
-    onError: (e: unknown) => showToast((e as Error)?.message ?? '電池規定刪除失敗', 'error'),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['admin-battery-regulations'] }); showToast(t('batteryRegulations.delete.saved'), 'success') },
+    onError: (e: unknown) => showToast((e as Error)?.message ?? t('batteryRegulations.delete.failed'), 'error'),
   })
 
   const move = useMutation({
@@ -60,7 +62,7 @@ function BatteryRegulationsPage() {
       ])
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['admin-battery-regulations'] }),
-    onError: (e: unknown) => showToast((e as Error)?.message ?? '排序更新失敗', 'error'),
+    onError: (e: unknown) => showToast((e as Error)?.message ?? t('batteryRegulations.sort.failed'), 'error'),
   })
 
   const startEdit = (regulation: BatteryRegulation) => {
@@ -79,8 +81,8 @@ function BatteryRegulationsPage() {
     <div className="space-y-5">
       <div className="page-header">
         <div>
-          <h1 className="page-title">電池規定</h1>
-          <p className="page-subtitle">前台電池提醒內容，可新增多組規定</p>
+          <h1 className="page-title">{t('batteryRegulations.title')}</h1>
+          <p className="page-subtitle">{t('batteryRegulations.subtitle')}</p>
         </div>
       </div>
 
@@ -88,7 +90,7 @@ function BatteryRegulationsPage() {
         className="card grid gap-3 p-4 lg:grid-cols-[1fr_auto]"
         onSubmit={handleSubmit((data) => (editing ? update.mutate(data) : create.mutate(data)))}
       >
-        <input className="input" placeholder="標題，例如：台灣出入境鋰電池規定" {...register('title', { required: true })} />
+        <input className="input" placeholder={t('batteryRegulations.placeholder.title')} {...register('title', { required: true })} />
         <div className="flex gap-2">
           {editing && (
             <button type="button" className="btn-secondary px-3" onClick={cancelEdit}>
@@ -97,12 +99,12 @@ function BatteryRegulationsPage() {
           )}
           <button className="btn-primary" disabled={create.isPending || update.isPending}>
             {editing ? <Pencil className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
-            {editing ? '儲存' : '新增'}
+            {editing ? t('common.save') : t('common.add')}
           </button>
         </div>
         <textarea
           className="input min-h-32 lg:col-span-2"
-          placeholder="每行一條規定"
+          placeholder={t('batteryRegulations.placeholder.content')}
           {...register('content', { required: true })}
         />
       </form>
@@ -132,7 +134,7 @@ function BatteryRegulationsPage() {
                 </button>
                 <button
                   className="btn-danger px-3"
-                  onClick={() => { if (confirm(`刪除 ${regulation.title}？`)) del.mutate(regulation.id) }}
+                  onClick={() => { if (confirm(t('batteryRegulations.delete.confirm', { title: regulation.title }))) del.mutate(regulation.id) }}
                 >
                   <Trash2 className="h-4 w-4" />
                 </button>

@@ -1,8 +1,9 @@
 import { prisma } from '../plugins/prisma'
+import { LocalizedError } from '../lib/i18n'
 
 export async function getActiveEventId(): Promise<string> {
   const setting = await prisma.systemSetting.findUnique({ where: { key: 'activeEventId' } })
-  if (!setting?.value) throw new Error('尚未設定使用中的 Event，請至管理介面建立並啟用一個 Event')
+  if (!setting?.value) throw new LocalizedError('events.error.noActiveSetting', 400)
   return setting.value
 }
 

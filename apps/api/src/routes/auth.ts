@@ -3,6 +3,7 @@ import axios from 'axios'
 import { prisma } from '../plugins/prisma'
 import { cookieSecureFor, requireAuth, setAuthCookie, signToken, verifyToken } from '../plugins/auth'
 import { AdminAccountSchema } from '@packman/shared'
+import { t } from '../lib/i18n'
 import {
   createInitialAdminAccount,
   getAdminAuthStatus,
@@ -164,11 +165,11 @@ export async function authRoutes(app: FastifyInstance) {
       const { username, password } = request.body
       const key = adminLoginKey(request, username)
       if (isAdminLoginLimited(key)) {
-        return reply.status(429).send({ message: '登入失敗次數過多，請稍後再試' })
+        return reply.status(429).send({ message: t(request, 'auth.error.tooManyAttempts') })
       }
       if (!await verifyAdminLogin(username, password)) {
         recordAdminLoginFailure(key)
-        return reply.status(401).send({ message: '帳號或密碼錯誤' })
+        return reply.status(401).send({ message: t(request, 'auth.error.invalidCredentials') })
       }
       adminLoginFailures.delete(key)
       const token = signToken({ userId: '__admin__', role: 'ADMIN_PANEL' }, '1d')

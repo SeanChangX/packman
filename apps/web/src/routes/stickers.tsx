@@ -6,7 +6,8 @@ import * as pdfjsLib from 'pdfjs-dist'
 import pdfjsWorker from 'pdfjs-dist/build/pdf.worker.mjs?url'
 import { useToast } from '@packman/ui'
 import { itemsApi, boxesApi, stickersApi } from '../lib/api'
-import { STATUS_LABELS, STATUS_COLORS, cn } from '../lib/utils'
+import { STATUS_LABEL_KEYS, STATUS_COLORS, cn } from '../lib/utils'
+import { useT } from '../lib/i18n'
 import { Select } from '../lib/select'
 import { useAuth } from '../lib/auth-context'
 import type { PackingStatus } from '@packman/shared'
@@ -15,16 +16,17 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker
 
 type StickerSize = 'SMALL' | 'MEDIUM' | 'LARGE' | 'A4_SHEET'
 
-const SIZE_LABELS: Record<StickerSize, string> = {
-  SMALL: '小 (50×30mm)',
-  MEDIUM: '中 (100×50mm)',
-  LARGE: '大 (150×100mm)',
-  A4_SHEET: 'A4 (2×4 格)',
+const SIZE_LABEL_KEYS: Record<StickerSize, string> = {
+  SMALL: 'stickers.size.SMALL',
+  MEDIUM: 'stickers.size.MEDIUM',
+  LARGE: 'stickers.size.LARGE',
+  A4_SHEET: 'stickers.size.A4_SHEET',
 }
 
 function StickersPage() {
   const { user } = useAuth()
   const { showToast } = useToast()
+  const t = useT()
   const [mode, setMode] = useState<'items' | 'boxes'>('items')
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [size, setSize] = useState<StickerSize>('MEDIUM')
@@ -56,7 +58,7 @@ function StickersPage() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ ids, size }),
     })
-    if (!res.ok) throw new Error(`貼紙生成失敗 (${res.status})`)
+    if (!res.ok) throw new Error(`${t('stickers.fail.generate')} (${res.status})`)
     return res.blob()
   }
 
@@ -107,7 +109,7 @@ function StickersPage() {
       if (mode === 'items') await stickersApi.downloadItems({ ids, size })
       else await stickersApi.downloadBoxes({ ids, size })
     },
-    onError: (e: unknown) => showToast((e as Error)?.message ?? '貼紙生成失敗', 'error'),
+    onError: (e: unknown) => showToast((e as Error)?.message ?? t('stickers.fail.generate'), 'error'),
   })
 
   const previewSticker = async () => {
@@ -119,7 +121,7 @@ function StickersPage() {
     try {
       setPreviewBlob(await fetchStickerBlob())
     } catch (e: unknown) {
-      showToast((e as Error)?.message ?? '預覽失敗', 'error')
+      showToast((e as Error)?.message ?? t('stickers.fail.preview'), 'error')
     } finally {
       setPreviewing(false)
     }
@@ -142,8 +144,8 @@ function StickersPage() {
   if (user?.role !== 'ADMIN') {
     return (
       <div className="card mx-auto max-w-lg p-6 text-center">
-        <h1 className="text-xl font-bold">需要管理員權限</h1>
-        <p className="mt-2 text-sm text-muted">貼紙列印只開放給 Admin 角色使用。</p>
+        <h1 className="text-xl font-bold">{t('stickers.adminOnly.title')}</h1>
+        <p className="mt-2 text-sm text-muted">{t('stickers.adminOnly.body')}</p>
       </div>
     )
   }
@@ -152,8 +154,8 @@ function StickersPage() {
     <div className="space-y-6">
       <div className="page-header">
         <div>
-          <h1 className="page-title">貼紙列印</h1>
-          <p className="page-subtitle">選擇物品或箱子，生成 PDF 貼紙</p>
+          <h1 className="page-title">{t('stickers.title')}</h1>
+          <p className="page-subtitle">{t('stickers.subtitle')}</p>
         </div>
       </div>
 
@@ -164,23 +166,23 @@ function StickersPage() {
               className={cn('flex min-h-10 flex-1 items-center justify-center gap-1 rounded-xl px-3 py-1.5 text-sm font-semibold transition-colors lg:flex-none', mode === 'items' ? 'bg-brand-500 text-white' : 'text-muted hover:bg-white/40 dark:hover:bg-white/10')}
               onClick={() => { setMode('items'); setSelectedIds(new Set()) }}
             >
-              <Package className="h-4 w-4" /> 物品
+              <Package className="h-4 w-4" /> {t('stickers.mode.items')}
             </button>
             <button
               className={cn('flex min-h-10 flex-1 items-center justify-center gap-1 rounded-xl px-3 py-1.5 text-sm font-semibold transition-colors lg:flex-none', mode === 'boxes' ? 'bg-brand-500 text-white' : 'text-muted hover:bg-white/40 dark:hover:bg-white/10')}
               onClick={() => { setMode('boxes'); setSelectedIds(new Set()) }}
             >
-              <Box className="h-4 w-4" /> 箱子
+              <Box className="h-4 w-4" /> {t('stickers.mode.boxes')}
             </button>
           </div>
 
           <div className="flex items-center gap-2">
-            <label className="label whitespace-nowrap">尺寸</label>
+            <label className="label whitespace-nowrap">{t('stickers.size')}</label>
             <Select
               className="w-full lg:w-44"
               value={size}
               onChange={setSize}
-              options={Object.entries(SIZE_LABELS).map(([value, label]) => ({ value: value as StickerSize, label }))}
+              options={Object.entries(SIZE_LABEL_KEYS).map(([value, key]) => ({ value: value as StickerSize, label: t(key) }))}
             />
           </div>
 
@@ -191,7 +193,7 @@ function StickersPage() {
               onClick={previewSticker}
             >
               <Eye className="h-4 w-4" />
-              {previewing ? '生成中...' : previewBlob ? '關閉預覽' : `預覽 (${selectedIds.size})`}
+              {previewing ? t('stickers.previewing') : previewBlob ? t('stickers.closePreview') : t('stickers.preview', { n: selectedIds.size })}
             </button>
             <button
               className="btn-primary justify-center gap-1"
@@ -199,7 +201,7 @@ function StickersPage() {
               onClick={() => download.mutate()}
             >
               <Printer className="h-4 w-4" />
-              {download.isPending ? '生成中...' : `下載 PDF (${selectedIds.size})`}
+              {download.isPending ? t('stickers.generating') : t('stickers.download', { n: selectedIds.size })}
             </button>
           </div>
         </div>
@@ -208,8 +210,8 @@ function StickersPage() {
       {previewBlob && (
         <div className="card overflow-hidden">
           <div className="border-b border-black/10 px-4 py-3 dark:border-white/10">
-            <h2 className="font-semibold">貼紙預覽</h2>
-            <p className="text-xs text-muted">顯示 PDF 第一頁，選取項目或尺寸變更後會自動更新。</p>
+            <h2 className="font-semibold">{t('stickers.previewTitle')}</h2>
+            <p className="text-xs text-muted">{t('stickers.previewHint')}</p>
           </div>
           {rendering && (
             <div className="flex justify-center py-6">
@@ -234,7 +236,7 @@ function StickersPage() {
             className="h-4 w-4 cursor-pointer accent-brand-500"
           />
           <span className="text-sm text-muted">
-            已選 {selectedIds.size} / {list.length}
+            {t('stickers.selected', { n: selectedIds.size, total: list.length })}
           </span>
         </div>
 
@@ -259,13 +261,13 @@ function StickersPage() {
                 <div className="flex-1">
                   <p className="font-medium">{isItem ? i.name : i.label}</p>
                   {isItem && i.owner && <p className="text-xs text-muted">{i.owner.name}</p>}
-                  {!isItem && i.owner && <p className="text-xs text-muted">負責人: {i.owner.name}</p>}
+                  {!isItem && i.owner && <p className="text-xs text-muted">{t('stickers.box.owner', { name: i.owner.name })}</p>}
                 </div>
                 {isItem && (
-                  <span className={cn('badge', STATUS_COLORS[status])}>{STATUS_LABELS[status]}</span>
+                  <span className={cn('badge', STATUS_COLORS[status])}>{t(STATUS_LABEL_KEYS[status])}</span>
                 )}
                 {!isItem && (
-                  <span className={cn('badge', STATUS_COLORS[status])}>{STATUS_LABELS[status]}</span>
+                  <span className={cn('badge', STATUS_COLORS[status])}>{t(STATUS_LABEL_KEYS[status])}</span>
                 )}
               </li>
             )

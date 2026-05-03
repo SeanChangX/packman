@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { RouterProvider, createRouter } from '@tanstack/react-router'
 import { ToastProvider } from '@packman/ui'
 import { ThemeProvider } from './lib/theme-context'
+import { LocaleProvider } from './lib/i18n'
 import { routeTree } from './routeTree.gen'
 import './index.css'
 
@@ -15,11 +16,13 @@ declare module '@tanstack/react-router' { interface Register { router: typeof ro
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <QueryClientProvider client={qc}>
-      <ThemeProvider>
-        <ToastProvider>
-          <RouterProvider router={router} />
-        </ToastProvider>
-      </ThemeProvider>
+      <LocaleProvider>
+        <ThemeProvider>
+          <ToastProvider>
+            <RouterProvider router={router} />
+          </ToastProvider>
+        </ThemeProvider>
+      </LocaleProvider>
     </QueryClientProvider>
   </React.StrictMode>
 )

@@ -10,11 +10,15 @@ import type {
   OllamaEndpoint,
   SystemSettings,
 } from '@packman/shared'
+import { getLocale, translate as t } from './i18n'
 
 function buildHeaders(options?: RequestInit): Headers {
   const headers = new Headers(options?.headers)
   if (options?.body !== undefined && !(options.body instanceof FormData) && !headers.has('Content-Type')) {
     headers.set('Content-Type', 'application/json')
+  }
+  if (!headers.has('Accept-Language')) {
+    headers.set('Accept-Language', getLocale())
   }
   return headers
 }
@@ -44,19 +48,19 @@ async function responseError(res: Response, fallback: string): Promise<string> {
 
 export const adminApi = {
   adminStatus: async () => {
-    const res = await fetch('/auth/admin-status', { credentials: 'include' })
-    if (!res.ok) throw new Error('無法取得管理員狀態')
+    const res = await fetch('/auth/admin-status', { credentials: 'include', headers: { 'Accept-Language': getLocale() } })
+    if (!res.ok) throw new Error(t('api.error.adminStatus'))
     return res.json() as Promise<AdminAuthStatus>
   },
   setupAdmin: async (username: string, password: string) => {
     const res = await fetch('/auth/admin-setup', {
       method: 'POST',
       credentials: 'include',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'Accept-Language': getLocale() },
       body: JSON.stringify({ username, password }),
     })
     if (!res.ok) {
-      const err = await res.json().catch(() => ({ message: '建立失敗' }))
+      const err = await res.json().catch(() => ({ message: t('api.error.setupFailed') }))
       throw new Error(err.message)
     }
   },
@@ -64,10 +68,13 @@ export const adminApi = {
     const res = await fetch('/auth/admin-login', {
       method: 'POST',
       credentials: 'include',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'Accept-Language': getLocale() },
       body: JSON.stringify({ username, password }),
     })
-    if (!res.ok) throw new Error('帳號或密碼錯誤')
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ message: t('api.error.invalidCredentials') }))
+      throw new Error(err.message ?? t('api.error.invalidCredentials'))
+    }
   },
   logout: () =>
     req<void>('/auth/admin-logout', { method: 'POST' }),
@@ -133,6 +140,7 @@ export const adminApi = {
         : '/api/admin/import/backup'
       xhr.open('POST', url, true)
       xhr.withCredentials = true
+      xhr.setRequestHeader('Accept-Language', getLocale())
       const onProgress = options?.onProgress
       if (onProgress) {
         xhr.upload.onprogress = (e) => {
@@ -142,15 +150,15 @@ export const adminApi = {
       xhr.onload = () => {
         if (xhr.status >= 200 && xhr.status < 300) {
           try { resolve(JSON.parse(xhr.responseText)) }
-          catch { reject(new Error('回應格式錯誤')) }
+          catch { reject(new Error(t('api.error.responseFormat'))) }
         } else {
-          let message = '備份還原失敗'
+          let message = t('api.error.backupRestore')
           try { message = JSON.parse(xhr.responseText)?.message ?? message } catch {}
           reject(new Error(message))
         }
       }
-      xhr.onerror = () => reject(new Error('備份還原失敗（網路錯誤）'))
-      xhr.onabort = () => reject(new Error('備份還原已取消'))
+      xhr.onerror = () => reject(new Error(t('api.error.backupNetwork')))
+      xhr.onabort = () => reject(new Error(t('api.error.backupAborted')))
       xhr.send(form)
     })
   },
@@ -185,8 +193,8 @@ export const adminApi = {
   uploadBrandLogo: async (file: File): Promise<SystemSettings['brand']> => {
     const form = new FormData()
     form.append('file', file)
-    const res = await fetch('/api/admin/settings/brand/logo', { method: 'POST', credentials: 'include', body: form })
-    if (!res.ok) throw new Error(await responseError(res, 'Logo 上傳失敗'))
+    const res = await fetch('/api/admin/settings/brand/logo', { method: 'POST', credentials: 'include', headers: { 'Accept-Language': getLocale() }, body: form })
+    if (!res.ok) throw new Error(await responseError(res, t('api.error.logoUpload')))
     return res.json()
   },
   deleteBrandLogo: () => req<void>('/api/admin/settings/brand/logo', { method: 'DELETE' }),

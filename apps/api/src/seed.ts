@@ -4,7 +4,7 @@ import { getActiveEventId } from './services/events'
 
 const LEGACY_DEFAULT_BOX_LABELS = [
   '1', '2', '3', '4', '5', '6', '7', '8', '9',
-  'A', 'B', 'C', 'D', 'E', 'F', '大機', '推車1',
+  'A', 'B', 'C', 'D', 'E', 'F', '大機', '推車1號',
 ]
 
 function defaultOllamaBaseUrls() {
@@ -97,12 +97,12 @@ export async function seedDefaultData() {
   const defaultSelectOptions = [
     { type: 'SHIPPING_METHOD' as const, value: 'CHECKED',        label: '託運',       sortOrder: 0 },
     { type: 'SHIPPING_METHOD' as const, value: 'CARRY_ON',       label: '登機',       sortOrder: 1 },
-    { type: 'USE_CATEGORY'    as const, value: 'HIGH_FREQ',      label: '高使用頻率', sortOrder: 0 },
-    { type: 'USE_CATEGORY'    as const, value: 'RETURN_ONLY',    label: '往返物品',   sortOrder: 1 },
-    { type: 'USE_CATEGORY'    as const, value: 'ONE_WAY',        label: '單程物品',   sortOrder: 2 },
-    { type: 'USE_CATEGORY'    as const, value: 'LOW_FREQ',       label: '低使用頻率', sortOrder: 3 },
-    { type: 'BATTERY_TYPE'    as const, value: 'POWER_TOOL',     label: '工具機電池', sortOrder: 0 },
-    { type: 'BATTERY_TYPE'    as const, value: 'POWER_BANK', label: '行動電源', sortOrder: 1 },
+    { type: 'USE_CATEGORY'    as const, value: 'HIGH_FREQ',      label: '高使用頻率',  sortOrder: 0 },
+    { type: 'USE_CATEGORY'    as const, value: 'RETURN_ONLY',    label: '往返物品',    sortOrder: 1 },
+    { type: 'USE_CATEGORY'    as const, value: 'ONE_WAY',        label: '單程物品',    sortOrder: 2 },
+    { type: 'USE_CATEGORY'    as const, value: 'LOW_FREQ',       label: '低使用頻率',  sortOrder: 3 },
+    { type: 'BATTERY_TYPE'    as const, value: 'POWER_TOOL',     label: '工具機電池',  sortOrder: 0 },
+    { type: 'BATTERY_TYPE'    as const, value: 'POWER_BANK',     label: '行動電源',    sortOrder: 1 },
     { type: 'BATTERY_TYPE'    as const, value: 'LIFEPO4',        label: '磁酸鋰鐵電池', sortOrder: 2 },
   ]
   for (const opt of defaultSelectOptions) {

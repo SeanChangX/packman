@@ -5,6 +5,7 @@ import { RouterProvider, createRouter } from '@tanstack/react-router'
 import { ToastProvider } from '@packman/ui'
 import { AuthProvider } from './lib/auth-context'
 import { ThemeProvider } from './lib/theme-context'
+import { LocaleProvider } from './lib/i18n'
 import { routeTree } from './routeTree.gen'
 import './index.css'
 
@@ -25,13 +26,15 @@ declare module '@tanstack/react-router' {
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <QueryClientProvider client={queryClient}>
-      <ThemeProvider>
-        <ToastProvider>
-          <AuthProvider>
-            <RouterProvider router={router} />
-          </AuthProvider>
-        </ToastProvider>
-      </ThemeProvider>
+      <LocaleProvider>
+        <ThemeProvider>
+          <ToastProvider>
+            <AuthProvider>
+              <RouterProvider router={router} />
+            </AuthProvider>
+          </ToastProvider>
+        </ThemeProvider>
+      </LocaleProvider>
     </QueryClientProvider>
   </React.StrictMode>
 )

@@ -3,6 +3,7 @@ import { prisma } from '../plugins/prisma'
 import { requireAdminOrAdminSecret, requireAuthOrAdminSecret } from '../plugins/auth'
 import { CreateEventSchema, UpdateEventSchema } from '@packman/shared'
 import { getActiveEventId } from '../services/events'
+import { t } from '../lib/i18n'
 
 export async function eventRoutes(app: FastifyInstance) {
   app.get('/active', { preHandler: requireAuthOrAdminSecret }, async () => {
@@ -60,10 +61,10 @@ export async function eventRoutes(app: FastifyInstance) {
     if (!event) return reply.status(404).send({ message: 'Event not found' })
 
     const activeId = await getActiveEventId().catch(() => null)
-    if (event.id === activeId) return reply.status(400).send({ message: '無法刪除正在使用中的 Event' })
+    if (event.id === activeId) return reply.status(400).send({ message: t(request, 'events.error.deleteActive') })
 
     const total = event._count.items + event._count.boxes + event._count.batteries
-    if (total > 0) return reply.status(400).send({ message: `此 Event 尚有 ${total} 筆資料，請先清空後再刪除` })
+    if (total > 0) return reply.status(400).send({ message: t(request, 'events.error.hasData', { count: total }) })
 
     await prisma.event.delete({ where: { id: event.id } })
     return reply.status(204).send()

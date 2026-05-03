@@ -2,7 +2,8 @@ import { createFileRoute, Link } from '@tanstack/react-router'
 import { useQuery } from '@tanstack/react-query'
 import { Package, Box, Battery, CheckCircle2 } from 'lucide-react'
 import { itemsApi, boxesApi, batteriesApi } from '../lib/api'
-import { STATUS_LABELS, STATUS_COLORS, cn } from '../lib/utils'
+import { STATUS_LABEL_KEYS, STATUS_COLORS, cn } from '../lib/utils'
+import { useT } from '../lib/i18n'
 import type { PackingStatus } from '@packman/shared'
 
 function StatCard({ icon: Icon, label, value, color, iconColor = 'text-white', to }: {
@@ -30,6 +31,7 @@ const BOX_STATUS_CARD_COLORS: Record<PackingStatus, string> = {
 }
 
 function Dashboard() {
+  const t = useT()
   const { data: stats } = useQuery({
     queryKey: ['items', 'stats'],
     queryFn: () => itemsApi.stats(),
@@ -57,18 +59,18 @@ function Dashboard() {
     <div className="space-y-6">
       <div className="page-header">
         <div>
-          <h1 className="page-title">總覽</h1>
-          <p className="page-subtitle">打包進度與箱子狀態</p>
+          <h1 className="page-title">{t('dashboard.title')}</h1>
+          <p className="page-subtitle">{t('dashboard.subtitle')}</p>
         </div>
       </div>
 
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-        <StatCard icon={Package} label="物品總數" value={totalItems} color="bg-brand-500" to="/items" />
-        <StatCard icon={CheckCircle2} label="已打包" value={packedItems} color="bg-black" to="/items" />
-        <StatCard icon={Box} label="已封箱" value={sealedBoxes} color="bg-emerald-700 dark:bg-emerald-500/80" to="/boxes" />
+        <StatCard icon={Package} label={t('dashboard.totalItems')} value={totalItems} color="bg-brand-500" to="/items" />
+        <StatCard icon={CheckCircle2} label={t('dashboard.packed')} value={packedItems} color="bg-black" to="/items" />
+        <StatCard icon={Box} label={t('dashboard.sealedBoxes')} value={sealedBoxes} color="bg-emerald-700 dark:bg-emerald-500/80" to="/boxes" />
         <StatCard
           icon={Battery}
-          label="電池數"
+          label={t('dashboard.batteries')}
           value={batteries?.length ?? 0}
           color="bg-white ring-1 ring-black/10 dark:ring-white/10"
           iconColor="text-black"
@@ -78,13 +80,13 @@ function Dashboard() {
 
       {/* Packing progress */}
       <div className="card p-6">
-        <h2 className="mb-4 font-semibold text-app">打包進度</h2>
+        <h2 className="mb-4 font-semibold text-app">{t('dashboard.packingProgress')}</h2>
         {totalItems > 0 && (
           <div className="space-y-3">
             {(['NOT_PACKED', 'PACKED', 'SEALED'] as PackingStatus[]).map((s) => (
               <div key={s}>
                 <div className="flex justify-between text-sm">
-                  <span className={cn('badge', STATUS_COLORS[s])}>{STATUS_LABELS[s]}</span>
+                  <span className={cn('badge', STATUS_COLORS[s])}>{t(STATUS_LABEL_KEYS[s])}</span>
                   <span className="text-muted">{statusGroups[s]} / {totalItems}</span>
                 </div>
                 <div className="mt-2 h-2 overflow-hidden rounded-full bg-black/10 dark:bg-white/10">
@@ -105,7 +107,7 @@ function Dashboard() {
 
       {/* Box status grid */}
       <div className="card p-6">
-        <h2 className="mb-4 font-semibold text-app">箱子狀態</h2>
+        <h2 className="mb-4 font-semibold text-app">{t('dashboard.boxStatus')}</h2>
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-6">
           {boxes?.map((box) => (
             <Link
@@ -118,7 +120,7 @@ function Dashboard() {
               )}
             >
               <span className="text-lg font-bold">{box.label}</span>
-              <span className="text-xs opacity-70">{STATUS_LABELS[box.status]}</span>
+              <span className="text-xs opacity-70">{t(STATUS_LABEL_KEYS[box.status])}</span>
               {(box.totalWeightG ?? 0) > 0 && (
                 <span className="mt-0.5 text-xs opacity-60">
                   {(box.totalWeightG! / 1000).toFixed(2).replace(/\.?0+$/, '')} kg

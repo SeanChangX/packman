@@ -138,7 +138,7 @@ Docker images are built on every push to `main` via [GitHub Actions](.github/wor
 
 ## Stickers & QR workflow
 
-1. **Print stickers** — Admin panel → 貼紙列印 → choose size and items/boxes → PDF
+1. **Print stickers** — Admin panel → Sticker Print → choose size and items/boxes → PDF
 2. **Stick before packing** — Each sticker has a QR code pointing at the item/box page
 3. **Scan on-site** — Open `/scan` on phone, point at a box sticker, get the checklist
 4. **Tick off items** — Mark each item PACKED / SEALED as you load it
@@ -158,9 +158,9 @@ Stickers include the brand logo (configurable in Admin → Settings → Brand) a
 
 Optional Ollama integration. Upload an item photo → background worker calls a local Ollama vision model → tags appear on the item record.
 
-- Set up one or more Ollama endpoints in **Admin → AI 辨識**
+- Set up one or more Ollama endpoints in **Admin → AI Recognition**
 - Pick a vision model (e.g. `llava`, `llama3.2-vision`)
-- Customize the Chinese tagging prompt (default works for general gear)
+- Customize the tagging prompt (default works for general gear)
 - Health checks + latency stats per endpoint, automatic failover
 
 Photos and tags are searchable from the items page. Re-tag any photo manually from its detail page.
@@ -171,7 +171,7 @@ Photos and tags are searchable from the items page. Re-tag any photo manually fr
 
 One Packman instance can run multiple events. Items, boxes, and batteries are scoped to the **active event**; switching events instantly changes what users see, without touching the data.
 
-- Admin → 活動管理 → create / rename / activate / delete
+- Admin → Events → create / rename / activate / delete
 - Same box label (e.g. "1") can exist in different events without conflict
 - Backups capture all events at once
 
@@ -179,7 +179,7 @@ One Packman instance can run multiple events. Items, boxes, and batteries are sc
 
 ## Backup & restore
 
-Admin → 匯出資料 → **完整備份**:
+Admin → Export → **Backup & Restore**:
 
 - Downloads `packman-backup-YYYY-MM-DD.zip` containing:
   - `data.json` — all events, items, boxes, batteries, users, groups, options, regulations, settings, Ollama endpoints
