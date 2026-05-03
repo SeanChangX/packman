@@ -54,8 +54,9 @@ Packing for an international robotics competition with 30+ people, 5 oversized b
 - **QR scan-on-site** — Open `/scan` on phone, point at sticker, jump to checklist
 - **Sticker printing** — PDF stickers in 4 sizes (50×30 mm to A4 sheet)
 - **Slack SSO** — Sign in with your team's private Slack workspace
-- **Per-event scoping** — One DB, many events (Eurobot 2025 / 2026 / …); active event switch
+- **Per-event scoping** — One DB, many events (Eurobot 2025 / 2026 / …); active event switch, optional per-event member list to gate sign-in and shorten owner pickers
 - **Full backup** — Database + photos exported as a single ZIP, restorable in one click
+- **Localized UI** — English / 繁體中文 with Light / Dark / System theme; dark mode by default
 
 <p align="right">— Made by SCX, originally for the <a href="https://github.com/DIT-ROBOTICS/">DIT Robotics</a> team.</p>
 
@@ -139,7 +140,7 @@ Docker images are built on every push to `main` via [GitHub Actions](.github/wor
 
 ## Stickers & QR workflow
 
-1. **Print stickers** — Admin panel → Sticker Print → choose size and items/boxes → PDF
+1. **Print stickers** — Main app → Stickers → choose size and items/boxes → PDF (single-box stickers also available from any box detail page)
 2. **Stick before packing** — Each sticker has a QR code pointing at the item/box page
 3. **Scan on-site** — Open `/scan` on phone, point at a box sticker, get the checklist
 4. **Tick off items** — Mark each item PACKED / SEALED as you load it
@@ -175,6 +176,16 @@ One Packman instance can run multiple events. Items, boxes, and batteries are sc
 - Admin → Events → create / rename / activate / delete
 - Same box label (e.g. "1") can exist in different events without conflict
 - Backups capture all events at once
+
+### Per-event user membership (optional)
+
+Each event can be restricted to a subset of users via **Admin → Events → Members**. When at least one member is selected:
+
+- Owner pickers across the web app only show event members (faster to scan with large rosters)
+- Slack sign-in is rejected for non-members with a clear error on the login page
+- Existing live sessions of removed users get cleared on their next request
+
+Events with **no members configured** are unrestricted (all users available, all may sign in).
 
 ---
 
