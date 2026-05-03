@@ -44,7 +44,7 @@ function AdminLogin() {
     <div className="app-shell flex min-h-screen flex-col items-center justify-center px-4 py-10">
       <div className="card w-full max-w-md p-7 sm:p-9">
         <div className="mb-6 flex justify-center">
-          <div className="flex h-16 w-16 items-center justify-center rounded-[24px] bg-brand-500 shadow-2xl shadow-red-500/30">
+          <div className="flex h-16 w-16 items-center justify-center rounded-[24px] bg-brand-500">
             <Package className="h-8 w-8 text-white" />
           </div>
         </div>

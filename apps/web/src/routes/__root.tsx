@@ -105,7 +105,7 @@ function Layout() {
     <div className="app-shell flex overflow-hidden">
       <aside className="glass-nav hidden h-[100dvh] w-64 shrink-0 flex-col overflow-hidden border-r md:flex">
         <Link to="/" className="flex items-center gap-3 border-b border-white/10 px-4 py-4 transition-colors hover:bg-white/5">
-          <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-brand-500 shadow-lg shadow-red-500/30">
+          <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-brand-500">
             <Package className="h-5 w-5 text-white" />
           </div>
           <div>
@@ -182,7 +182,7 @@ function Layout() {
       {!isScanPage && (
         <Link
           to="/scan"
-          className="fixed bottom-5 right-5 z-50 flex h-14 w-14 items-center justify-center rounded-2xl bg-brand-500 text-white shadow-2xl shadow-red-500/30 transition-transform hover:scale-105 active:scale-95 md:bottom-6 md:right-6"
+          className="fixed bottom-5 right-5 z-50 flex h-14 w-14 items-center justify-center rounded-2xl bg-brand-500 text-white transition-transform hover:scale-105 active:scale-95 md:bottom-6 md:right-6"
           title="掃描 QR Code"
         >
           <QrCode className="h-6 w-6" />

@@ -17,7 +17,7 @@ function Login() {
 
       <div className="login-card-enter login-icon-float login-card card relative z-10 w-full max-w-md p-7 text-center sm:p-9">
         <div className="mb-6 flex justify-center">
-          <div className="flex h-16 w-16 items-center justify-center rounded-[24px] bg-brand-500 shadow-2xl shadow-red-500/30">
+          <div className="flex h-16 w-16 items-center justify-center rounded-[24px] bg-brand-500">
             <Package className="h-8 w-8 text-white" />
           </div>
         </div>

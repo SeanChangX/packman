@@ -1,15 +1,23 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useState } from 'react'
-import { Save, ShieldCheck, Slack, Globe2, ImagePlus, Trash2 } from 'lucide-react'
+import { Save, ShieldCheck, Slack, Globe2, ImagePlus, Trash2, Sun, Moon, Monitor, Palette } from 'lucide-react'
 import { useToast } from '@packman/ui'
 import { adminApi } from '../lib/api'
+import { useTheme, type ThemePreference } from '../lib/theme-context'
+
+const themeOptions: { value: ThemePreference; label: string; icon: React.ElementType }[] = [
+  { value: 'light', label: '淺色', icon: Sun },
+  { value: 'dark', label: '深色', icon: Moon },
+  { value: 'system', label: '系統', icon: Monitor },
+]
 
 const MASKED_SECRET = '••••••••••••'
 
 function SettingsPage() {
   const qc = useQueryClient()
   const { showToast } = useToast()
+  const { preference, setPreference } = useTheme()
   const { data: settings, isLoading } = useQuery({
     queryKey: ['admin-settings'],
     queryFn: adminApi.settings,
@@ -139,6 +147,35 @@ function SettingsPage() {
 
       <section className="card p-5">
         <div className="mb-5 flex items-center gap-3">
+          <Palette className="h-5 w-5 text-brand-500" />
+          <div>
+            <h2 className="text-base font-bold text-app">外觀</h2>
+            <p className="text-sm text-muted">系統模式會跟隨裝置的深色 / 淺色設定</p>
+          </div>
+        </div>
+        <label className="label">主題</label>
+        <div className="mt-1 flex max-w-md rounded-2xl border border-black/10 bg-black/5 p-1 dark:border-white/10 dark:bg-white/5">
+          {themeOptions.map(({ value, label, icon: Icon }) => (
+            <button
+              key={value}
+              type="button"
+              onClick={() => setPreference(value)}
+              className={
+                'flex flex-1 items-center justify-center gap-1.5 rounded-xl px-3 py-2 text-sm font-semibold transition-colors ' +
+                (preference === value
+                  ? 'bg-brand-500 text-white'
+                  : 'text-muted hover:bg-white/40 dark:hover:bg-white/10')
+              }
+            >
+              <Icon className="h-4 w-4" />
+              {label}
+            </button>
+          ))}
+        </div>
+      </section>
+
+      <section className="card p-5">
+        <div className="mb-5 flex items-center gap-3">
           <Globe2 className="h-5 w-5 text-brand-500" />
           <div>
             <h2 className="text-base font-bold text-app">App URLs</h2>
@@ -255,7 +292,16 @@ function SettingsPage() {
             <span className="label">品牌 Logo</span>
             <div className="flex items-start gap-3">
               {brandLogoUrl ? (
-                <div className="flex h-24 w-24 items-center justify-center overflow-hidden rounded-lg border border-black/10 bg-black/5 dark:border-white/10 dark:bg-white/5">
+                <div
+                  className="flex h-24 w-24 items-center justify-center overflow-hidden rounded-lg border border-black/10 dark:border-white/10"
+                  style={{
+                    backgroundColor: '#a1a1aa',
+                    backgroundImage:
+                      'linear-gradient(45deg, rgba(255,255,255,0.55) 25%, transparent 25%), linear-gradient(-45deg, rgba(255,255,255,0.55) 25%, transparent 25%), linear-gradient(45deg, transparent 75%, rgba(255,255,255,0.55) 75%), linear-gradient(-45deg, transparent 75%, rgba(255,255,255,0.55) 75%)',
+                    backgroundSize: '12px 12px',
+                    backgroundPosition: '0 0, 0 6px, 6px -6px, -6px 0',
+                  }}
+                >
                   <img src={brandLogoUrl} alt="Brand logo" className="h-full w-full object-contain" />
                 </div>
               ) : (

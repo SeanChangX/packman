@@ -231,7 +231,7 @@ function StickersPage() {
             checked={selectedIds.size === list.length && list.length > 0}
             ref={(el) => { if (el) el.indeterminate = selectedIds.size > 0 && selectedIds.size < list.length }}
             onChange={toggleAll}
-            className="checkbox"
+            className="h-4 w-4 cursor-pointer accent-brand-500"
           />
           <span className="text-sm text-muted">
             已選 {selectedIds.size} / {list.length}
@@ -254,7 +254,7 @@ function StickersPage() {
                   checked={selectedIds.has(item.id)}
                   onChange={() => toggle(item.id)}
                   onClick={(e) => e.stopPropagation()}
-                  className="checkbox"
+                  className="h-4 w-4 cursor-pointer accent-brand-500"
                 />
                 <div className="flex-1">
                   <p className="font-medium">{isItem ? i.name : i.label}</p>

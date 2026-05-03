@@ -25,11 +25,11 @@ function AdminDashboard() {
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
         <StatCard label="用戶數" value={stats?.users ?? 0} color="text-brand-600" />
         <StatCard label="物品數" value={stats?.items ?? 0} color="text-app" />
-        <StatCard label="箱子數" value={stats?.boxes ?? 0} color="text-zinc-700 dark:text-zinc-200" />
+        <StatCard label="箱子數" value={stats?.boxes ?? 0} color="text-app" />
         <StatCard label="電池數" value={stats?.batteries ?? 0} color="text-brand-600" />
         <StatCard label="已打包物品" value={stats?.packedItems ?? 0} color="text-app" />
-        <StatCard label="已封箱" value={stats?.sealedBoxes ?? 0} color="text-zinc-700 dark:text-zinc-200" />
-        <StatCard label="組別數" value={stats?.groups ?? 0} color="text-muted" />
+        <StatCard label="已封箱" value={stats?.sealedBoxes ?? 0} color="text-app" />
+        <StatCard label="組別數" value={stats?.groups ?? 0} color="text-app" />
       </div>
     </div>
   )

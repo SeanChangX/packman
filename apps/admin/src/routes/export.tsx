@@ -85,7 +85,7 @@ function ExportPage() {
               <p className="mb-2 text-xs font-semibold text-muted">包含欄位</p>
               <div className="flex flex-wrap gap-1.5">
               {['品項名稱', '負責人', '組別', '箱子', '運送方式', '數量', '狀態', '標籤', '說明'].map((field) => (
-                <span key={field} className="rounded-full bg-white/5 px-2.5 py-1 text-[11px] text-app/80 ring-1 ring-white/10">
+                <span key={field} className="rounded-full bg-black/5 px-2.5 py-1 text-[11px] text-app/80 ring-1 ring-black/10 dark:bg-white/5 dark:ring-white/10">
                   {field}
                 </span>
               ))}
@@ -113,7 +113,7 @@ function ExportPage() {
               <p className="mb-2 text-xs font-semibold text-muted">包含欄位</p>
               <div className="flex flex-wrap gap-1.5">
               {['電池編號', '種類', '負責人', '說明'].map((field) => (
-                <span key={field} className="rounded-full bg-white/5 px-2.5 py-1 text-[11px] text-app/80 ring-1 ring-white/10">
+                <span key={field} className="rounded-full bg-black/5 px-2.5 py-1 text-[11px] text-app/80 ring-1 ring-black/10 dark:bg-white/5 dark:ring-white/10">
                   {field}
                 </span>
               ))}
@@ -147,8 +147,8 @@ function ExportPage() {
             disabled={importing}
             onClick={() => setPreserveSecrets((v) => !v)}
             className={[
-              'mb-3 flex w-full items-center justify-between gap-3 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-left transition-colors',
-              importing ? 'opacity-60' : 'hover:bg-white/[0.07]',
+              'mb-3 flex w-full items-center justify-between gap-3 rounded-2xl border border-black/10 bg-black/5 px-4 py-3 text-left transition-colors dark:border-white/10 dark:bg-white/5',
+              importing ? 'opacity-60' : 'hover:bg-black/[0.07] dark:hover:bg-white/[0.07]',
             ].join(' ')}
           >
             <span className="min-w-0 text-xs font-semibold text-app">
@@ -157,7 +157,7 @@ function ExportPage() {
             <span
               className={[
                 'relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors',
-                preserveSecrets ? 'bg-brand-500' : 'bg-white/15',
+                preserveSecrets ? 'bg-brand-500' : 'bg-zinc-300 dark:bg-white/15',
               ].join(' ')}
             >
               <span
