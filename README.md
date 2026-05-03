@@ -234,6 +234,27 @@ IMAGE_TAG=v1.0.0 docker compose up -d
 
 ---
 
+## Troubleshooting
+
+### Forgot the admin password
+
+There is no built-in password-reset flow (no email, no reset link). The admin credentials live in the `SystemSetting` table; deleting those rows puts the admin console back into "first-time setup" mode and you can choose a new username + password.
+
+```bash
+# 1. Back up the DB first
+docker compose exec -T postgres pg_dump -U "${POSTGRES_USER:-packman}" "${POSTGRES_DB:-packman}" > pre-reset-backup.sql
+
+# 2. Drop the admin credentials
+docker compose exec -T postgres psql -U "${POSTGRES_USER:-packman}" -d "${POSTGRES_DB:-packman}" \
+  -c "DELETE FROM \"SystemSetting\" WHERE key IN ('admin.username', 'admin.passwordHash') RETURNING key;"
+
+# 3. Reload the admin URL — it now shows the setup form again
+```
+
+Nothing else is touched: events, items, boxes, batteries, users, groups, Slack OAuth, brand, Ollama endpoints, JWT/cookie secrets, and existing user sessions all survive. Only the admin login is reset.
+
+---
+
 ## License
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)

@@ -234,6 +234,27 @@ IMAGE_TAG=v1.0.0 docker compose up -d
 
 ---
 
+## 疑難排解
+
+### 忘記 admin 密碼
+
+系統沒有內建「重設密碼」流程（沒有 email、沒有 reset link）。admin 帳密存在 `SystemSetting` 表，把對應的兩列刪掉，後台會回到「初次設定」模式，可重新建立使用者名稱與密碼。
+
+```bash
+# 1. 先備份資料庫
+docker compose exec -T postgres pg_dump -U "${POSTGRES_USER:-packman}" "${POSTGRES_DB:-packman}" > pre-reset-backup.sql
+
+# 2. 刪掉 admin 帳密
+docker compose exec -T postgres psql -U "${POSTGRES_USER:-packman}" -d "${POSTGRES_DB:-packman}" \
+  -c "DELETE FROM \"SystemSetting\" WHERE key IN ('admin.username', 'admin.passwordHash') RETURNING key;"
+
+# 3. 重新整理管理後台網址 — 會再次顯示初次設定表單
+```
+
+其他資料完全不動：所有活動、物品、箱子、電池、使用者、組別、Slack OAuth、品牌設定、Ollama 端點、JWT / cookie secret、現有使用者 session 全部保留。只有 admin 帳號被重設。
+
+---
+
 ## 授權
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
