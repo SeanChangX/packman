@@ -9,7 +9,11 @@ type ExtendedTrackConstraintSet = MediaTrackConstraintSet & { torch?: boolean; f
 type Html5QrcodeModule = typeof import('html5-qrcode')
 type Html5QrcodeInstance = InstanceType<Html5QrcodeModule['Html5Qrcode']>
 
-type DetectedBarcode = { rawValue: string }
+type DetectedBarcode = {
+  rawValue: string
+  boundingBox?: { x: number; y: number; width: number; height: number }
+  cornerPoints?: { x: number; y: number }[]
+}
 type BarcodeDetectorInstance = { detect: (source: CanvasImageSource) => Promise<DetectedBarcode[]> }
 type BarcodeDetectorCtor = new (options?: { formats?: string[] }) => BarcodeDetectorInstance
 type BarcodeDetectorStatic = BarcodeDetectorCtor & { getSupportedFormats?: () => Promise<string[]> }
@@ -31,6 +35,31 @@ function buildVideoConstraints(deviceId?: string): MediaTrackConstraints {
     height: { ideal: 1080 },
     advanced: advanced as MediaTrackConstraintSet[],
   }
+}
+
+// When multiple QR codes appear in the frame (e.g. a sticker sheet), prefer the
+// one whose centroid sits closest to the video centre — that's what the user
+// is aiming the viewfinder at. Fall back to the first detected code if no
+// boundingBox is provided by the implementation.
+function pickCenterMostCode(codes: DetectedBarcode[], width: number, height: number): DetectedBarcode | null {
+  if (codes.length === 0) return null
+  if (codes.length === 1) return codes[0]
+  const cx = width / 2
+  const cy = height / 2
+  let best: DetectedBarcode | null = null
+  let bestDist = Infinity
+  for (const code of codes) {
+    const bb = code.boundingBox
+    if (!bb) continue
+    const dx = bb.x + bb.width / 2 - cx
+    const dy = bb.y + bb.height / 2 - cy
+    const dist = dx * dx + dy * dy
+    if (dist < bestDist) {
+      bestDist = dist
+      best = code
+    }
+  }
+  return best ?? codes[0]
 }
 
 async function detectNativeSupport(): Promise<boolean> {
@@ -107,8 +136,9 @@ async function startNativeScanner(
       busy = true
       try {
         const codes = await detector.detect(video)
-        if (!stopped && codes.length > 0 && codes[0].rawValue) {
-          onDecoded(codes[0].rawValue)
+        const best = pickCenterMostCode(codes, video.videoWidth, video.videoHeight)
+        if (!stopped && best?.rawValue) {
+          onDecoded(best.rawValue)
         }
       } catch {
         // Frame decode failure (motion blur, partial frame); next tick will retry.
@@ -429,16 +459,21 @@ function ScanPage() {
         try { scanner.clear() } catch { /* harmless if not started */ }
       }
       handleDecodedText(decodedText)
-    } catch {
-      // No QR detected in image — show transient notice without disturbing live scanner.
+    } catch (err) {
+      // Surface the actual error so deployment-specific failures (e.g. the
+      // html5-qrcode chunk failing to load behind a CDN) are visible instead
+      // of being masked as "no QR detected".
+      console.error('[scan] image decode failed', err)
+      const raw = err instanceof Error ? err.message : String(err ?? '')
+      const isLoadFailure = /failed to fetch dynamically imported module|loading chunk|importscripts|networkerror/i.test(raw)
       lastInvalidTextRef.current = ''
       lastInvalidAtRef.current = performance.now()
-      setInvalidNotice(t('scan.invalid.image'))
+      setInvalidNotice(isLoadFailure ? `${t('scan.invalid.image')}: ${raw}` : t('scan.invalid.image'))
       if (invalidTimerRef.current !== null) window.clearTimeout(invalidTimerRef.current)
       invalidTimerRef.current = window.setTimeout(() => {
         setInvalidNotice('')
         invalidTimerRef.current = null
-      }, 2200)
+      }, 4000)
     }
   }
 
