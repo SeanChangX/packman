@@ -183,7 +183,7 @@
 管理後台 → 匯出資料 → **備份與還原**：
 
 - 下載 `packman-backup-YYYY-MM-DD.zip`，內含：
-  - `data.json` — 所有活動、物品、箱子、電池、用戶、組別、選項、規定、設定、Ollama 端點
+  - `data.json` — 所有活動、物品、箱子、電池、用戶、組別、活動成員、選項、規定、設定、Ollama 端點
   - `photos/` — MinIO 中所有照片（物品照片 + 品牌 logo）
 - **還原** 上傳同一個 ZIP：在 transaction 內清空現有資料後完整覆蓋，照片也會一併重新上傳
 - 還原前會驗證 ZIP magic bytes、版本（1.x）、必要欄位，照片只接受白名單副檔名（jpg / png / webp / gif / heic）

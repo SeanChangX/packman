@@ -417,7 +417,7 @@ export async function adminRoutes(app: FastifyInstance) {
   })
 
   app.get('/export/backup', async (request, reply) => {
-    const [events, activeEventId, items, boxes, batteries, groups, users, selectOptions, batteryRegulations, systemSettings, ollamaEndpoints] = await Promise.all([
+    const [events, activeEventId, items, boxes, batteries, groups, users, eventMembers, selectOptions, batteryRegulations, systemSettings, ollamaEndpoints] = await Promise.all([
       prisma.event.findMany({ orderBy: { createdAt: 'asc' } }),
       getActiveEventId().catch(() => null),
       prisma.item.findMany({ orderBy: { createdAt: 'asc' } }),
@@ -425,13 +425,14 @@ export async function adminRoutes(app: FastifyInstance) {
       prisma.battery.findMany({ orderBy: { batteryId: 'asc' } }),
       prisma.group.findMany({ orderBy: { name: 'asc' } }),
       prisma.user.findMany({ orderBy: { name: 'asc' } }),
+      prisma.eventMember.findMany({ orderBy: [{ eventId: 'asc' }, { userId: 'asc' }] }),
       prisma.selectOption.findMany({ orderBy: [{ type: 'asc' }, { sortOrder: 'asc' }] }),
       prisma.batteryRegulation.findMany({ orderBy: { sortOrder: 'asc' } }),
       prisma.systemSetting.findMany(),
       prisma.ollamaEndpoint.findMany({ orderBy: { createdAt: 'asc' } }),
     ])
 
-    const data = { exportedAt: new Date().toISOString(), version: '1.2', activeEventId, events, items, boxes, batteries, groups, users, selectOptions, batteryRegulations, systemSettings, ollamaEndpoints }
+    const data = { exportedAt: new Date().toISOString(), version: '1.3', activeEventId, events, items, boxes, batteries, groups, users, eventMembers, selectOptions, batteryRegulations, systemSettings, ollamaEndpoints }
     const date = new Date().toISOString().slice(0, 10)
 
     // Stream the archive directly to the client. zlib level 0 (store) avoids
@@ -563,6 +564,9 @@ export async function adminRoutes(app: FastifyInstance) {
           if (Array.isArray(payload.events)) await tx.event.createMany({ data: payload.events, skipDuplicates: true })
           if (Array.isArray(payload.groups)) await tx.group.createMany({ data: payload.groups, skipDuplicates: true })
           if (Array.isArray(payload.users)) await tx.user.createMany({ data: payload.users, skipDuplicates: true })
+          // EventMember restored after both events and users are present (FKs to both).
+          // Older backups (version < 1.3) don't include this field; skipped silently.
+          if (Array.isArray(payload.eventMembers)) await tx.eventMember.createMany({ data: payload.eventMembers, skipDuplicates: true })
           if (Array.isArray(payload.boxes)) await tx.box.createMany({ data: payload.boxes, skipDuplicates: true })
           if (Array.isArray(payload.items)) await tx.item.createMany({ data: payload.items, skipDuplicates: true })
           if (Array.isArray(payload.batteries)) await tx.battery.createMany({ data: payload.batteries, skipDuplicates: true })

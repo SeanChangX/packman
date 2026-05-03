@@ -183,7 +183,7 @@ One Packman instance can run multiple events. Items, boxes, and batteries are sc
 Admin → Export → **Backup & Restore**:
 
 - Downloads `packman-backup-YYYY-MM-DD.zip` containing:
-  - `data.json` — all events, items, boxes, batteries, users, groups, options, regulations, settings, Ollama endpoints
+  - `data.json` — all events, items, boxes, batteries, users, groups, event memberships, options, regulations, settings, Ollama endpoints
   - `photos/` — every photo in MinIO (item photos + brand logo)
 - **Restore** uploads the same ZIP back: wipes current data inside a transaction, then re-imports everything including photos
 - Validates ZIP magic bytes, version (1.x), required fields, and only allows whitelisted photo extensions (jpg/png/webp/gif/heic)
