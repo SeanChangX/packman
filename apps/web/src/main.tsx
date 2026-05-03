@@ -44,26 +44,3 @@ if ('serviceWorker' in navigator && import.meta.env.PROD) {
     navigator.serviceWorker.register('/sw.js').catch(() => undefined)
   })
 }
-
-// Eruda mobile DevTools — opt-in only via ?debug=1 (sticky in localStorage so
-// it survives navigation). Loaded from CDN at runtime so it ships zero bytes
-// to ordinary visitors. Use ?debug=0 to turn it off again.
-{
-  try {
-    const url = new URL(window.location.href)
-    const flag = url.searchParams.get('debug')
-    if (flag === '1') localStorage.setItem('packman:debug', '1')
-    if (flag === '0') localStorage.removeItem('packman:debug')
-    if (localStorage.getItem('packman:debug') === '1') {
-      const script = document.createElement('script')
-      script.src = 'https://cdn.jsdelivr.net/npm/eruda@3'
-      script.onload = () => {
-        const eruda = (window as unknown as { eruda?: { init: () => void } }).eruda
-        eruda?.init()
-      }
-      document.head.appendChild(script)
-    }
-  } catch {
-    // localStorage / URL parsing unavailable; debug flag is optional, skip silently.
-  }
-}

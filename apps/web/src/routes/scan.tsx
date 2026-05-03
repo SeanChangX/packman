@@ -185,9 +185,7 @@ async function startNativeScanner(
 // Fallback decoder for browsers without BarcodeDetector (notably iOS Safari and
 // desktop Linux Chrome). Drives the same <video> element as the native path,
 // then samples a centred square crop into an offscreen canvas every frame and
-// feeds the ImageData to jsQR. Replacing html5-qrcode with this fixes silent
-// decode failures we hit on iOS where html5-qrcode's internal ZXing wrapper
-// never produced a result regardless of QR size, lighting, or distance.
+// feeds the ImageData to jsQR.
 async function startJsqrScanner(
   video: HTMLVideoElement,
   onDecoded: (text: string) => void,
@@ -211,13 +209,6 @@ async function startJsqrScanner(
     try { stream.getTracks().forEach((t) => t.stop()) } catch { /* tracks already ended */ }
     try { video.srcObject = null } catch { /* element detached */ }
     throw err
-  }
-
-  if (typeof window !== 'undefined' && localStorage.getItem('packman:debug') === '1') {
-    try {
-      const track = stream.getVideoTracks()[0]
-      console.log('[scan] track settings:', track?.getSettings?.())
-    } catch { /* settings unavailable */ }
   }
 
   const canvas = document.createElement('canvas')
