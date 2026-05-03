@@ -1,41 +1,198 @@
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Camera, ImageUp, RefreshCcw } from 'lucide-react'
+import { Camera, Flashlight, FlashlightOff, ImageUp, RefreshCcw } from 'lucide-react'
 
-type Html5QrcodeCtor = new (elementId: string) => {
-  start: (
-    cameraIdOrConfig: string | { facingMode: string | { ideal: string } },
-    config: {
-      fps: number
-      qrbox: { width: number; height: number } | ((viewfinderWidth: number, viewfinderHeight: number) => { width: number; height: number })
-      aspectRatio?: number
-      disableFlip?: boolean
-    },
-    onSuccess: (decodedText: string) => void,
-    onError?: () => void,
-  ) => Promise<void>
-  pause: (shouldPauseVideo?: boolean) => void
+type ExtendedTrackCapabilities = MediaTrackCapabilities & { torch?: boolean; focusMode?: string[] }
+type ExtendedTrackConstraintSet = MediaTrackConstraintSet & { torch?: boolean; focusMode?: string }
+
+type Html5QrcodeModule = typeof import('html5-qrcode')
+type Html5QrcodeInstance = InstanceType<Html5QrcodeModule['Html5Qrcode']>
+
+type DetectedBarcode = { rawValue: string }
+type BarcodeDetectorInstance = { detect: (source: CanvasImageSource) => Promise<DetectedBarcode[]> }
+type BarcodeDetectorCtor = new (options?: { formats?: string[] }) => BarcodeDetectorInstance
+type BarcodeDetectorStatic = BarcodeDetectorCtor & { getSupportedFormats?: () => Promise<string[]> }
+
+type ScannerHandle = {
   stop: () => Promise<void>
-  clear: () => void
-  scanFile: (file: File, showImage?: boolean) => Promise<string>
+  applyTorch: (on: boolean) => Promise<void>
+  isTorchSupported: () => boolean
 }
 
-interface Html5QrcodeModule {
-  Html5Qrcode: Html5QrcodeCtor & {
-    getCameras: () => Promise<Array<{ id: string; label: string }>>
+const SCANNER_FALLBACK_ID = 'qr-scanner-fallback'
+const FILE_SCANNER_ID = 'qr-file-scan'
+
+function buildVideoConstraints(deviceId?: string): MediaTrackConstraints {
+  const advanced: ExtendedTrackConstraintSet[] = [{ focusMode: 'continuous' }]
+  return {
+    ...(deviceId ? { deviceId: { exact: deviceId } } : { facingMode: { ideal: 'environment' } }),
+    width: { ideal: 1920 },
+    height: { ideal: 1080 },
+    advanced: advanced as MediaTrackConstraintSet[],
   }
 }
 
-const SCANNER_ID = 'qr-scanner'
-const SCAN_CONFIG = {
-  fps: 15,
-  qrbox: (viewfinderWidth: number, viewfinderHeight: number) => {
-    const minEdge = Math.min(viewfinderWidth, viewfinderHeight)
-    const size = Math.floor(Math.min(Math.max(minEdge * 0.82, 280), 420))
-    return { width: size, height: size }
-  },
-  aspectRatio: 1,
-  disableFlip: true,
+async function detectNativeSupport(): Promise<boolean> {
+  const ctor = (window as unknown as { BarcodeDetector?: BarcodeDetectorStatic }).BarcodeDetector
+  if (!ctor) return false
+  try {
+    const formats = (await ctor.getSupportedFormats?.()) ?? []
+    return formats.includes('qr_code')
+  } catch {
+    return false
+  }
+}
+
+let sharedAudioCtx: AudioContext | null = null
+function playBeep() {
+  try {
+    const Ctx = window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext
+    if (!Ctx) return
+    sharedAudioCtx = sharedAudioCtx ?? new Ctx()
+    if (sharedAudioCtx.state === 'suspended') void sharedAudioCtx.resume()
+    const osc = sharedAudioCtx.createOscillator()
+    const gain = sharedAudioCtx.createGain()
+    osc.connect(gain).connect(sharedAudioCtx.destination)
+    osc.type = 'sine'
+    osc.frequency.value = 880
+    const t0 = sharedAudioCtx.currentTime
+    gain.gain.setValueAtTime(0.0001, t0)
+    gain.gain.exponentialRampToValueAtTime(0.18, t0 + 0.01)
+    gain.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.16)
+    osc.start(t0)
+    osc.stop(t0 + 0.18)
+  } catch {
+    // Audio output unavailable (autoplay policy, no audio device); ignore.
+  }
+}
+
+function feedbackOnScan() {
+  if (typeof navigator.vibrate === 'function') {
+    try { navigator.vibrate(50) } catch { /* unsupported */ }
+  }
+  playBeep()
+}
+
+async function startNativeScanner(
+  video: HTMLVideoElement,
+  onDecoded: (text: string) => void,
+): Promise<ScannerHandle> {
+  const stream = await navigator.mediaDevices.getUserMedia({
+    video: buildVideoConstraints(),
+    audio: false,
+  })
+
+  try {
+    video.srcObject = stream
+    video.setAttribute('playsinline', 'true')
+    video.muted = true
+    await video.play()
+  } catch (err) {
+    // play() can reject before any frame plays (e.g. element detached, autoplay rejection); release the stream.
+    try { stream.getTracks().forEach((t) => t.stop()) } catch { /* tracks already ended */ }
+    try { video.srcObject = null } catch { /* element detached */ }
+    throw err
+  }
+
+  const Ctor = (window as unknown as { BarcodeDetector: BarcodeDetectorCtor }).BarcodeDetector
+  const detector = new Ctor({ formats: ['qr_code'] })
+
+  let stopped = false
+  let busy = false
+
+  const tick = async () => {
+    if (stopped) return
+    if (!busy && video.readyState >= 2) {
+      busy = true
+      try {
+        const codes = await detector.detect(video)
+        if (!stopped && codes.length > 0 && codes[0].rawValue) {
+          onDecoded(codes[0].rawValue)
+        }
+      } catch {
+        // Frame decode failure (motion blur, partial frame); next tick will retry.
+      } finally {
+        busy = false
+      }
+    }
+    if (stopped) return
+    const v = video as HTMLVideoElement & { requestVideoFrameCallback?: (cb: () => void) => number }
+    if (typeof v.requestVideoFrameCallback === 'function') {
+      v.requestVideoFrameCallback(() => void tick())
+    } else {
+      requestAnimationFrame(() => void tick())
+    }
+  }
+  void tick()
+
+  const track = stream.getVideoTracks()[0] ?? null
+  const caps = (track?.getCapabilities?.() as ExtendedTrackCapabilities | undefined) ?? {}
+  const torchSupported = caps.torch === true
+
+  return {
+    stop: async () => {
+      stopped = true
+      try { stream.getTracks().forEach((t) => t.stop()) } catch { /* track already ended */ }
+      try { video.srcObject = null } catch { /* element detached */ }
+    },
+    applyTorch: async (on) => {
+      if (!track) return
+      await track.applyConstraints({
+        advanced: [{ torch: on } as ExtendedTrackConstraintSet] as MediaTrackConstraintSet[],
+      })
+    },
+    isTorchSupported: () => torchSupported,
+  }
+}
+
+async function startHtml5Scanner(
+  containerId: string,
+  onDecoded: (text: string) => void,
+  moduleRef: { current: Html5QrcodeModule | null },
+): Promise<{ handle: ScannerHandle; instance: Html5QrcodeInstance }> {
+  const html5Module = moduleRef.current ?? (await import('html5-qrcode'))
+  moduleRef.current = html5Module
+
+  const scanner = new html5Module.Html5Qrcode(containerId, {
+    formatsToSupport: [html5Module.Html5QrcodeSupportedFormats.QR_CODE],
+    verbose: false,
+  })
+  const cameras = await html5Module.Html5Qrcode.getCameras().catch(() => [])
+  const preferred = cameras.find((c) => /back|rear|environment|後|背/i.test(c.label)) ?? cameras[0]
+
+  await scanner.start(
+    preferred?.id ?? { facingMode: { ideal: 'environment' } },
+    {
+      fps: 15,
+      // Skip html5-qrcode's built-in qrbox so it doesn't draw its own L-corners and scan line on top of our overlay.
+      videoConstraints: buildVideoConstraints(preferred?.id),
+      disableFlip: true,
+    },
+    onDecoded,
+    undefined,
+  )
+
+  let torchSupported = false
+  try {
+    const caps = scanner.getRunningTrackCapabilities() as ExtendedTrackCapabilities | undefined
+    torchSupported = caps?.torch === true
+  } catch { /* capability unsupported on this browser */ }
+
+  return {
+    instance: scanner,
+    handle: {
+      stop: async () => {
+        try { await scanner.stop() } catch { /* not fully started */ }
+        try { scanner.clear() } catch { /* partial startup */ }
+      },
+      applyTorch: async (on) => {
+        await scanner.applyVideoConstraints({
+          advanced: [{ torch: on } as ExtendedTrackConstraintSet] as MediaTrackConstraintSet[],
+        })
+      },
+      isTorchSupported: () => torchSupported,
+    },
+  }
 }
 
 function scanErrorMessage(err: unknown) {
@@ -76,63 +233,112 @@ function routeFromQr(decodedText: string) {
   return null
 }
 
+const SCAN_STYLES = `
+#${SCANNER_FALLBACK_ID} video {
+  object-fit: cover !important;
+  width: 100% !important;
+  height: 100% !important;
+}
+`
+
 function ScanPage() {
   const navigate = useNavigate()
-  const scannerRef = useRef<InstanceType<Html5QrcodeCtor> | null>(null)
+  const videoRef = useRef<HTMLVideoElement | null>(null)
+  const handleRef = useRef<ScannerHandle | null>(null)
+  const html5InstanceRef = useRef<Html5QrcodeInstance | null>(null)
   const html5ModuleRef = useRef<Html5QrcodeModule | null>(null)
+  const runIdRef = useRef(0)
+  const hasScannedRef = useRef(false)
+  const lastInvalidTextRef = useRef('')
+  const lastInvalidAtRef = useRef(0)
+  const invalidTimerRef = useRef<number | null>(null)
+  const successTimerRef = useRef<number | null>(null)
+
   const [error, setError] = useState('')
   const [status, setStatus] = useState('啟動相機中...')
   const [isScanning, setIsScanning] = useState(false)
   const [retryKey, setRetryKey] = useState(0)
-  const runIdRef = useRef(0)
-  const hasScannedRef = useRef(false)
+  const [torchSupported, setTorchSupported] = useState(false)
+  const [torchOn, setTorchOn] = useState(false)
+  const [engine, setEngine] = useState<'native' | 'html5' | null>(null)
+  const [invalidNotice, setInvalidNotice] = useState('')
+  const [successFlash, setSuccessFlash] = useState(false)
 
-  const stopScanner = useCallback(async (scanner = scannerRef.current) => {
-    if (!scanner) return
-    if (scannerRef.current === scanner) scannerRef.current = null
-
-    try {
-      await scanner.stop()
-    } catch {
-      // stop() rejects when the scanner never fully started.
+  const stopAll = useCallback(async () => {
+    if (invalidTimerRef.current !== null) {
+      window.clearTimeout(invalidTimerRef.current)
+      invalidTimerRef.current = null
     }
-
-    try {
-      scanner.clear()
-    } catch {
-      // clear() can fail after partial startup; a retry will recreate the instance.
+    if (successTimerRef.current !== null) {
+      window.clearTimeout(successTimerRef.current)
+      successTimerRef.current = null
+    }
+    setInvalidNotice('')
+    setSuccessFlash(false)
+    setTorchSupported(false)
+    setTorchOn(false)
+    const handle = handleRef.current
+    handleRef.current = null
+    html5InstanceRef.current = null
+    if (handle) {
+      try { await handle.stop() } catch { /* idempotent */ }
     }
   }, [])
+
+  const toggleTorch = useCallback(async () => {
+    const handle = handleRef.current
+    if (!handle) return
+    const next = !torchOn
+    try {
+      await handle.applyTorch(next)
+      setTorchOn(next)
+    } catch {
+      setTorchSupported(false)
+    }
+  }, [torchOn])
 
   const handleDecodedText = useCallback((decodedText: string) => {
     if (hasScannedRef.current) return
 
     const route = routeFromQr(decodedText)
     if (!route) {
-      setError('這不是 Packman 的箱子或物品 QR Code')
+      // Invalid Packman QR — keep scanner alive and show a transient toast.
+      // Dedup: same text within 2s does not re-trigger to avoid per-frame spam.
+      const now = performance.now()
+      const sameText = decodedText === lastInvalidTextRef.current
+      if (sameText && now - lastInvalidAtRef.current < 2000) return
+
+      lastInvalidTextRef.current = decodedText
+      lastInvalidAtRef.current = now
+      setInvalidNotice('這不是 Packman 的箱子或物品 QR Code')
+      if (invalidTimerRef.current !== null) window.clearTimeout(invalidTimerRef.current)
+      invalidTimerRef.current = window.setTimeout(() => {
+        setInvalidNotice('')
+        invalidTimerRef.current = null
+      }, 2200)
       return
     }
 
     hasScannedRef.current = true
-    setIsScanning(false)
+    feedbackOnScan()
+    setSuccessFlash(true)
     setStatus('已掃描，正在開啟...')
 
-    const scanner = scannerRef.current
-    try {
-      scanner?.pause(true)
-    } catch {
-      // pause() can fail if the scanner is already stopping; stopScanner handles cleanup.
-    }
+    const instance = html5InstanceRef.current
+    try { instance?.pause(true) } catch { /* already stopping */ }
 
-    void navigate(route)
-    void stopScanner(scanner)
-  }, [navigate, stopScanner])
+    successTimerRef.current = window.setTimeout(() => {
+      successTimerRef.current = null
+      void navigate(route)
+      void stopAll()
+    }, 400)
+  }, [navigate, stopAll])
 
   useEffect(() => {
     let cancelled = false
     const runId = ++runIdRef.current
 
-    const startScanner = async () => {
+    const start = async () => {
       setError('')
       setStatus('啟動相機中...')
       setIsScanning(false)
@@ -143,7 +349,6 @@ function ScanPage() {
         setStatus('')
         return
       }
-
       if (!navigator.mediaDevices?.getUserMedia) {
         setError('此瀏覽器不支援相機掃描')
         setStatus('')
@@ -151,85 +356,158 @@ function ScanPage() {
       }
 
       try {
-        const html5Module = html5ModuleRef.current ?? (await import('html5-qrcode') as Html5QrcodeModule)
-        html5ModuleRef.current = html5Module
+        const useNative = await detectNativeSupport()
 
-        const scanner = new html5Module.Html5Qrcode(SCANNER_ID)
-        scannerRef.current = scanner
+        if (useNative && videoRef.current) {
+          try {
+            const handle = await startNativeScanner(videoRef.current, handleDecodedText)
+            if (cancelled || runIdRef.current !== runId) {
+              await handle.stop()
+              return
+            }
+            handleRef.current = handle
+            setEngine('native')
+            setIsScanning(true)
+            setStatus('對準箱子或物品上的 QR Code')
+            setTorchSupported(handle.isTorchSupported())
+            return
+          } catch (nativeErr) {
+            if (cancelled || runIdRef.current !== runId) return
+            // Permission errors should surface, not silently fall back to a doomed engine.
+            const msg = nativeErr instanceof Error ? nativeErr.message.toLowerCase() : ''
+            if (msg.includes('notallowed') || msg.includes('permission') || msg.includes('denied')) {
+              throw nativeErr
+            }
+            // Otherwise fall through to html5-qrcode (e.g. transient detect failure).
+          }
+        }
 
-        const cameras = await html5Module.Html5Qrcode.getCameras().catch(() => [])
-        const preferredCamera = cameras.find((camera) => /back|rear|environment|後|背/i.test(camera.label)) ?? cameras[0]
-
+        const { handle, instance } = await startHtml5Scanner(SCANNER_FALLBACK_ID, handleDecodedText, html5ModuleRef)
         if (cancelled || runIdRef.current !== runId) {
-          await stopScanner(scanner)
+          await handle.stop()
           return
         }
-
-        await scanner.start(
-          preferredCamera?.id ?? { facingMode: { ideal: 'environment' } },
-          SCAN_CONFIG,
-          handleDecodedText,
-          undefined,
-        )
-
-        if (!cancelled && runIdRef.current === runId) {
-          setIsScanning(true)
-          setStatus('對準箱子或物品上的 QR Code')
-        } else {
-          await stopScanner(scanner)
-        }
+        handleRef.current = handle
+        html5InstanceRef.current = instance
+        setEngine('html5')
+        setIsScanning(true)
+        setStatus('對準箱子或物品上的 QR Code')
+        setTorchSupported(handle.isTorchSupported())
       } catch (err) {
         if (!cancelled && runIdRef.current === runId) {
           setError(scanErrorMessage(err))
           setStatus('')
           setIsScanning(false)
-          await stopScanner()
+          await stopAll()
         }
       }
     }
 
-    void startScanner()
+    void start()
     return () => {
       cancelled = true
-      void stopScanner()
+      void stopAll()
     }
-  }, [handleDecodedText, retryKey, stopScanner])
+  }, [handleDecodedText, retryKey, stopAll])
 
   const scanImage = async (file: File | undefined) => {
     if (!file) return
 
     try {
-      setError('')
-      setStatus('讀取圖片中...')
-      await stopScanner()
-      const html5Module = html5ModuleRef.current ?? (await import('html5-qrcode') as Html5QrcodeModule)
+      const html5Module = html5ModuleRef.current ?? (await import('html5-qrcode'))
       html5ModuleRef.current = html5Module
-      const scanner = scannerRef.current ?? new html5Module.Html5Qrcode(SCANNER_ID)
-      scannerRef.current = scanner
-      const decodedText = await scanner.scanFile(file, false)
+      const scanner = new html5Module.Html5Qrcode(FILE_SCANNER_ID, {
+        formatsToSupport: [html5Module.Html5QrcodeSupportedFormats.QR_CODE],
+        verbose: false,
+      })
+      let decodedText: string
+      try {
+        decodedText = await scanner.scanFile(file, false)
+      } finally {
+        try { scanner.clear() } catch { /* harmless if not started */ }
+      }
       handleDecodedText(decodedText)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : '無法辨識圖片中的 QR Code')
-      setStatus('')
+    } catch {
+      // No QR detected in image — show transient notice without disturbing live scanner.
+      lastInvalidTextRef.current = ''
+      lastInvalidAtRef.current = performance.now()
+      setInvalidNotice('圖片中沒有可辨識的 QR Code')
+      if (invalidTimerRef.current !== null) window.clearTimeout(invalidTimerRef.current)
+      invalidTimerRef.current = window.setTimeout(() => {
+        setInvalidNotice('')
+        invalidTimerRef.current = null
+      }, 2200)
     }
   }
 
   return (
     <div className="mx-auto max-w-md space-y-6">
+      <style>{SCAN_STYLES}</style>
+
       <div className="text-center">
         <h1 className="text-2xl font-bold">掃描 QR Code</h1>
         <p className="page-subtitle">掃描箱子或物品上的 QR Code</p>
       </div>
 
-      <div className="card overflow-hidden">
-        <div id={SCANNER_ID} className="min-h-[18rem] w-full overflow-hidden" />
-        {!isScanning && !error && (
-          <div className="flex flex-col items-center justify-center gap-3 py-16 text-muted">
-            <Camera className="h-12 w-12" />
-            <p className="text-sm">{status}</p>
-          </div>
-        )}
+      <div className={`card overflow-hidden ${error ? 'hidden' : ''}`}>
+        <div className="relative aspect-square w-full overflow-hidden bg-black">
+          {/* Native engine renders into this video element. */}
+          <video
+            ref={videoRef}
+            className={`absolute inset-0 h-full w-full object-cover ${engine === 'native' ? '' : 'hidden'}`}
+            playsInline
+            muted
+          />
+          {/* html5-qrcode injects its own video into this container. Always rendered so the library can read its dimensions on start(). */}
+          <div id={SCANNER_FALLBACK_ID} className="absolute inset-0 h-full w-full" />
+
+          {(isScanning || successFlash) && (
+            <div className="pointer-events-none absolute inset-0">
+              <div
+                className="absolute left-1/2 top-1/2 aspect-square w-[70%] -translate-x-1/2 -translate-y-1/2 rounded-2xl"
+                style={{ boxShadow: '0 0 0 9999px rgba(0,0,0,0.5)' }}
+              >
+                <span
+                  className={`absolute left-0 top-0 h-7 w-7 rounded-tl-2xl border-l-2 border-t-2 transition-all duration-150 ${successFlash ? 'border-brand-500' : 'border-white'}`}
+                  style={successFlash ? { filter: 'drop-shadow(0 0 8px rgba(222,39,44,0.95))' } : undefined}
+                />
+                <span
+                  className={`absolute right-0 top-0 h-7 w-7 rounded-tr-2xl border-r-2 border-t-2 transition-all duration-150 ${successFlash ? 'border-brand-500' : 'border-white'}`}
+                  style={successFlash ? { filter: 'drop-shadow(0 0 8px rgba(222,39,44,0.95))' } : undefined}
+                />
+                <span
+                  className={`absolute bottom-0 left-0 h-7 w-7 rounded-bl-2xl border-b-2 border-l-2 transition-all duration-150 ${successFlash ? 'border-brand-500' : 'border-white'}`}
+                  style={successFlash ? { filter: 'drop-shadow(0 0 8px rgba(222,39,44,0.95))' } : undefined}
+                />
+                <span
+                  className={`absolute bottom-0 right-0 h-7 w-7 rounded-br-2xl border-b-2 border-r-2 transition-all duration-150 ${successFlash ? 'border-brand-500' : 'border-white'}`}
+                  style={successFlash ? { filter: 'drop-shadow(0 0 8px rgba(222,39,44,0.95))' } : undefined}
+                />
+              </div>
+            </div>
+          )}
+
+          {!isScanning && !error && (
+            <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 text-white/80">
+              <Camera className="h-12 w-12" />
+              <p className="text-sm">{status}</p>
+            </div>
+          )}
+        </div>
       </div>
+
+      {invalidNotice && !error && (
+        <div className="rounded-2xl border border-brand-500/20 bg-brand-500/10 p-4 text-center text-sm text-brand-500">
+          <p className="font-semibold">{invalidNotice}</p>
+        </div>
+      )}
+
+      {isScanning && torchSupported && (
+        <button className="btn-secondary flex w-full justify-center gap-2" onClick={() => void toggleTorch()}>
+          {torchOn ? <Flashlight className="h-4 w-4" /> : <FlashlightOff className="h-4 w-4" />}
+          {torchOn ? '關閉手電筒' : '開啟手電筒'}
+        </button>
+      )}
 
       {error && (
         <div className="rounded-2xl border border-brand-500/20 bg-brand-500/10 p-4 text-center text-sm text-brand-500">
@@ -253,6 +531,8 @@ function ScanPage() {
           onChange={(event) => void scanImage(event.target.files?.[0])}
         />
       </label>
+
+      <div id={FILE_SCANNER_ID} className="hidden" />
 
       <p className="text-center text-xs text-muted">
         {status || '對準箱子或物品上的 QR Code，系統將自動跳轉'}
