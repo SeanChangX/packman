@@ -251,8 +251,6 @@ docker compose exec -T postgres psql -U "${POSTGRES_USER:-packman}" -d "${POSTGR
 # 3. 重新整理管理後台網址 — 會再次顯示初次設定表單
 ```
 
-其他資料完全不動：所有活動、物品、箱子、電池、使用者、組別、Slack OAuth、品牌設定、Ollama 端點、JWT / cookie secret、現有使用者 session 全部保留。只有 admin 帳號被重設。
-
 ---
 
 ## 授權

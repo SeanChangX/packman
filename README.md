@@ -251,8 +251,6 @@ docker compose exec -T postgres psql -U "${POSTGRES_USER:-packman}" -d "${POSTGR
 # 3. Reload the admin URL — it now shows the setup form again
 ```
 
-Nothing else is touched: events, items, boxes, batteries, users, groups, Slack OAuth, brand, Ollama endpoints, JWT/cookie secrets, and existing user sessions all survive. Only the admin login is reset.
-
 ---
 
 ## License
