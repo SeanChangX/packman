@@ -132,7 +132,7 @@ In production, only the Web (`3000`) and Admin (`3001`) nginx containers are rea
 | **Postgres** | — (internal) | Schema with per-event scoping, GIN/trigram indexes |
 | **MinIO** | console on 127.0.0.1:9001 | S3-compatible photo storage (S3 API internal :9000) |
 
-> **Admin URL safety.** The Admin URL configured in **Admin → Settings** must match the address you use to reach the admin console (used as a CORS origin). If they diverge, the admin SPA will be unable to call the API and you'll be locked out — recovery requires editing the `system_setting` row directly via `docker compose exec postgres psql`. The admin UI shows a confirmation prompt if you try to save a value that doesn't match your current location. For production, exposing port `3001` only on a private network or behind a VPN is recommended.
+> **Admin URL note.** The Admin URL configured in **Admin → Settings** is added to the API's CORS allowlist. With the default same-origin reverse-proxy deployment (admin nginx serves the SPA *and* proxies `/api/*` to the API on the same host:port), CORS doesn't trigger for day-to-day admin use, so a mismatched Admin URL won't lock you out. The setting matters in cross-origin deployments — if you serve the admin SPA from a different host than the API, the value must match the admin origin or the browser will CORS-reject the requests. Either way, exposing port `3001` only on a private network or behind a VPN is recommended.
 
 Docker images are built on every push to `main` via [GitHub Actions](.github/workflows/build-and-push.yml) and pushed to `ghcr.io/seanchangx/packman-{api,web,admin}` with `latest`, branch, sha, and semver tags.
 

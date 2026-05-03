@@ -90,8 +90,8 @@ const en: Record<string, string> = {
   'settings.appUrls.web': 'Web URL',
   'settings.appUrls.webHint': 'Public address of the user-facing site, used for QR codes, sticker links, and Slack sign-in callback.',
   'settings.appUrls.admin': 'Admin URL',
-  'settings.appUrls.adminHint': 'Address of this admin console, used to authorize requests to the backend. Recommended to expose only on a private network or via VPN, not the public internet.',
-  'settings.appUrls.adminMismatchConfirm': 'The Admin URL you are saving ({next}) does not match your current location ({current}). After saving, this admin console may be unable to reach the API and you may be locked out until the value is corrected directly in the database. Continue?',
+  'settings.appUrls.adminHint': 'Public address of this admin console, added to the API CORS allowlist to block cross-origin calls from elsewhere. Recommended to expose only on a private network or via VPN.',
+  'settings.appUrls.adminMismatchConfirm': 'The Admin URL you are saving ({next}) does not match your current location ({current}). With the default same-origin reverse-proxy deployment this has no effect on day-to-day use; in a cross-origin deployment CORS would block admin requests. Continue?',
   'settings.appUrls.saved': 'App URLs updated',
   'settings.appUrls.failed': 'Failed to update App URLs',
 
@@ -439,8 +439,8 @@ const zhHant: Record<string, string> = {
   'settings.appUrls.web': 'Web URL',
   'settings.appUrls.webHint': '使用者前台對外網址，用於 QR code、貼紙連結與 Slack 登入回呼。',
   'settings.appUrls.admin': 'Admin URL',
-  'settings.appUrls.adminHint': '此為管理後台網址，用於授權後台對 API 的請求。建議僅於內部網路或 VPN 內提供存取，不要對外公開。',
-  'settings.appUrls.adminMismatchConfirm': '即將儲存的 Admin URL（{next}）與目前所在網址（{current}）不一致。儲存後此後台可能無法連線到 API，且必須直接修改資料庫才能還原。是否繼續？',
+  'settings.appUrls.adminHint': '此為管理後台對外網址，會加入 API 的 CORS 允許清單以阻擋外部跨來源呼叫。建議僅於內部網路或 VPN 內提供存取。',
+  'settings.appUrls.adminMismatchConfirm': '即將儲存的 Admin URL（{next}）與目前所在網址（{current}）不一致。預設的同源反代部署下不影響日常操作；若改為跨來源部署，CORS 會擋下後台對 API 的請求。是否繼續？',
   'settings.appUrls.saved': 'App URLs 已更新',
   'settings.appUrls.failed': 'App URLs 更新失敗',
 

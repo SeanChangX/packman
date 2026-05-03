@@ -132,7 +132,7 @@
 | **Postgres** | — (內網) | 多活動分區 schema、GIN / trigram 索引 |
 | **MinIO** | console 綁 127.0.0.1:9001 | S3 相容物件儲存（S3 API 內網 :9000） |
 
-> **Admin URL 安全注意事項。** 在 **管理後台 → 系統設定** 中設定的 Admin URL 必須與你實際開啟管理後台所用的網址一致（用於 CORS origin 比對）。一旦不一致，後台 SPA 將無法呼叫 API 而被鎖死，必須透過 `docker compose exec postgres psql` 直接修改 `system_setting` 才能還原。儲存時若偵測到與目前所在網址不符會跳出確認提示。正式環境建議將 `3001` 僅綁在內部網路或透過 VPN 存取。
+> **Admin URL 注意事項。** 在 **管理後台 → 系統設定** 中設定的 Admin URL 會加入 API 的 CORS 允許清單。在預設的同源反代部署下（admin nginx 同時提供 SPA 並把 `/api/*` 反代到同 host:port 的 API），日常後台操作不會觸發 CORS 檢查，**Admin URL 設錯也不會把你鎖死**。此設定在跨來源部署才有實質作用 — 若 admin 與 API 來自不同 host，必須匹配 admin 的 origin，否則瀏覽器會 CORS 拒絕請求。無論如何，建議將 `3001` 僅綁在內部網路或透過 VPN 存取。
 
 每次推送到 `main` 都會透過 [GitHub Actions](.github/workflows/build-and-push.yml) 自動 build 並推送到 `ghcr.io/seanchangx/packman-{api,web,admin}`，會打上 `latest`、branch、sha、semver 等多個 tag。
 
