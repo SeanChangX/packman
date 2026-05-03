@@ -53,6 +53,46 @@ export async function eventRoutes(app: FastifyInstance) {
     return { activeEventId: event.id }
   })
 
+  app.get<{ Params: { id: string } }>('/:id/members', { preHandler: requireAdminOrAdminSecret }, async (request, reply) => {
+    const event = await prisma.event.findUnique({ where: { id: request.params.id }, select: { id: true } })
+    if (!event) return reply.status(404).send({ message: 'Event not found' })
+    const members = await prisma.eventMember.findMany({
+      where: { eventId: event.id },
+      include: { user: { select: { id: true, name: true, avatarUrl: true, email: true, role: true } } },
+      orderBy: { user: { name: 'asc' } },
+    })
+    return members.map((m) => m.user)
+  })
+
+  app.put<{ Params: { id: string }; Body: { userIds?: unknown } }>('/:id/members', { preHandler: requireAdminOrAdminSecret }, async (request, reply) => {
+    const event = await prisma.event.findUnique({ where: { id: request.params.id }, select: { id: true } })
+    if (!event) return reply.status(404).send({ message: 'Event not found' })
+
+    const raw = request.body?.userIds
+    if (!Array.isArray(raw) || !raw.every((v) => typeof v === 'string')) {
+      return reply.status(400).send({ message: 'userIds must be an array of strings' })
+    }
+    const userIds = Array.from(new Set(raw as string[]))
+
+    if (userIds.length > 0) {
+      const existing = await prisma.user.count({ where: { id: { in: userIds } } })
+      if (existing !== userIds.length) {
+        return reply.status(400).send({ message: 'One or more users not found' })
+      }
+    }
+
+    await prisma.$transaction([
+      prisma.eventMember.deleteMany({ where: { eventId: event.id } }),
+      ...(userIds.length > 0
+        ? [prisma.eventMember.createMany({
+            data: userIds.map((userId) => ({ eventId: event.id, userId })),
+            skipDuplicates: true,
+          })]
+        : []),
+    ])
+    return reply.status(204).send()
+  })
+
   app.delete<{ Params: { id: string } }>('/:id', { preHandler: requireAdminOrAdminSecret }, async (request, reply) => {
     const event = await prisma.event.findUnique({
       where: { id: request.params.id },

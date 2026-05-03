@@ -348,6 +348,18 @@ const en: Record<string, string> = {
   'events.delete': 'Delete event',
   'events.deleteDisabled': 'Cannot delete active event',
   'events.delete.confirm': 'Delete "{name}"? This action cannot be undone.',
+  'events.members.action': 'Members',
+  'events.members.title': 'Members of "{name}"',
+  'events.members.hint': 'Only checked users will appear in owner pickers for this event. Leave empty to allow all users.',
+  'events.members.searchPlaceholder': 'Search by name or email…',
+  'events.members.empty': 'No matching users',
+  'events.members.selectedCount': '{n} selected',
+  'events.members.matchedCount': '{n} matched',
+  'events.members.selectAll': 'Select all',
+  'events.members.clearAll': 'Clear all',
+  'events.members.saved': 'Members updated',
+  'events.members.saveFailed': 'Failed to update members',
+  'events.members.loadFailed': 'Failed to load members',
 }
 
 const zhHant: Record<string, string> = {
@@ -680,6 +692,18 @@ const zhHant: Record<string, string> = {
   'events.delete': '刪除活動',
   'events.deleteDisabled': '無法刪除使用中的活動',
   'events.delete.confirm': '確定刪除「{name}」？此操作無法復原。',
+  'events.members.action': '成員',
+  'events.members.title': '「{name}」的成員',
+  'events.members.hint': '只有勾選的使用者會出現在此活動的負責人下拉選單。全部不勾選即代表不限制（所有使用者皆可選）。',
+  'events.members.searchPlaceholder': '依姓名或 Email 搜尋…',
+  'events.members.empty': '找不到符合的使用者',
+  'events.members.selectedCount': '已選 {n} 人',
+  'events.members.matchedCount': '符合 {n} 人',
+  'events.members.selectAll': '全選',
+  'events.members.clearAll': '全部取消',
+  'events.members.saved': '成員已更新',
+  'events.members.saveFailed': '成員更新失敗',
+  'events.members.loadFailed': '成員載入失敗',
 }
 
 export const messages: Record<AdminLocale, Record<string, string>> = {

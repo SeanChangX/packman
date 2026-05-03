@@ -125,6 +125,10 @@ export const adminApi = {
     req<{ activeEventId: string }>(`/api/events/${id}/activate`, { method: 'POST' }),
   deleteEvent: (id: string) =>
     req<void>(`/api/events/${id}`, { method: 'DELETE' }),
+  eventMembers: (id: string) =>
+    req<User[]>(`/api/events/${id}/members`),
+  updateEventMembers: (id: string, userIds: string[]) =>
+    req<void>(`/api/events/${id}/members`, { method: 'PUT', body: JSON.stringify({ userIds }) }),
 
   exportItems: () => window.open('/api/admin/export/items', '_blank'),
   exportBatteries: () => window.open('/api/admin/export/batteries', '_blank'),

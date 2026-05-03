@@ -41,6 +41,7 @@ const en: Record<string, string> = {
   'login.error.slackDenied': 'Slack sign-in was denied. Please try again.',
   'login.error.wrongWorkspace': 'Please sign in with the configured Slack workspace.',
   'login.error.authFailed': 'Sign-in failed. Please try again.',
+  'login.error.notInEvent': 'You are not a member of the active event. Please contact an administrator.',
   'login.error.generic': 'An error occurred. Please try again.',
 
   'errors.generic': 'Something went wrong',
@@ -350,6 +351,7 @@ const zhHant: Record<string, string> = {
   'login.error.slackDenied': 'Slack 登入被拒絕，請重試。',
   'login.error.wrongWorkspace': '請使用指定的 Slack Workspace 登入。',
   'login.error.authFailed': '登入失敗，請重試。',
+  'login.error.notInEvent': '你不是目前活動的成員，請聯絡管理員。',
   'login.error.generic': '發生錯誤，請重試。',
 
   'errors.generic': '發生了一些問題',

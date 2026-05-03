@@ -11,6 +11,7 @@ import {
   getSlackConfig,
   verifyAdminLogin,
 } from '../services/runtime-config'
+import { isUserAllowedInActiveEvent } from '../services/events'
 
 const ADMIN_LOGIN_WINDOW_MS = 15 * 60 * 1000
 const ADMIN_LOGIN_MAX_FAILURES = 5
@@ -134,6 +135,11 @@ export async function authRoutes(app: FastifyInstance) {
             avatarUrl: slackUser.image_192,
           },
         })
+
+        // Block sign-in for users not in the active event's member list (admin role bypasses).
+        if (!(await isUserAllowedInActiveEvent(user.id, user.role))) {
+          return reply.redirect(`${appUrl}/login?error=not_in_event`)
+        }
 
         await setAuthCookie(request, reply, user.id, user.role)
         reply.redirect(appUrl)

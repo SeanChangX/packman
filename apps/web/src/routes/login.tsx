@@ -11,6 +11,7 @@ function Login() {
     slack_denied: t('login.error.slackDenied'),
     wrong_workspace: t('login.error.wrongWorkspace'),
     auth_failed: t('login.error.authFailed'),
+    not_in_event: t('login.error.notInEvent'),
   }
 
   return (

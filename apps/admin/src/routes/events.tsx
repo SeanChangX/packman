@@ -1,9 +1,154 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { useState, useEffect } from 'react'
-import { Calendar, Plus, Pencil, Trash2, CheckCircle, Circle } from 'lucide-react'
+import { Calendar, Plus, Pencil, Trash2, CheckCircle, Circle, Users, X } from 'lucide-react'
+import { Modal, useToast } from '@packman/ui'
 import { adminApi } from '../lib/api'
 import { useT } from '../lib/i18n'
-import type { Event } from '@packman/shared'
+import type { Event, User } from '@packman/shared'
+
+function MembersModal({ event, onClose }: { event: { id: string; name: string }; onClose: () => void }) {
+  const t = useT()
+  const { showToast } = useToast()
+  const [allUsers, setAllUsers] = useState<User[]>([])
+  const [selected, setSelected] = useState<Set<string>>(new Set())
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [search, setSearch] = useState('')
+
+  useEffect(() => {
+    Promise.all([adminApi.users(), adminApi.eventMembers(event.id)])
+      .then(([users, members]) => {
+        setAllUsers(users)
+        setSelected(new Set(members.map((m) => m.id)))
+      })
+      .catch((e: unknown) => showToast((e as Error)?.message ?? t('events.members.loadFailed'), 'error'))
+      .finally(() => setLoading(false))
+  }, [event.id])
+
+  const toggle = (id: string) => {
+    setSelected((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  const handleSave = async () => {
+    setSaving(true)
+    try {
+      await adminApi.updateEventMembers(event.id, Array.from(selected))
+      showToast(t('events.members.saved'), 'success')
+      onClose()
+    } catch (e: unknown) {
+      showToast((e as Error)?.message ?? t('events.members.saveFailed'), 'error')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const filtered = search.trim()
+    ? allUsers.filter((u) => u.name.toLowerCase().includes(search.trim().toLowerCase())
+        || u.email?.toLowerCase().includes(search.trim().toLowerCase()))
+    : allUsers
+
+  const selectAllFiltered = () => {
+    setSelected((prev) => {
+      const next = new Set(prev)
+      filtered.forEach((u) => next.add(u.id))
+      return next
+    })
+  }
+
+  const clearAllFiltered = () => {
+    setSelected((prev) => {
+      const next = new Set(prev)
+      filtered.forEach((u) => next.delete(u.id))
+      return next
+    })
+  }
+
+  return (
+    <Modal onClose={onClose}>
+      <div className="card flex max-h-[80vh] w-full max-w-lg flex-col p-6">
+        <div className="mb-1 flex items-center justify-between">
+          <h2 className="font-bold">{t('events.members.title', { name: event.name })}</h2>
+          <button onClick={onClose}><X className="h-4 w-4" /></button>
+        </div>
+        <p className="mb-4 text-xs text-muted">{t('events.members.hint')}</p>
+
+        <input
+          type="text"
+          className="input mb-2"
+          placeholder={t('events.members.searchPlaceholder')}
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+        />
+
+        <div className="mb-2 flex items-center justify-between text-xs">
+          <span className="text-muted">{t('events.members.matchedCount', { n: filtered.length })}</span>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              className="font-semibold text-brand-600 hover:text-brand-700 disabled:opacity-30"
+              onClick={selectAllFiltered}
+              disabled={loading || filtered.length === 0}
+            >
+              {t('events.members.selectAll')}
+            </button>
+            <span className="text-muted">·</span>
+            <button
+              type="button"
+              className="font-semibold text-muted hover:text-app disabled:opacity-30"
+              onClick={clearAllFiltered}
+              disabled={loading || filtered.length === 0}
+            >
+              {t('events.members.clearAll')}
+            </button>
+          </div>
+        </div>
+
+        <div className="mb-4 min-h-32 flex-1 overflow-y-auto rounded-2xl border border-black/10 dark:border-white/10">
+          {loading ? (
+            <div className="flex justify-center py-6"><div className="h-6 w-6 animate-spin rounded-full border-4 border-brand-500 border-t-transparent" /></div>
+          ) : filtered.length === 0 ? (
+            <p className="py-6 text-center text-sm text-muted">{t('events.members.empty')}</p>
+          ) : (
+            <ul className="divide-y divide-black/5 dark:divide-white/10">
+              {filtered.map((u) => (
+                <li key={u.id}>
+                  <label className="flex cursor-pointer items-center gap-3 px-3 py-2 hover:bg-black/5 dark:hover:bg-white/5">
+                    <input
+                      type="checkbox"
+                      checked={selected.has(u.id)}
+                      onChange={() => toggle(u.id)}
+                      className="h-4 w-4 accent-brand-500"
+                    />
+                    {u.avatarUrl
+                      ? <img src={u.avatarUrl} alt="" className="h-7 w-7 rounded-full" />
+                      : <div className="flex h-7 w-7 items-center justify-center rounded-full bg-brand-500 text-xs text-white">{u.name[0]}</div>}
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-medium">{u.name}</p>
+                      {u.email && <p className="truncate text-xs text-muted">{u.email}</p>}
+                    </div>
+                  </label>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+
+        <div className="flex items-center justify-between gap-2">
+          <span className="text-xs text-muted">{t('events.members.selectedCount', { n: selected.size })}</span>
+          <div className="flex gap-2">
+            <button type="button" className="btn-secondary" onClick={onClose}>{t('common.cancel')}</button>
+            <button type="button" className="btn-primary" onClick={handleSave} disabled={saving || loading}>{t('common.save')}</button>
+          </div>
+        </div>
+      </div>
+    </Modal>
+  )
+}
 
 function EventsPage() {
   const t = useT()
@@ -14,6 +159,7 @@ function EventsPage() {
   const [newName, setNewName] = useState('')
   const [showCreate, setShowCreate] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [membersFor, setMembersFor] = useState<{ id: string; name: string } | null>(null)
 
   const load = async () => {
     setLoading(true)
@@ -177,6 +323,13 @@ function EventsPage() {
                 <div className="flex shrink-0 gap-1">
                   <button
                     className="rounded-xl p-2 text-muted hover:bg-white/10 hover:text-white"
+                    onClick={() => setMembersFor({ id: event.id, name: event.name })}
+                    title={t('events.members.action')}
+                  >
+                    <Users className="h-4 w-4" />
+                  </button>
+                  <button
+                    className="rounded-xl p-2 text-muted hover:bg-white/10 hover:text-white"
                     onClick={() => { setEditingId(event.id); setEditName(event.name) }}
                     title={t('events.rename')}
                   >
@@ -195,6 +348,10 @@ function EventsPage() {
             </div>
           ))}
         </div>
+      )}
+
+      {membersFor && (
+        <MembersModal event={membersFor} onClose={() => setMembersFor(null)} />
       )}
     </div>
   )

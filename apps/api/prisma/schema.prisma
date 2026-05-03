@@ -22,6 +22,7 @@ model User {
   createdItems Item[]    @relation("ItemCreator")
   ownedBoxes   Box[]
   batteries    Battery[]
+  eventMembers EventMember[]
 }
 
 model Group {
@@ -42,6 +43,20 @@ model Event {
   items     Item[]
   boxes     Box[]
   batteries Battery[]
+  members   EventMember[]
+}
+
+// Restricts which users appear in owner pickers for a given event.
+// Empty members for an event = unrestricted (all users available).
+model EventMember {
+  eventId   String
+  userId    String
+  event     Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@id([eventId, userId])
+  @@index([userId])
 }
 
 model Box {

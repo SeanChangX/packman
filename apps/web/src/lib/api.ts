@@ -31,8 +31,10 @@ async function request<T>(url: string, options?: RequestInit): Promise<T> {
     headers: buildHeaders(options),
   })
   if (res.status === 401) {
+    const body = await res.clone().json().catch(() => null)
+    const target = body?.code === 'NOT_IN_EVENT' ? '/login?error=not_in_event' : '/login'
     if (window.location.pathname !== '/login') {
-      window.location.href = '/login'
+      window.location.href = target
     }
     throw new Error('Unauthorized')
   }

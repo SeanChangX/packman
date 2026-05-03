@@ -2,6 +2,7 @@ import { FastifyInstance } from 'fastify'
 import { prisma } from '../plugins/prisma'
 import { requireAuth, requireAuthOrAdminSecret } from '../plugins/auth'
 import { UpdateUserSchema } from '@packman/shared'
+import { getActiveEventId } from '../services/events'
 
 const userSelect = {
   id: true,
@@ -16,7 +17,21 @@ const userSelect = {
 }
 
 export async function userRoutes(app: FastifyInstance) {
+  // GET /users feeds owner pickers across the web SPA. When the active event
+  // has at least one EventMember row, we restrict the result to those members
+  // so users can find owners faster. Empty membership = unrestricted.
   app.get('/', { preHandler: requireAuthOrAdminSecret }, async () => {
+    const activeEventId = await getActiveEventId().catch(() => null)
+    if (activeEventId) {
+      const memberCount = await prisma.eventMember.count({ where: { eventId: activeEventId } })
+      if (memberCount > 0) {
+        return prisma.user.findMany({
+          where: { eventMembers: { some: { eventId: activeEventId } } },
+          select: userSelect,
+          orderBy: { name: 'asc' },
+        })
+      }
+    }
     return prisma.user.findMany({
       select: userSelect,
       orderBy: { name: 'asc' },

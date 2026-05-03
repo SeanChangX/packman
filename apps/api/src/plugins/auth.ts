@@ -3,6 +3,19 @@ import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify'
 import jwt from 'jsonwebtoken'
 import { prisma } from './prisma'
 import { getJwtExpiresIn, getJwtSecret } from '../services/runtime-config'
+import { isUserAllowedInActiveEvent } from '../services/events'
+
+// Sent in the JSON body of 401 responses when the SPA should redirect to
+// /login?error=not_in_event so the user understands why they were kicked.
+const NOT_IN_EVENT_CODE = 'NOT_IN_EVENT'
+
+async function denyIfNotInEvent(request: FastifyRequest, reply: FastifyReply): Promise<boolean> {
+  const allowed = await isUserAllowedInActiveEvent(request.userId!, request.userRole ?? 'MEMBER')
+  if (allowed) return false
+  reply.clearCookie('packman_token', { path: '/' })
+  reply.status(401).send({ message: 'Not a member of the active event', code: NOT_IN_EVENT_CODE })
+  return true
+}
 
 export interface JwtPayload {
   userId: string
@@ -54,6 +67,7 @@ export async function requireAuth(request: FastifyRequest, reply: FastifyReply) 
   if (!request.userId) {
     return reply.status(401).send({ message: 'Unauthorized' })
   }
+  if (await denyIfNotInEvent(request, reply)) return
 }
 
 export async function requireAdmin(request: FastifyRequest, reply: FastifyReply) {
@@ -81,6 +95,7 @@ export async function requireAuthOrAdminSecret(request: FastifyRequest, reply: F
   if (!request.userId) {
     return reply.status(401).send({ message: 'Unauthorized' })
   }
+  if (await denyIfNotInEvent(request, reply)) return
 }
 
 export async function requireAdminOrAdminSecret(request: FastifyRequest, reply: FastifyReply) {
