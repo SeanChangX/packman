@@ -6,8 +6,8 @@ import { useT } from '../lib/i18n'
 type ExtendedTrackCapabilities = MediaTrackCapabilities & { torch?: boolean; focusMode?: string[] }
 type ExtendedTrackConstraintSet = MediaTrackConstraintSet & { torch?: boolean; focusMode?: string }
 
-type Html5QrcodeModule = typeof import('html5-qrcode')
-type Html5QrcodeInstance = InstanceType<Html5QrcodeModule['Html5Qrcode']>
+type JsqrModule = typeof import('jsqr')
+type JsqrFn = JsqrModule['default']
 
 type DetectedBarcode = {
   rawValue: string
@@ -24,13 +24,10 @@ type ScannerHandle = {
   isTorchSupported: () => boolean
 }
 
-const SCANNER_FALLBACK_ID = 'qr-scanner-fallback'
-const FILE_SCANNER_ID = 'qr-file-scan'
-
-function buildVideoConstraints(deviceId?: string): MediaTrackConstraints {
+function buildVideoConstraints(): MediaTrackConstraints {
   const advanced: ExtendedTrackConstraintSet[] = [{ focusMode: 'continuous' }]
   return {
-    ...(deviceId ? { deviceId: { exact: deviceId } } : { facingMode: { ideal: 'environment' } }),
+    facingMode: { ideal: 'environment' },
     width: { ideal: 1280 },
     height: { ideal: 720 },
     advanced: advanced as MediaTrackConstraintSet[],
@@ -70,7 +67,7 @@ async function detectNativeSupport(): Promise<boolean> {
     if (!formats.includes('qr_code')) return false
     // iOS Safari sometimes lists qr_code in getSupportedFormats but throws on
     // the very first detect() call. Verify by actually invoking detect on a
-    // tiny canvas — if construction or detect fails, fall back to html5-qrcode.
+    // tiny canvas — if construction or detect fails, fall back to jsQR.
     const probe = document.createElement('canvas')
     probe.width = 8
     probe.height = 8
@@ -185,79 +182,121 @@ async function startNativeScanner(
   }
 }
 
-async function startHtml5Scanner(
-  containerId: string,
+// Fallback decoder for browsers without BarcodeDetector (notably iOS Safari and
+// desktop Linux Chrome). Drives the same <video> element as the native path,
+// then samples a centred square crop into an offscreen canvas every frame and
+// feeds the ImageData to jsQR. Replacing html5-qrcode with this fixes silent
+// decode failures we hit on iOS where html5-qrcode's internal ZXing wrapper
+// never produced a result regardless of QR size, lighting, or distance.
+async function startJsqrScanner(
+  video: HTMLVideoElement,
   onDecoded: (text: string) => void,
-  moduleRef: { current: Html5QrcodeModule | null },
-): Promise<{ handle: ScannerHandle; instance: Html5QrcodeInstance }> {
-  const html5Module = moduleRef.current ?? (await import('html5-qrcode'))
-  moduleRef.current = html5Module
+  moduleRef: { current: JsqrModule | null },
+): Promise<ScannerHandle> {
+  const jsqrModule = moduleRef.current ?? (await import('jsqr'))
+  moduleRef.current = jsqrModule
+  const jsqr: JsqrFn = jsqrModule.default
 
-  const scanner = new html5Module.Html5Qrcode(containerId, {
-    formatsToSupport: [html5Module.Html5QrcodeSupportedFormats.QR_CODE],
-    verbose: false,
+  const stream = await navigator.mediaDevices.getUserMedia({
+    video: buildVideoConstraints(),
+    audio: false,
   })
-  // Only trust the device list when we can positively identify a rear camera.
-  // On iOS the list often returns front + ultra-wide + wide + tele in an order
-  // where cameras[0] is the front camera, so blindly falling back to it picks
-  // the wrong lens. If no rear-labelled camera is found, fall through to the
-  // facingMode constraint and let the browser pick.
-  const cameras = await html5Module.Html5Qrcode.getCameras().catch(() => [])
-  const preferred = cameras.find((c) => /back|rear|environment|後|背/i.test(c.label))
-  if (typeof window !== 'undefined' && localStorage.getItem('packman:debug') === '1') {
-    console.log('[scan] cameras:', cameras.map((c: { id: string; label: string }) => ({ id: c.id, label: c.label })))
-    console.log('[scan] preferred:', preferred ? { id: preferred.id, label: preferred.label } : '(facingMode env)')
-  }
 
-  // Without qrbox, html5-qrcode draws the (often 16:9) video into a square
-  // internal canvas which distorts QR modules and makes ZXing fail to decode.
-  // Compute a centred square scan region from the actual viewport so modules
-  // stay square regardless of camera aspect ratio.
-  const qrboxFn = (viewW: number, viewH: number) => {
-    const side = Math.floor(Math.min(viewW, viewH) * 0.7)
-    return { width: side, height: side }
-  }
-
-  await scanner.start(
-    preferred?.id ?? { facingMode: { ideal: 'environment' } },
-    {
-      fps: 15,
-      qrbox: qrboxFn,
-      aspectRatio: 1,
-      videoConstraints: buildVideoConstraints(preferred?.id),
-      disableFlip: false,
-    },
-    onDecoded,
-    undefined,
-  )
-
-  let torchSupported = false
   try {
-    const caps = scanner.getRunningTrackCapabilities() as ExtendedTrackCapabilities | undefined
-    torchSupported = caps?.torch === true
-  } catch { /* capability unsupported on this browser */ }
+    video.srcObject = stream
+    video.setAttribute('playsinline', 'true')
+    video.muted = true
+    await video.play()
+  } catch (err) {
+    try { stream.getTracks().forEach((t) => t.stop()) } catch { /* tracks already ended */ }
+    try { video.srcObject = null } catch { /* element detached */ }
+    throw err
+  }
 
   if (typeof window !== 'undefined' && localStorage.getItem('packman:debug') === '1') {
     try {
-      const settings = scanner.getRunningTrackSettings()
-      console.log('[scan] running track settings:', settings)
+      const track = stream.getVideoTracks()[0]
+      console.log('[scan] track settings:', track?.getSettings?.())
     } catch { /* settings unavailable */ }
   }
 
+  const canvas = document.createElement('canvas')
+  const ctx = canvas.getContext('2d', { willReadFrequently: true })
+
+  let stopped = false
+  let busy = false
+
+  const tick = () => {
+    if (stopped) return
+    if (!busy && ctx && video.readyState >= 2 && video.videoWidth > 0) {
+      busy = true
+      try {
+        // Sample a centred square crop sized to the smaller video dimension so
+        // QR modules stay square regardless of camera aspect ratio. Cap the
+        // sampled side at 720px — bigger crops slow jsQR down without helping
+        // decode quality on phone-sized QR codes.
+        const side = Math.min(video.videoWidth, video.videoHeight, 720)
+        canvas.width = side
+        canvas.height = side
+        const sx = (video.videoWidth - Math.min(video.videoWidth, video.videoHeight)) / 2
+        const sy = (video.videoHeight - Math.min(video.videoWidth, video.videoHeight)) / 2
+        const sSide = Math.min(video.videoWidth, video.videoHeight)
+        ctx.drawImage(video, sx, sy, sSide, sSide, 0, 0, side, side)
+        const image = ctx.getImageData(0, 0, side, side)
+        const result = jsqr(image.data, image.width, image.height, { inversionAttempts: 'attemptBoth' })
+        if (!stopped && result?.data) {
+          onDecoded(result.data)
+        }
+      } catch {
+        // Frame sample / decode failure; next tick will retry.
+      } finally {
+        busy = false
+      }
+    }
+    if (stopped) return
+    const v = video as HTMLVideoElement & { requestVideoFrameCallback?: (cb: () => void) => number }
+    if (typeof v.requestVideoFrameCallback === 'function') {
+      v.requestVideoFrameCallback(() => tick())
+    } else {
+      requestAnimationFrame(() => tick())
+    }
+  }
+  tick()
+
+  const track = stream.getVideoTracks()[0] ?? null
+  const caps = (track?.getCapabilities?.() as ExtendedTrackCapabilities | undefined) ?? {}
+  const torchSupported = caps.torch === true
+
   return {
-    instance: scanner,
-    handle: {
-      stop: async () => {
-        try { await scanner.stop() } catch { /* not fully started */ }
-        try { scanner.clear() } catch { /* partial startup */ }
-      },
-      applyTorch: async (on) => {
-        await scanner.applyVideoConstraints({
-          advanced: [{ torch: on } as ExtendedTrackConstraintSet] as MediaTrackConstraintSet[],
-        })
-      },
-      isTorchSupported: () => torchSupported,
+    stop: async () => {
+      stopped = true
+      try { stream.getTracks().forEach((t) => t.stop()) } catch { /* track already ended */ }
+      try { video.srcObject = null } catch { /* element detached */ }
     },
+    applyTorch: async (on) => {
+      if (!track) return
+      await track.applyConstraints({
+        advanced: [{ torch: on } as ExtendedTrackConstraintSet] as MediaTrackConstraintSet[],
+      })
+    },
+    isTorchSupported: () => torchSupported,
+  }
+}
+
+async function decodeImageFile(file: File, jsqr: JsqrFn): Promise<string | null> {
+  const bitmap = await createImageBitmap(file)
+  try {
+    const canvas = document.createElement('canvas')
+    canvas.width = bitmap.width
+    canvas.height = bitmap.height
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return null
+    ctx.drawImage(bitmap, 0, 0)
+    const image = ctx.getImageData(0, 0, canvas.width, canvas.height)
+    const result = jsqr(image.data, image.width, image.height, { inversionAttempts: 'attemptBoth' })
+    return result?.data ?? null
+  } finally {
+    try { bitmap.close() } catch { /* ImageBitmap already closed */ }
   }
 }
 
@@ -299,25 +338,12 @@ function routeFromQr(decodedText: string) {
   return null
 }
 
-const SCAN_STYLES = `
-#${SCANNER_FALLBACK_ID} video {
-  object-fit: cover !important;
-  width: 100% !important;
-  height: 100% !important;
-}
-/* Hide every html5-qrcode-injected child except the video and the decode canvas, so the page's own viewfinder is the only UI. */
-#${SCANNER_FALLBACK_ID} > *:not(video):not(canvas) {
-  display: none !important;
-}
-`
-
 function ScanPage() {
   const t = useT()
   const navigate = useNavigate()
   const videoRef = useRef<HTMLVideoElement | null>(null)
   const handleRef = useRef<ScannerHandle | null>(null)
-  const html5InstanceRef = useRef<Html5QrcodeInstance | null>(null)
-  const html5ModuleRef = useRef<Html5QrcodeModule | null>(null)
+  const jsqrModuleRef = useRef<JsqrModule | null>(null)
   const runIdRef = useRef(0)
   const hasScannedRef = useRef(false)
   const lastInvalidTextRef = useRef('')
@@ -331,7 +357,6 @@ function ScanPage() {
   const [retryKey, setRetryKey] = useState(0)
   const [torchSupported, setTorchSupported] = useState(false)
   const [torchOn, setTorchOn] = useState(false)
-  const [engine, setEngine] = useState<'native' | 'html5' | null>(null)
   const [invalidNotice, setInvalidNotice] = useState('')
   const [successFlash, setSuccessFlash] = useState(false)
 
@@ -350,7 +375,6 @@ function ScanPage() {
     setTorchOn(false)
     const handle = handleRef.current
     handleRef.current = null
-    html5InstanceRef.current = null
     if (handle) {
       try { await handle.stop() } catch { /* idempotent */ }
     }
@@ -395,15 +419,12 @@ function ScanPage() {
     setSuccessFlash(true)
     setStatus(t('scan.scanned'))
 
-    const instance = html5InstanceRef.current
-    try { instance?.pause(true) } catch { /* already stopping */ }
-
     successTimerRef.current = window.setTimeout(() => {
       successTimerRef.current = null
       void navigate(route)
       void stopAll()
     }, 400)
-  }, [navigate, stopAll])
+  }, [navigate, stopAll, t])
 
   useEffect(() => {
     let cancelled = false
@@ -425,11 +446,12 @@ function ScanPage() {
         setStatus('')
         return
       }
+      if (!videoRef.current) return
 
       try {
         const useNative = await detectNativeSupport()
 
-        if (useNative && videoRef.current) {
+        if (useNative) {
           try {
             const handle = await startNativeScanner(videoRef.current, handleDecodedText)
             if (cancelled || runIdRef.current !== runId) {
@@ -437,7 +459,6 @@ function ScanPage() {
               return
             }
             handleRef.current = handle
-            setEngine('native')
             setIsScanning(true)
             setStatus(t('scan.aim'))
             setTorchSupported(handle.isTorchSupported())
@@ -449,18 +470,16 @@ function ScanPage() {
             if (msg.includes('notallowed') || msg.includes('permission') || msg.includes('denied')) {
               throw nativeErr
             }
-            // Otherwise fall through to html5-qrcode (e.g. transient detect failure).
+            // Otherwise fall through to jsQR (e.g. transient detect failure).
           }
         }
 
-        const { handle, instance } = await startHtml5Scanner(SCANNER_FALLBACK_ID, handleDecodedText, html5ModuleRef)
+        const handle = await startJsqrScanner(videoRef.current, handleDecodedText, jsqrModuleRef)
         if (cancelled || runIdRef.current !== runId) {
           await handle.stop()
           return
         }
         handleRef.current = handle
-        html5InstanceRef.current = instance
-        setEngine('html5')
         setIsScanning(true)
         setStatus(t('scan.aim'))
         setTorchSupported(handle.isTorchSupported())
@@ -479,29 +498,31 @@ function ScanPage() {
       cancelled = true
       void stopAll()
     }
-  }, [handleDecodedText, retryKey, stopAll])
+  }, [handleDecodedText, retryKey, stopAll, t])
 
   const scanImage = async (file: File | undefined) => {
     if (!file) return
 
     try {
-      const html5Module = html5ModuleRef.current ?? (await import('html5-qrcode'))
-      html5ModuleRef.current = html5Module
-      const scanner = new html5Module.Html5Qrcode(FILE_SCANNER_ID, {
-        formatsToSupport: [html5Module.Html5QrcodeSupportedFormats.QR_CODE],
-        verbose: false,
-      })
-      let decodedText: string
-      try {
-        decodedText = await scanner.scanFile(file, false)
-      } finally {
-        try { scanner.clear() } catch { /* harmless if not started */ }
+      const jsqrModule = jsqrModuleRef.current ?? (await import('jsqr'))
+      jsqrModuleRef.current = jsqrModule
+      const decoded = await decodeImageFile(file, jsqrModule.default)
+      if (!decoded) {
+        lastInvalidTextRef.current = ''
+        lastInvalidAtRef.current = performance.now()
+        setInvalidNotice(t('scan.invalid.image'))
+        if (invalidTimerRef.current !== null) window.clearTimeout(invalidTimerRef.current)
+        invalidTimerRef.current = window.setTimeout(() => {
+          setInvalidNotice('')
+          invalidTimerRef.current = null
+        }, 4000)
+        return
       }
-      handleDecodedText(decodedText)
+      handleDecodedText(decoded)
     } catch (err) {
       // Surface the actual error so deployment-specific failures (e.g. the
-      // html5-qrcode chunk failing to load behind a CDN) are visible instead
-      // of being masked as "no QR detected".
+      // jsQR chunk failing to load behind a CDN) are visible instead of being
+      // masked as "no QR detected".
       console.error('[scan] image decode failed', err)
       const raw = err instanceof Error ? err.message : String(err ?? '')
       const isLoadFailure = /failed to fetch dynamically imported module|loading chunk|importscripts|networkerror/i.test(raw)
@@ -518,8 +539,6 @@ function ScanPage() {
 
   return (
     <div className="mx-auto max-w-md page-stack">
-      <style>{SCAN_STYLES}</style>
-
       <div className="text-center">
         <h1 className="text-2xl font-bold">{t('scan.title')}</h1>
         <p className="page-subtitle">{t('scan.subtitle')}</p>
@@ -527,15 +546,12 @@ function ScanPage() {
 
       <div className={`card overflow-hidden ${error ? 'hidden' : ''}`}>
         <div className="relative aspect-square w-full overflow-hidden bg-black">
-          {/* Native engine renders into this video element. */}
           <video
             ref={videoRef}
-            className={`absolute inset-0 h-full w-full object-cover ${engine === 'native' ? '' : 'hidden'}`}
+            className="absolute inset-0 h-full w-full object-cover"
             playsInline
             muted
           />
-          {/* html5-qrcode injects its own video into this container. Always rendered so the library can read its dimensions on start(). */}
-          <div id={SCANNER_FALLBACK_ID} className="absolute inset-0 h-full w-full" />
 
           {(isScanning || successFlash) && (
             <div className="pointer-events-none absolute inset-0">
@@ -607,8 +623,6 @@ function ScanPage() {
           onChange={(event) => void scanImage(event.target.files?.[0])}
         />
       </label>
-
-      <div id={FILE_SCANNER_ID} className="hidden" />
 
       <p className="text-center text-xs text-muted">
         {status || t('scan.aimHint')}

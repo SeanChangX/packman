@@ -1,4 +1,4 @@
-const CACHE_NAME = 'packman-web-v9'
+const CACHE_NAME = 'packman-web-v10'
 const APP_SHELL = ['/manifest.webmanifest', '/packman-icon.svg']
 
 self.addEventListener('install', (event) => {
