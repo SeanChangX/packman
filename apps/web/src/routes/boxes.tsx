@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { Package, Plus, Trash2, UserRound, Weight, X } from 'lucide-react'
-import { useToast } from '@packman/ui'
+import { useToast, Modal } from '@packman/ui'
 import { boxesApi, usersApi } from '../lib/api'
 import { STATUS_LABEL_KEYS, STATUS_COLORS, cn, formatApiError } from '../lib/utils'
 import { Select, SelectController } from '../lib/select'
@@ -23,7 +23,7 @@ function NewBoxModal({ onClose }: { onClose: () => void }) {
   })
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+    <Modal onClose={onClose}>
       <div className="card w-full max-w-md p-6">
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-lg font-bold">{t('boxes.new.title')}</h2>
@@ -73,7 +73,7 @@ function NewBoxModal({ onClose }: { onClose: () => void }) {
           </div>
         </form>
       </div>
-    </div>
+    </Modal>
   )
 }
 
@@ -200,7 +200,7 @@ function BoxesPage() {
   )
 
   return (
-    <div className="space-y-6">
+    <div className="page-stack">
       <div className="page-header">
         <div>
           <h1 className="page-title">{t('boxes.title')}</h1>

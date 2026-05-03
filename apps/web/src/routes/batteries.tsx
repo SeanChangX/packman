@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useForm } from 'react-hook-form'
 import { useState } from 'react'
 import { Plus, X, AlertTriangle, Pencil, Check, XCircle } from 'lucide-react'
-import { useToast } from '@packman/ui'
+import { useToast, Modal } from '@packman/ui'
 import { batteriesApi, batteryRegulationsApi, usersApi, selectOptionsApi } from '../lib/api'
 import { getLabelFromOptions, formatApiError } from '../lib/utils'
 import { Select, SelectController } from '../lib/select'
@@ -58,7 +58,7 @@ function NewBatteryModal({ onClose, batteryTypeOpts }: { onClose: () => void; ba
   })
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+    <Modal onClose={onClose}>
       <div className="card w-full max-w-md p-6">
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-lg font-bold">{t('batteries.new.title')}</h2>
@@ -105,7 +105,7 @@ function NewBatteryModal({ onClose, batteryTypeOpts }: { onClose: () => void; ba
           </div>
         </form>
       </div>
-    </div>
+    </Modal>
   )
 }
 
@@ -254,7 +254,7 @@ function BatteriesPage() {
   })
 
   return (
-    <div className="space-y-6">
+    <div className="page-stack">
       <div className="page-header">
         <div>
           <h1 className="page-title">{t('batteries.title')}</h1>

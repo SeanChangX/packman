@@ -443,7 +443,7 @@ function ScanPage() {
   }
 
   return (
-    <div className="mx-auto max-w-md space-y-6">
+    <div className="mx-auto max-w-md page-stack">
       <style>{SCAN_STYLES}</style>
 
       <div className="text-center">

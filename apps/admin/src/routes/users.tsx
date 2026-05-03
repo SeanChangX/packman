@@ -27,7 +27,7 @@ function UsersPage() {
   })
 
   return (
-    <div className="space-y-4">
+    <div className="page-stack">
       <div className="page-header">
         <div>
           <h1 className="page-title">{t('users.title')}</h1>

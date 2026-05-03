@@ -189,7 +189,7 @@ function OllamaTest() {
   const weightPromptValid = weightPrompt.trim().length > 0 && weightPrompt.trim().length <= 2000
 
   return (
-    <div className="page space-y-5">
+    <div className="page-stack">
       <div className="page-header">
         <div>
           <h1 className="page-title">{t('ollama.title')}</h1>

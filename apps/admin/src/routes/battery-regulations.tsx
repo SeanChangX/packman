@@ -78,7 +78,7 @@ function BatteryRegulationsPage() {
   const sorted = [...(regulations ?? [])].sort((a, b) => a.sortOrder - b.sortOrder)
 
   return (
-    <div className="space-y-5">
+    <div className="page-stack">
       <div className="page-header">
         <div>
           <h1 className="page-title">{t('batteryRegulations.title')}</h1>

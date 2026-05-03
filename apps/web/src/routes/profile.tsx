@@ -33,7 +33,7 @@ function ProfilePage() {
   if (!user) return null
 
   return (
-    <div className="mx-auto max-w-md space-y-6">
+    <div className="mx-auto max-w-md page-stack">
       <div>
         <h1 className="page-title">{t('profile.title')}</h1>
         <p className="page-subtitle">{t('profile.subtitle')}</p>
@@ -67,11 +67,6 @@ function ProfilePage() {
               ...(groups?.map((g) => ({ value: g.id, label: g.name })) ?? []),
             ]}
           />
-          {user.group && (
-            <p className="mt-2 text-sm text-muted">
-              {t('profile.currentGroup')}: <span style={{ color: user.group.color }} className="font-medium">{user.group.name}</span>
-            </p>
-          )}
         </div>
       </div>
 

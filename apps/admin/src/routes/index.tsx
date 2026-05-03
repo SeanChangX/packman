@@ -17,7 +17,7 @@ function AdminDashboard() {
   const t = useT()
 
   return (
-    <div className="space-y-6">
+    <div className="page-stack">
       <div className="page-header">
         <div>
           <h1 className="page-title">{t('dashboard.title')}</h1>

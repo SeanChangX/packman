@@ -71,7 +71,7 @@ function BoxesPage() {
   ]
 
   return (
-    <div className="space-y-5">
+    <div className="page-stack">
       <div className="page-header">
         <div>
           <h1 className="page-title">{t('boxes.title')}</h1>

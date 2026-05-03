@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useForm } from 'react-hook-form'
 import { useState } from 'react'
 import { Plus, Pencil, Trash2, X } from 'lucide-react'
-import { useToast } from '@packman/ui'
+import { useToast, Modal } from '@packman/ui'
 import { adminApi } from '../lib/api'
 import { useT } from '../lib/i18n'
 
@@ -35,7 +35,7 @@ function GroupModal({ initial, onClose }: { initial?: { id: string; name: string
   })
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+    <Modal onClose={onClose}>
       <div className="card w-full max-w-sm p-6">
         <div className="mb-4 flex items-center justify-between">
           <h2 className="font-bold">{initial ? t('groups.modal.editTitle') : t('groups.modal.addTitle')}</h2>
@@ -84,7 +84,7 @@ function GroupModal({ initial, onClose }: { initial?: { id: string; name: string
           </div>
         </form>
       </div>
-    </div>
+    </Modal>
   )
 }
 
@@ -102,7 +102,7 @@ function GroupsPage() {
   })
 
   return (
-    <div className="space-y-4">
+    <div className="page-stack">
       <div className="page-header">
         <div>
           <h1 className="page-title">{t('groups.title')}</h1>

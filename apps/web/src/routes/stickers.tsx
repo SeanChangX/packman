@@ -151,7 +151,7 @@ function StickersPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="page-stack">
       <div className="page-header">
         <div>
           <h1 className="page-title">{t('stickers.title')}</h1>

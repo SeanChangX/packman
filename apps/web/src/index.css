@@ -95,6 +95,10 @@
     }
   }
 
+  .page-stack {
+    @apply space-y-6;
+  }
+
   .page-header {
     @apply flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between;
   }

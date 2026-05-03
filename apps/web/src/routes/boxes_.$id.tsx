@@ -141,7 +141,7 @@ function BoxDetailPage() {
   ]
 
   return (
-    <div className="mx-auto max-w-2xl space-y-6">
+    <div className="mx-auto max-w-2xl page-stack">
       <div className="flex items-center gap-3">
         <button onClick={() => navigate({ to: '/boxes' })} className="rounded-2xl p-2 text-muted transition-colors hover:bg-white/10 hover:text-app">
           <ArrowLeft className="h-5 w-5" />
