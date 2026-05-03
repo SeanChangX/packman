@@ -424,7 +424,11 @@ function ScanPage() {
       void navigate(route)
       void stopAll()
     }, 400)
-  }, [navigate, stopAll, t])
+    // t intentionally omitted: useT() returns a new function reference each
+    // render, which would make this callback unstable and re-trigger the
+    // scanner-start effect on every render (camera flicker / never-starts).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [navigate, stopAll])
 
   useEffect(() => {
     let cancelled = false
@@ -498,7 +502,9 @@ function ScanPage() {
       cancelled = true
       void stopAll()
     }
-  }, [handleDecodedText, retryKey, stopAll, t])
+    // t intentionally omitted: see handleDecodedText note.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [handleDecodedText, retryKey, stopAll])
 
   const scanImage = async (file: File | undefined) => {
     if (!file) return
