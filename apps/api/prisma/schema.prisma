@@ -87,6 +87,7 @@ model Item {
   eventId        String
   event          Event           @relation(fields: [eventId], references: [id])
   createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
   aiTagJobs       AiTagJob[]
 
   @@index([eventId, createdAt])

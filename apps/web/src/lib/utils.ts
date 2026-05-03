@@ -37,6 +37,15 @@ export function formatDate(iso: string, locale: string = 'en-US') {
   })
 }
 
+// ISO-style timestamp: "2026-05-04 15:42" — sv-SE happens to format dates in
+// ISO 8601 shape, giving us zero-padded year/month/day and 24-hour time.
+export function formatTimestamp(iso: string) {
+  return new Intl.DateTimeFormat('sv-SE', {
+    year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', hour12: false,
+  }).format(new Date(iso))
+}
+
 export function formatApiError(error: unknown, fallback = 'Operation failed', requiredHint = 'Please ensure all required fields are filled in correctly'): string {
   const msg = (error as Error)?.message ?? fallback
   try {

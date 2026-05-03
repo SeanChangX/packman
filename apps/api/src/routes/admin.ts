@@ -210,6 +210,19 @@ export async function adminRoutes(app: FastifyInstance) {
     }
   })
 
+  app.get<{ Params: { id: string } }>('/users/:id/impact', async (request, reply) => {
+    const id = request.params.id
+    const user = await prisma.user.findUnique({ where: { id }, select: { id: true } })
+    if (!user) return reply.status(404).send({ message: 'User not found' })
+    const [ownedItems, ownedBoxes, ownedBatteries, createdItems] = await Promise.all([
+      prisma.item.count({ where: { ownerId: id } }),
+      prisma.box.count({ where: { ownerId: id } }),
+      prisma.battery.count({ where: { ownerId: id } }),
+      prisma.item.count({ where: { createdById: id } }),
+    ])
+    return { ownedItems, ownedBoxes, ownedBatteries, createdItems }
+  })
+
   app.delete<{ Params: { id: string } }>('/users/:id', async (request, reply) => {
     if (request.params.id === request.userId) {
       return reply.status(400).send({ message: 'Cannot delete yourself' })

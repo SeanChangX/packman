@@ -98,7 +98,8 @@ function BoxesPage() {
 
   const deleteBox = useMutation({
     mutationFn: (id: string) => boxesApi.delete(id),
-    onSuccess: () => {
+    onSuccess: (_, id) => {
+      qc.removeQueries({ queryKey: ['box', id] })
       qc.invalidateQueries({ queryKey: ['boxes'] })
       showToast(t('boxes.action.deleted'), 'success')
     },
@@ -108,7 +109,11 @@ function BoxesPage() {
   const updateBox = useMutation({
     mutationFn: ({ id, data }: { id: string; data: UpdateBoxInput }) =>
       boxesApi.update(id, data),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['boxes'] }),
+    onSuccess: (_, { id }) => {
+      qc.invalidateQueries({ queryKey: ['boxes'] })
+      qc.invalidateQueries({ queryKey: ['box', id] })
+      qc.invalidateQueries({ queryKey: ['items'] })
+    },
     onError: (e: unknown) => showToast(formatApiError(e, t('common.opFailed'), t('common.requiredHint')), 'error'),
   })
 

@@ -68,6 +68,7 @@ function NewItemPage() {
     onSuccess: ({ item, photoError }) => {
       qc.invalidateQueries({ queryKey: ['items'] })
       qc.invalidateQueries({ queryKey: ['item', item.id] })
+      qc.invalidateQueries({ queryKey: ['boxes'] })
       if (photoError) showToast(t('items.upload.itemAddedPhotoFailed', { error: photoError }), 'error')
       navigate({ to: '/items/$id', params: { id: item.id } })
     },

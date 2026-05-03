@@ -5,7 +5,7 @@ import { ArrowLeft, Download, Eye, CheckSquare, Square } from 'lucide-react'
 import * as pdfjsLib from 'pdfjs-dist'
 import pdfjsWorker from 'pdfjs-dist/build/pdf.worker.mjs?url'
 import { boxesApi, itemsApi, usersApi } from '../lib/api'
-import { STATUS_LABEL_KEYS, STATUS_COLORS, SHIPPING_LABEL_KEYS, cn } from '../lib/utils'
+import { STATUS_LABEL_KEYS, STATUS_COLORS, SHIPPING_LABEL_KEYS, cn, formatApiError } from '../lib/utils'
 import { Select } from '../lib/select'
 import { useT } from '../lib/i18n'
 import { useAuth } from '../lib/auth-context'
@@ -27,9 +27,10 @@ function BoxDetailPage() {
   const [rendering, setRendering] = useState(false)
   const canvasRef = useRef<HTMLCanvasElement>(null)
 
-  const { data: box, isLoading } = useQuery({
+  const { data: box, isLoading, isError, error } = useQuery({
     queryKey: ['box', id],
     queryFn: () => boxesApi.get(id),
+    retry: (failureCount, err) => ((err as { status?: number })?.status === 404 ? false : failureCount < 2),
   })
   const { data: users } = useQuery({
     queryKey: ['users'],
@@ -116,7 +117,11 @@ function BoxDetailPage() {
   const updateItem = useMutation({
     mutationFn: ({ itemId, status }: { itemId: string; status: PackingStatus }) =>
       itemsApi.update(itemId, { status }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['box', id] }),
+    onSuccess: (_, { itemId }) => {
+      qc.invalidateQueries({ queryKey: ['box', id] })
+      qc.invalidateQueries({ queryKey: ['items'] })
+      qc.invalidateQueries({ queryKey: ['item', itemId] })
+    },
   })
 
   const updateBox = useMutation({
@@ -127,8 +132,14 @@ function BoxDetailPage() {
     },
   })
 
+  if (isError && (error as { status?: number })?.status === 404) {
+    return <p className="py-12 text-center text-muted">{t('box.detail.notFound')}</p>
+  }
+  if (isError) {
+    return <p className="py-12 text-center text-red-500">{formatApiError(error, t('common.opFailed'), t('common.requiredHint'))}</p>
+  }
   if (isLoading) return <div className="flex justify-center py-12"><div className="h-8 w-8 animate-spin rounded-full border-4 border-brand-500 border-t-transparent" /></div>
-  if (!box) return <p>{t('box.detail.notFound')}</p>
+  if (!box) return <p className="py-12 text-center text-muted">{t('box.detail.notFound')}</p>
 
   const items = box.items ?? []
   const packedCount = items.filter((i) => i.status !== 'NOT_PACKED').length

@@ -85,6 +85,8 @@ export const adminApi = {
   }>('/api/admin/stats'),
 
   users: () => req<User[]>('/api/admin/users'),
+  userImpact: (id: string) =>
+    req<{ ownedItems: number; ownedBoxes: number; ownedBatteries: number; createdItems: number }>(`/api/admin/users/${id}/impact`),
   updateUser: (id: string, data: { role?: string; groupId?: string | null }) =>
     req<User>(`/api/admin/users/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
   deleteUser: (id: string) =>

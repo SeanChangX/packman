@@ -96,7 +96,17 @@ function UsersPage() {
                       <td className="w-20 whitespace-nowrap px-4 py-3">
                         <button
                           className="whitespace-nowrap text-xs font-semibold text-brand-600 hover:text-brand-700"
-                          onClick={() => { if (confirm(t('users.delete.confirm', { name: user.name }))) deleteUser.mutate(user.id) }}
+                          onClick={async () => {
+                            try {
+                              const impact = await adminApi.userImpact(user.id)
+                              const message = impact.ownedItems + impact.ownedBoxes + impact.ownedBatteries + impact.createdItems > 0
+                                ? t('users.delete.confirmWithImpact', { name: user.name, ...impact })
+                                : t('users.delete.confirm', { name: user.name })
+                              if (confirm(message)) deleteUser.mutate(user.id)
+                            } catch {
+                              showToast(t('users.delete.impactFailed'), 'error')
+                            }
+                          }}
                         >
                           {t('common.delete')}
                         </button>

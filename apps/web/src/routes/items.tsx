@@ -66,13 +66,18 @@ function ItemsPage() {
   const updateStatus = useMutation({
     mutationFn: ({ id, status }: { id: string; status: PackingStatus }) =>
       itemsApi.update(id, { status }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['items'] }),
+    onSuccess: (_, { id }) => {
+      qc.invalidateQueries({ queryKey: ['items'] })
+      qc.invalidateQueries({ queryKey: ['item', id] })
+      qc.invalidateQueries({ queryKey: ['boxes'] })
+    },
     onError: (e: unknown) => showToast(formatApiError(e, t('common.opFailed'), t('common.requiredHint')), 'error'),
   })
 
   const batchDelete = useMutation({
     mutationFn: (ids: string[]) => itemsApi.batchDelete(ids),
-    onSuccess: () => {
+    onSuccess: (_, ids) => {
+      ids.forEach((id) => qc.removeQueries({ queryKey: ['item', id] }))
       setSelected(new Set())
       qc.invalidateQueries({ queryKey: ['items'] })
       showToast(t('items.batchDelete.success'), 'success')

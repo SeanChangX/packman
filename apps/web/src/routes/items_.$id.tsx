@@ -5,7 +5,7 @@ import { useState, useRef, useEffect } from 'react'
 import { ArrowLeft, RefreshCw, Tag, Trash2, Upload, X } from 'lucide-react'
 import { useToast } from '@packman/ui'
 import { itemsApi, groupsApi, boxesApi, usersApi, selectOptionsApi } from '../lib/api'
-import { STATUS_LABEL_KEYS, STATUS_COLORS, getLabelFromOptions, optionsToSelectItems, cn, formatApiError } from '../lib/utils'
+import { STATUS_LABEL_KEYS, STATUS_COLORS, getLabelFromOptions, optionsToSelectItems, cn, formatApiError, formatTimestamp } from '../lib/utils'
 import { SelectController } from '../lib/select'
 import { useT } from '../lib/i18n'
 import type { UpdateItemInput, PackingStatus } from '@packman/shared'
@@ -23,11 +23,12 @@ function ItemDetailPage() {
   const [photoSrc, setPhotoSrc] = useState('')
   const [photoLoadError, setPhotoLoadError] = useState(false)
 
-  const { data: item, refetch } = useQuery({
+  const { data: item, refetch, isLoading, isError, error } = useQuery({
     queryKey: ['item', id],
     queryFn: () => itemsApi.get(id),
+    retry: (failureCount, err) => ((err as { status?: number })?.status === 404 ? false : failureCount < 2),
     refetchInterval: (q) =>
-      q.state.data?.aiTagStatus === 'PENDING' ? 3000 : false,
+      q.state.status !== 'error' && q.state.data?.aiTagStatus === 'PENDING' ? 3000 : false,
   })
   const { data: groups } = useQuery({ queryKey: ['groups'], queryFn: groupsApi.list })
   const { data: boxes } = useQuery({ queryKey: ['boxes'], queryFn: () => boxesApi.list() })
@@ -65,6 +66,8 @@ function ItemDetailPage() {
     mutationFn: (data: UpdateItemInput) => itemsApi.update(id, data),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['item', id] })
+      qc.invalidateQueries({ queryKey: ['items'] })
+      qc.invalidateQueries({ queryKey: ['boxes'] })
       setEditing(false)
       showToast(t('items.action.updated'), 'success')
     },
@@ -97,6 +100,7 @@ function ItemDetailPage() {
         uploadToastIdRef.current = null
       }
       showToast(t('items.upload.success'), 'success')
+      qc.invalidateQueries({ queryKey: ['items'] })
       refetch()
     },
     onError: (e: unknown) => {
@@ -111,6 +115,7 @@ function ItemDetailPage() {
   const reanalyzePhoto = useMutation({
     mutationFn: () => itemsApi.reanalyzePhoto(id),
     onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['items'] })
       refetch()
       showToast(t('items.action.queuedReanalyze'), 'success')
     },
@@ -120,13 +125,22 @@ function ItemDetailPage() {
   const deleteItem = useMutation({
     mutationFn: () => itemsApi.delete(id),
     onSuccess: () => {
+      qc.removeQueries({ queryKey: ['item', id] })
+      qc.invalidateQueries({ queryKey: ['items'] })
+      qc.invalidateQueries({ queryKey: ['boxes'] })
       showToast(t('items.action.deleted'), 'success')
       navigate({ to: '/items' })
     },
     onError: (e: unknown) => showToast(formatApiError(e, t('common.opFailed'), t('common.requiredHint')), 'error'),
   })
 
-  if (!item) return <div className="flex justify-center py-12"><div className="h-8 w-8 animate-spin rounded-full border-4 border-brand-500 border-t-transparent" /></div>
+  if (isError && (error as { status?: number })?.status === 404) {
+    return <p className="py-12 text-center text-muted">{t('item.detail.notFound')}</p>
+  }
+  if (isError) {
+    return <p className="py-12 text-center text-red-500">{formatApiError(error, t('common.opFailed'), t('common.requiredHint'))}</p>
+  }
+  if (isLoading || !item) return <div className="flex justify-center py-12"><div className="h-8 w-8 animate-spin rounded-full border-4 border-brand-500 border-t-transparent" /></div>
 
   const latestJob = item.aiTagJobs?.[0]
   const aiStatusLabel = (() => {
@@ -425,6 +439,8 @@ function ItemDetailPage() {
                   [t('items.detail.field.useCategory'), item.useCategory ? getLabelFromOptions(categoryOpts, item.useCategory) : '—'],
                   [t('items.detail.field.notes'), item.notes ?? '—'],
                   [t('items.detail.field.specialNotes'), item.specialNotes ?? '—'],
+                  [t('items.detail.field.createdAt'), formatTimestamp(item.createdAt)],
+                  [t('items.detail.field.updatedAt'), formatTimestamp(item.updatedAt)],
                 ].map(([label, value]) => (
                   <div key={String(label)} className="flex justify-between">
                     <dt className="font-medium text-muted">{label}</dt>

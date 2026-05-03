@@ -210,7 +210,10 @@ export async function authRoutes(app: FastifyInstance) {
       where: { id: request.userId },
       include: { group: true },
     })
-    if (!user) return reply.status(404).send({ message: 'User not found' })
+    if (!user) {
+      reply.clearCookie('packman_token', { path: '/' })
+      return reply.status(401).send({ message: 'User no longer exists' })
+    }
     return user
   })
 

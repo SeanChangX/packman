@@ -181,6 +181,7 @@ const en: Record<string, string> = {
   // Items detail
   'items.detail.delete': 'Delete',
   'items.detail.deleteConfirm': 'Delete "{name}"?',
+  'item.detail.notFound': 'Item not found or has been deleted',
   'items.detail.photoLoadFailed': 'Photo failed to load, please re-upload',
   'items.detail.noPhoto': 'No photo',
   'items.detail.uploading': 'Uploading...',
@@ -215,6 +216,8 @@ const en: Record<string, string> = {
   'items.detail.field.useCategory': 'Use category',
   'items.detail.field.notes': 'Notes',
   'items.detail.field.specialNotes': 'Special notes',
+  'items.detail.field.createdAt': 'Created',
+  'items.detail.field.updatedAt': 'Last updated',
   'items.upload.uploadingPct': 'Uploading photo... {pct}%',
   'items.upload.serverProcessing': 'Server processing...',
   'items.upload.success': 'Photo uploaded',
@@ -246,7 +249,7 @@ const en: Record<string, string> = {
   'boxes.new.submit': 'Add',
 
   // Box detail
-  'box.detail.notFound': 'Box not found',
+  'box.detail.notFound': 'Box not found or has been deleted',
   'box.detail.boxOwner': 'Box owner',
   'box.detail.boxOwnerLabel': 'Box owner: {name}',
   'box.detail.stickerSize': 'Sticker size',
@@ -487,6 +490,7 @@ const zhHant: Record<string, string> = {
   // Items detail
   'items.detail.delete': '刪除',
   'items.detail.deleteConfirm': '確定刪除「{name}」？',
+  'item.detail.notFound': '物品不存在或已被刪除',
   'items.detail.photoLoadFailed': '照片載入失敗，請重新上傳',
   'items.detail.noPhoto': '尚無照片',
   'items.detail.uploading': '上傳中...',
@@ -521,6 +525,8 @@ const zhHant: Record<string, string> = {
   'items.detail.field.useCategory': '用途分類',
   'items.detail.field.notes': '說明',
   'items.detail.field.specialNotes': '須留意之處',
+  'items.detail.field.createdAt': '建立時間',
+  'items.detail.field.updatedAt': '最後修改',
   'items.upload.uploadingPct': '上傳照片中… {pct}%',
   'items.upload.serverProcessing': '伺服器處理中…',
   'items.upload.success': '照片已上傳',
@@ -552,7 +558,7 @@ const zhHant: Record<string, string> = {
   'boxes.new.submit': '新增',
 
   // Box detail
-  'box.detail.notFound': '箱子不存在',
+  'box.detail.notFound': '箱子不存在或已被刪除',
   'box.detail.boxOwner': '整箱負責人',
   'box.detail.boxOwnerLabel': '整箱負責人: {name}',
   'box.detail.stickerSize': '貼紙尺寸',

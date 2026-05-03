@@ -82,6 +82,7 @@ export interface Item {
   aiTagStatus: AiTagStatus
   aiTagJobs?: AiTagJob[]
   createdAt: string
+  updatedAt: string
 }
 
 export interface AiTagJob {
