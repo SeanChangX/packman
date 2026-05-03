@@ -31,8 +31,8 @@ function buildVideoConstraints(deviceId?: string): MediaTrackConstraints {
   const advanced: ExtendedTrackConstraintSet[] = [{ focusMode: 'continuous' }]
   return {
     ...(deviceId ? { deviceId: { exact: deviceId } } : { facingMode: { ideal: 'environment' } }),
-    width: { ideal: 1920 },
-    height: { ideal: 1080 },
+    width: { ideal: 1280 },
+    height: { ideal: 720 },
     advanced: advanced as MediaTrackConstraintSet[],
   }
 }
@@ -197,8 +197,17 @@ async function startHtml5Scanner(
     formatsToSupport: [html5Module.Html5QrcodeSupportedFormats.QR_CODE],
     verbose: false,
   })
+  // Only trust the device list when we can positively identify a rear camera.
+  // On iOS the list often returns front + ultra-wide + wide + tele in an order
+  // where cameras[0] is the front camera, so blindly falling back to it picks
+  // the wrong lens. If no rear-labelled camera is found, fall through to the
+  // facingMode constraint and let the browser pick.
   const cameras = await html5Module.Html5Qrcode.getCameras().catch(() => [])
-  const preferred = cameras.find((c) => /back|rear|environment|後|背/i.test(c.label)) ?? cameras[0]
+  const preferred = cameras.find((c) => /back|rear|environment|後|背/i.test(c.label))
+  if (typeof window !== 'undefined' && localStorage.getItem('packman:debug') === '1') {
+    console.log('[scan] cameras:', cameras.map((c: { id: string; label: string }) => ({ id: c.id, label: c.label })))
+    console.log('[scan] preferred:', preferred ? { id: preferred.id, label: preferred.label } : '(facingMode env)')
+  }
 
   // Without qrbox, html5-qrcode draws the (often 16:9) video into a square
   // internal canvas which distorts QR modules and makes ZXing fail to decode.
@@ -227,6 +236,13 @@ async function startHtml5Scanner(
     const caps = scanner.getRunningTrackCapabilities() as ExtendedTrackCapabilities | undefined
     torchSupported = caps?.torch === true
   } catch { /* capability unsupported on this browser */ }
+
+  if (typeof window !== 'undefined' && localStorage.getItem('packman:debug') === '1') {
+    try {
+      const settings = scanner.getRunningTrackSettings()
+      console.log('[scan] running track settings:', settings)
+    } catch { /* settings unavailable */ }
+  }
 
   return {
     instance: scanner,
