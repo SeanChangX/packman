@@ -6,6 +6,12 @@ const apiProxy = process.env.API_PROXY ?? 'http://localhost:8080'
 
 export default defineConfig({
   plugins: [react(), TanStackRouterVite()],
+  esbuild: {
+    keepNames: true,
+  },
+  build: {
+    minify: 'esbuild',
+  },
   server: {
     host: true,
     port: 3000,
