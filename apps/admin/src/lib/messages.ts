@@ -88,8 +88,10 @@ const en: Record<string, string> = {
   'settings.appUrls.title': 'App URLs',
   'settings.appUrls.subtitle': 'Used for Slack redirect, QR codes, sticker links, and CORS origins',
   'settings.appUrls.web': 'Web URL',
+  'settings.appUrls.webHint': 'Public address of the user-facing site, used for QR codes, sticker links, and Slack sign-in callback.',
   'settings.appUrls.admin': 'Admin URL',
-  'settings.appUrls.api': 'API URL',
+  'settings.appUrls.adminHint': 'Address of this admin console, used to authorize requests to the backend. Recommended to expose only on a private network or via VPN, not the public internet.',
+  'settings.appUrls.adminMismatchConfirm': 'The Admin URL you are saving ({next}) does not match your current location ({current}). After saving, this admin console may be unable to reach the API and you may be locked out until the value is corrected directly in the database. Continue?',
   'settings.appUrls.saved': 'App URLs updated',
   'settings.appUrls.failed': 'Failed to update App URLs',
 
@@ -100,6 +102,7 @@ const en: Record<string, string> = {
   'settings.slack.clientSecret': 'Client Secret',
   'settings.slack.workspaceId': 'Workspace ID',
   'settings.slack.redirectUri': 'Redirect URI',
+  'settings.slack.redirectUriHint': 'Auto-derived from Web URL. Copy this into your Slack app configuration.',
   'settings.slack.saved': 'Slack OAuth updated',
   'settings.slack.failed': 'Failed to update Slack OAuth',
 
@@ -420,8 +423,10 @@ const zhHant: Record<string, string> = {
   'settings.appUrls.title': 'App URLs',
   'settings.appUrls.subtitle': '用於 Slack redirect、QR code、貼紙連結與 CORS 來源',
   'settings.appUrls.web': 'Web URL',
+  'settings.appUrls.webHint': '使用者前台對外網址，用於 QR code、貼紙連結與 Slack 登入回呼。',
   'settings.appUrls.admin': 'Admin URL',
-  'settings.appUrls.api': 'API URL',
+  'settings.appUrls.adminHint': '此為管理後台網址，用於授權後台對 API 的請求。建議僅於內部網路或 VPN 內提供存取，不要對外公開。',
+  'settings.appUrls.adminMismatchConfirm': '即將儲存的 Admin URL（{next}）與目前所在網址（{current}）不一致。儲存後此後台可能無法連線到 API，且必須直接修改資料庫才能還原。是否繼續？',
   'settings.appUrls.saved': 'App URLs 已更新',
   'settings.appUrls.failed': 'App URLs 更新失敗',
 
@@ -431,6 +436,7 @@ const zhHant: Record<string, string> = {
   'settings.slack.clientSecret': 'Client Secret',
   'settings.slack.workspaceId': 'Workspace ID',
   'settings.slack.redirectUri': 'Redirect URI',
+  'settings.slack.redirectUriHint': '由 Web URL 自動衍生，請將此網址填入 Slack app 設定中。',
   'settings.slack.saved': 'Slack OAuth 已更新',
   'settings.slack.failed': 'Slack OAuth 更新失敗',
 

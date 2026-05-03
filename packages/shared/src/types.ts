@@ -175,7 +175,6 @@ export interface SystemSettings {
   app: {
     appUrl: string
     adminUrl: string
-    apiUrl: string
   }
   slack: {
     clientId: string

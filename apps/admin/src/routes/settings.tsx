@@ -31,7 +31,6 @@ function SettingsPage() {
 
   const [appUrl, setAppUrl] = useState('')
   const [adminUrl, setAdminUrl] = useState('')
-  const [apiUrl, setApiUrl] = useState('')
   const [slackClientId, setSlackClientId] = useState('')
   const [slackClientSecret, setSlackClientSecret] = useState('')
   const [slackWorkspaceId, setSlackWorkspaceId] = useState('')
@@ -47,7 +46,6 @@ function SettingsPage() {
     if (!settings) return
     setAppUrl(settings.app.appUrl)
     setAdminUrl(settings.app.adminUrl)
-    setApiUrl(settings.app.apiUrl)
     setSlackClientId(settings.slack.clientId)
     setSlackWorkspaceId(settings.slack.workspaceId)
     setSlackRedirectUri(settings.slack.redirectUri)
@@ -63,7 +61,6 @@ function SettingsPage() {
     mutationFn: () => adminApi.updateAppSettings({
       appUrl: appUrl.trim(),
       adminUrl: adminUrl.trim(),
-      apiUrl: apiUrl.trim(),
     }),
     onSuccess: () => { refresh(); showToast(t('settings.appUrls.saved'), 'success') },
     onError: (e: unknown) => showToast((e as Error)?.message ?? t('settings.appUrls.failed'), 'error'),
@@ -74,7 +71,6 @@ function SettingsPage() {
       clientId: slackClientId.trim(),
       clientSecret: slackClientSecret === MASKED_SECRET ? undefined : slackClientSecret.trim() || undefined,
       workspaceId: slackWorkspaceId.trim(),
-      redirectUri: slackRedirectUri.trim(),
     }),
     onSuccess: () => {
       refresh()
@@ -203,22 +199,31 @@ function SettingsPage() {
             <p className="text-sm text-muted">{t('settings.appUrls.subtitle')}</p>
           </div>
         </div>
-        <div className="grid gap-4 md:grid-cols-3">
+        <div className="grid gap-4 md:grid-cols-2">
           <label className="flex flex-col gap-1.5">
             <span className="label">{t('settings.appUrls.web')}</span>
             <input className="input" value={appUrl} onChange={(e) => setAppUrl(e.target.value)} placeholder="http://localhost:3000" />
+            <p className="text-xs text-muted">{t('settings.appUrls.webHint')}</p>
           </label>
           <label className="flex flex-col gap-1.5">
             <span className="label">{t('settings.appUrls.admin')}</span>
             <input className="input" value={adminUrl} onChange={(e) => setAdminUrl(e.target.value)} placeholder="http://localhost:3001" />
-          </label>
-          <label className="flex flex-col gap-1.5">
-            <span className="label">{t('settings.appUrls.api')}</span>
-            <input className="input" value={apiUrl} onChange={(e) => setApiUrl(e.target.value)} placeholder="http://localhost:8080" />
+            <p className="text-xs text-muted">{t('settings.appUrls.adminHint')}</p>
           </label>
         </div>
         <div className="mt-5 flex justify-end">
-          <button onClick={() => updateApp.mutate()} disabled={updateApp.isPending} className="btn-primary">
+          <button
+            onClick={() => {
+              const trimmedAdmin = adminUrl.trim()
+              const currentOrigin = window.location.origin
+              if (trimmedAdmin && trimmedAdmin !== currentOrigin) {
+                if (!confirm(t('settings.appUrls.adminMismatchConfirm', { current: currentOrigin, next: trimmedAdmin }))) return
+              }
+              updateApp.mutate()
+            }}
+            disabled={updateApp.isPending}
+            className="btn-primary"
+          >
             <Save className="h-4 w-4" />
             {t('common.save')}
           </button>
@@ -254,7 +259,8 @@ function SettingsPage() {
           </label>
           <label className="flex flex-col gap-1.5">
             <span className="label">{t('settings.slack.redirectUri')}</span>
-            <input className="input" value={slackRedirectUri} onChange={(e) => setSlackRedirectUri(e.target.value)} placeholder="http://localhost:8080/auth/slack/callback" />
+            <input className="input" value={slackRedirectUri} readOnly />
+            <p className="text-xs text-muted">{t('settings.slack.redirectUriHint')}</p>
           </label>
         </div>
         <div className="mt-5 flex justify-end">

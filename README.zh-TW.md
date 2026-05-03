@@ -106,31 +106,32 @@
 
 1. 前往 https://api.slack.com/apps → **Create New App** → From scratch
 2. 名稱填 `Packman`，選擇你的 workspace
-3. **OAuth & Permissions** → 新增 redirect URL：
-   ```
-   http://YOUR_HOST:8080/auth/slack/callback
-   ```
-4. User Token Scopes：`identity.basic`、`identity.email`、`identity.avatar`
-5. 複製 **Client ID**、**Client Secret**、**Workspace ID** 到 管理後台 → 系統設定 → Slack
+3. User Token Scopes：`identity.basic`、`identity.email`、`identity.avatar`
+4. 在 **管理後台 → 系統設定** 中將 **Web URL** 設為對外正式網址（例如 `https://packman.example.com`）。Slack Redirect URI 會由系統自動衍生為 `${WEB_URL}/auth/slack/callback`，並以唯讀方式顯示在 Slack 區塊內 — 將此網址貼到 Slack App 的 **OAuth & Permissions → Redirect URLs**。
+5. 複製 Slack 的 **Client ID**、**Client Secret**、**Workspace ID** 到 管理後台 → 系統設定 → Slack。
 
 ---
 
 ## 系統架構
 
 ```
-[ 瀏覽器 ] ─── [ Web (3000) ]  ─┐
-                                ├─→ [ API (8080) ] ─── [ Postgres ]
-[ 瀏覽器 ] ─── [ Admin (3001) ] ─┘                  └─ [ MinIO (照片) ]
-                                                    └─ [ Ollama (視覺 LLM) ]
+               ┌─ Web nginx (3000) ─┐  反代 /api、/auth
+[ 瀏覽器 ] ─────┤                    ├──→ [ API (內網 :8080) ] ─── [ Postgres (內網) ]
+               └─ Admin nginx (3001)┘                            └─ [ MinIO (內網 :9000) ]
+                                                                 └─ [ Ollama (視覺 LLM) ]
 ```
 
-| 服務 | 連接埠 | 技術棧 |
+正式環境只暴露 Web (`3000`) 與 Admin (`3001`) 兩個 nginx 容器；API、Postgres、MinIO 都未對外開 port — SPA 只對自身 origin 呼叫 `/api/*` 與 `/auth/*`，由 nginx 反代到 API。攻擊面僅限於前後台兩個前端。
+
+| 服務 | 對外連接埠（prod） | 技術棧 |
 |---|---|---|
 | **Web** | 3000 | React + Vite + TanStack Router/Query |
 | **Admin** | 3001 | React + Vite（獨立 SPA） |
-| **API** | 8080 | Node.js + Fastify + Prisma + TypeScript |
-| **Postgres** | 內部 | 多活動分區 schema、GIN / trigram 索引 |
-| **MinIO** | 9000 / 9001 | S3 相容物件儲存 |
+| **API** | — (內網 :8080) | Node.js + Fastify + Prisma + TypeScript |
+| **Postgres** | — (內網) | 多活動分區 schema、GIN / trigram 索引 |
+| **MinIO** | console 綁 127.0.0.1:9001 | S3 相容物件儲存（S3 API 內網 :9000） |
+
+> **Admin URL 安全注意事項。** 在 **管理後台 → 系統設定** 中設定的 Admin URL 必須與你實際開啟管理後台所用的網址一致（用於 CORS origin 比對）。一旦不一致，後台 SPA 將無法呼叫 API 而被鎖死，必須透過 `docker compose exec postgres psql` 直接修改 `system_setting` 才能還原。儲存時若偵測到與目前所在網址不符會跳出確認提示。正式環境建議將 `3001` 僅綁在內部網路或透過 VPN 存取。
 
 每次推送到 `main` 都會透過 [GitHub Actions](.github/workflows/build-and-push.yml) 自動 build 並推送到 `ghcr.io/seanchangx/packman-{api,web,admin}`，會打上 `latest`、branch、sha、semver 等多個 tag。
 

@@ -106,31 +106,32 @@ Packing for an international robotics competition with 30+ people, 5 oversized b
 
 1. https://api.slack.com/apps → **Create New App** → From scratch
 2. Name `Packman`, pick your workspace
-3. **OAuth & Permissions** → add redirect URL:
-   ```
-   http://YOUR_HOST:8080/auth/slack/callback
-   ```
-4. User Token Scopes: `identity.basic`, `identity.email`, `identity.avatar`
-5. Copy **Client ID** + **Client Secret** + **Workspace ID** into Admin → Settings → Slack
+3. User Token Scopes: `identity.basic`, `identity.email`, `identity.avatar`
+4. In **Admin → Settings**, set the **Web URL** to your public address (e.g. `https://packman.example.com`). The Slack Redirect URI is auto-derived as `${WEB_URL}/auth/slack/callback` and shown read-only in the Slack section — copy it into your Slack app's **OAuth & Permissions → Redirect URLs**.
+5. Copy **Client ID** + **Client Secret** + **Workspace ID** from Slack into Admin → Settings → Slack.
 
 ---
 
 ## System architecture
 
 ```
-[ Browser ] ─── [ Web (3000) ]  ─┐
-                                 ├─→ [ API (8080) ] ─── [ Postgres ]
-[ Browser ] ─── [ Admin (3001) ] ─┘                  └─ [ MinIO (photos) ]
-                                                     └─ [ Ollama (vision LLM) ]
+                ┌─ Web nginx (3000) ─┐  proxies /api, /auth
+[ Browser ] ────┤                    ├──→ [ API (internal :8080) ] ─── [ Postgres (internal) ]
+                └─ Admin nginx (3001)┘                                 └─ [ MinIO (internal :9000) ]
+                                                                       └─ [ Ollama (vision LLM) ]
 ```
 
-| Service | Port | Stack |
-|---------|------|-------|
+In production, only the Web (`3000`) and Admin (`3001`) nginx containers are reachable from outside the Docker network. API, Postgres, and MinIO have no published ports — the SPAs call `/api/*` and `/auth/*` on their own origin and nginx reverse-proxies to the API. This keeps the attack surface to the two SPA front-ends.
+
+| Service | Public port (prod) | Stack |
+|---------|--------------------|-------|
 | **Web** | 3000 | React + Vite + TanStack Router/Query |
 | **Admin** | 3001 | React + Vite (separate SPA) |
-| **API** | 8080 | Node.js + Fastify + Prisma + TypeScript |
-| **Postgres** | internal | Schema with per-event scoping, GIN/trigram indexes |
-| **MinIO** | 9000 / 9001 | S3-compatible photo storage |
+| **API** | — (internal :8080) | Node.js + Fastify + Prisma + TypeScript |
+| **Postgres** | — (internal) | Schema with per-event scoping, GIN/trigram indexes |
+| **MinIO** | console on 127.0.0.1:9001 | S3-compatible photo storage (S3 API internal :9000) |
+
+> **Admin URL safety.** The Admin URL configured in **Admin → Settings** must match the address you use to reach the admin console (used as a CORS origin). If they diverge, the admin SPA will be unable to call the API and you'll be locked out — recovery requires editing the `system_setting` row directly via `docker compose exec postgres psql`. The admin UI shows a confirmation prompt if you try to save a value that doesn't match your current location. For production, exposing port `3001` only on a private network or behind a VPN is recommended.
 
 Docker images are built on every push to `main` via [GitHub Actions](.github/workflows/build-and-push.yml) and pushed to `ghcr.io/seanchangx/packman-{api,web,admin}` with `latest`, branch, sha, and semver tags.
 

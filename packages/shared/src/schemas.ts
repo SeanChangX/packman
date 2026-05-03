@@ -123,14 +123,12 @@ export const UpdateOllamaEndpointSchema = z.object({
 export const UpdateAppSettingsSchema = z.object({
   appUrl: z.string().url().max(300),
   adminUrl: z.string().url().max(300),
-  apiUrl: z.string().url().max(300),
 })
 
 export const UpdateSlackSettingsSchema = z.object({
   clientId: z.string().max(200),
   clientSecret: z.string().max(500).optional(),
   workspaceId: z.string().max(100),
-  redirectUri: z.union([z.literal(''), z.string().url().max(300)]),
 })
 
 export const AdminAccountSchema = z.object({

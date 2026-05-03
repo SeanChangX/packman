@@ -182,9 +182,9 @@ export const adminApi = {
     req<void>(`/api/admin/ollama-endpoints/${id}`, { method: 'DELETE' }),
 
   settings: () => req<SystemSettings>('/api/admin/settings'),
-  updateAppSettings: (data: { appUrl: string; adminUrl: string; apiUrl: string }) =>
+  updateAppSettings: (data: { appUrl: string; adminUrl: string }) =>
     req<SystemSettings['app']>('/api/admin/settings/app', { method: 'PATCH', body: JSON.stringify(data) }),
-  updateSlackSettings: (data: { clientId: string; clientSecret?: string; workspaceId: string; redirectUri: string }) =>
+  updateSlackSettings: (data: { clientId: string; clientSecret?: string; workspaceId: string }) =>
     req<SystemSettings['slack']>('/api/admin/settings/slack', { method: 'PATCH', body: JSON.stringify(data) }),
   updateAdminAccount: (data: { username: string; password?: string }) =>
     req<AdminAuthStatus>('/api/admin/settings/admin-account', { method: 'PATCH', body: JSON.stringify(data) }),

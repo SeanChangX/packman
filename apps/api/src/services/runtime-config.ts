@@ -14,11 +14,9 @@ function scrypt(password: string, salt: string, keylen: number, options: ScryptO
 const SETTINGS = {
   appUrl: 'app.url',
   adminUrl: 'app.adminUrl',
-  apiUrl: 'app.apiUrl',
   slackClientId: 'slack.clientId',
   slackClientSecret: 'slack.clientSecret',
   slackWorkspaceId: 'slack.workspaceId',
-  slackRedirectUri: 'slack.redirectUri',
   adminUsername: 'admin.username',
   adminPasswordHash: 'admin.passwordHash',
   jwtSecret: 'security.jwtSecret',
@@ -30,7 +28,7 @@ const SETTINGS = {
 
 const DEFAULT_APP_URL = 'http://localhost:3000'
 const DEFAULT_ADMIN_URL = 'http://localhost:3001'
-const DEFAULT_API_URL = 'http://localhost:8080'
+const SLACK_CALLBACK_PATH = '/auth/slack/callback'
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN ?? '7d'
 
 let jwtSecret = ''
@@ -78,39 +76,48 @@ export function getJwtExpiresIn() {
   return JWT_EXPIRES_IN
 }
 
+function stripTrailingSlash(value: string): string {
+  return value.replace(/\/+$/, '')
+}
+
 export async function getAppConfig() {
-  const [appUrl, adminUrl, apiUrl] = await Promise.all([
+  const [appUrl, adminUrl] = await Promise.all([
     getSetting(SETTINGS.appUrl),
     getSetting(SETTINGS.adminUrl),
-    getSetting(SETTINGS.apiUrl),
   ])
 
   return {
-    appUrl: appUrl || DEFAULT_APP_URL,
-    adminUrl: adminUrl || DEFAULT_ADMIN_URL,
-    apiUrl: apiUrl || DEFAULT_API_URL,
+    appUrl: stripTrailingSlash(appUrl || DEFAULT_APP_URL),
+    adminUrl: stripTrailingSlash(adminUrl || DEFAULT_ADMIN_URL),
   }
+}
+
+function normalizeOrigin(value: string | undefined): string | undefined {
+  if (value === undefined) return undefined
+  return stripTrailingSlash(value.trim())
 }
 
 export async function updateAppConfig(input: {
   appUrl?: string
   adminUrl?: string
-  apiUrl?: string
 }) {
   await Promise.all([
-    setOptionalSetting(SETTINGS.appUrl, input.appUrl),
-    setOptionalSetting(SETTINGS.adminUrl, input.adminUrl),
-    setOptionalSetting(SETTINGS.apiUrl, input.apiUrl),
+    setOptionalSetting(SETTINGS.appUrl, normalizeOrigin(input.appUrl)),
+    setOptionalSetting(SETTINGS.adminUrl, normalizeOrigin(input.adminUrl)),
   ])
   return getAppConfig()
 }
 
+export function getSlackRedirectUri(appUrl: string) {
+  return `${appUrl.replace(/\/+$/, '')}${SLACK_CALLBACK_PATH}`
+}
+
 export async function getSlackConfig() {
-  const [clientId, clientSecret, workspaceId, redirectUri] = await Promise.all([
+  const [clientId, clientSecret, workspaceId, { appUrl }] = await Promise.all([
     getSetting(SETTINGS.slackClientId),
     getSetting(SETTINGS.slackClientSecret),
     getSetting(SETTINGS.slackWorkspaceId),
-    getSetting(SETTINGS.slackRedirectUri),
+    getAppConfig(),
   ])
 
   return {
@@ -118,7 +125,7 @@ export async function getSlackConfig() {
     clientSecret: clientSecret ?? '',
     clientSecretSet: Boolean(clientSecret),
     workspaceId: workspaceId ?? '',
-    redirectUri: redirectUri ?? '',
+    redirectUri: getSlackRedirectUri(appUrl),
   }
 }
 
@@ -126,13 +133,11 @@ export async function updateSlackConfig(input: {
   clientId?: string
   clientSecret?: string
   workspaceId?: string
-  redirectUri?: string
 }) {
   await Promise.all([
     setOptionalSetting(SETTINGS.slackClientId, input.clientId),
     input.clientSecret ? setSetting(SETTINGS.slackClientSecret, input.clientSecret.trim()) : Promise.resolve(),
     setOptionalSetting(SETTINGS.slackWorkspaceId, input.workspaceId),
-    setOptionalSetting(SETTINGS.slackRedirectUri, input.redirectUri),
   ])
   return getSlackConfig()
 }

@@ -44,7 +44,7 @@ export async function authRoutes(app: FastifyInstance) {
   // Initiate Slack OAuth
   app.get('/slack', async (request, reply) => {
     const [{ appUrl }, slack] = await Promise.all([getAppConfig(), getSlackConfig()])
-    if (!slack.clientId || !slack.clientSecret || !slack.redirectUri) {
+    if (!slack.clientId || !slack.clientSecret) {
       return reply.redirect(`${appUrl}/login?error=slack_not_configured`)
     }
 
@@ -67,7 +67,7 @@ export async function authRoutes(app: FastifyInstance) {
         return reply.redirect(`${appUrl}/login?error=slack_denied`)
       }
 
-      if (!slack.clientId || !slack.clientSecret || !slack.redirectUri) {
+      if (!slack.clientId || !slack.clientSecret) {
         return reply.redirect(`${appUrl}/login?error=slack_not_configured`)
       }
 
