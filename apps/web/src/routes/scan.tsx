@@ -186,18 +186,28 @@ async function startHtml5Scanner(
 
   const scanner = new html5Module.Html5Qrcode(containerId, {
     formatsToSupport: [html5Module.Html5QrcodeSupportedFormats.QR_CODE],
-    verbose: false,
+    verbose: true,
   })
   const cameras = await html5Module.Html5Qrcode.getCameras().catch(() => [])
   const preferred = cameras.find((c) => /back|rear|environment|後|背/i.test(c.label)) ?? cameras[0]
+
+  // Without qrbox, html5-qrcode draws the (often 16:9) video into a square
+  // internal canvas which distorts QR modules and makes ZXing fail to decode.
+  // Compute a centred square scan region from the actual viewport so modules
+  // stay square regardless of camera aspect ratio.
+  const qrboxFn = (viewW: number, viewH: number) => {
+    const side = Math.floor(Math.min(viewW, viewH) * 0.7)
+    return { width: side, height: side }
+  }
 
   await scanner.start(
     preferred?.id ?? { facingMode: { ideal: 'environment' } },
     {
       fps: 15,
-      // Skip html5-qrcode's built-in qrbox so it doesn't draw its own L-corners and scan line on top of our overlay.
+      qrbox: qrboxFn,
+      aspectRatio: 1,
       videoConstraints: buildVideoConstraints(preferred?.id),
-      disableFlip: true,
+      disableFlip: false,
     },
     onDecoded,
     undefined,
@@ -269,6 +279,16 @@ const SCAN_STYLES = `
   object-fit: cover !important;
   width: 100% !important;
   height: 100% !important;
+}
+/* Hide html5-qrcode's built-in qrbox L-corners and scan line so our own overlay is the only viewfinder UI. */
+#${SCANNER_FALLBACK_ID} > div:not([id]) {
+  border: 0 !important;
+  box-shadow: none !important;
+  background: transparent !important;
+}
+#${SCANNER_FALLBACK_ID} img[alt="Info icon"],
+#${SCANNER_FALLBACK_ID} canvas[id$="qr-shaded-region"] {
+  display: none !important;
 }
 `
 
