@@ -12,7 +12,6 @@ type JsqrFn = JsqrModule['default']
 type DetectedBarcode = {
   rawValue: string
   boundingBox?: { x: number; y: number; width: number; height: number }
-  cornerPoints?: { x: number; y: number }[]
 }
 type BarcodeDetectorInstance = { detect: (source: CanvasImageSource) => Promise<DetectedBarcode[]> }
 type BarcodeDetectorCtor = new (options?: { formats?: string[] }) => BarcodeDetectorInstance
@@ -23,6 +22,13 @@ type ScannerHandle = {
   applyTorch: (on: boolean) => Promise<void>
   isTorchSupported: () => boolean
 }
+
+const VIEWFINDER_CORNERS = [
+  { className: 'left-0 top-0 rounded-tl-2xl border-l-2 border-t-2' },
+  { className: 'right-0 top-0 rounded-tr-2xl border-r-2 border-t-2' },
+  { className: 'bottom-0 left-0 rounded-bl-2xl border-b-2 border-l-2' },
+  { className: 'bottom-0 right-0 rounded-br-2xl border-b-2 border-r-2' },
+] as const
 
 function buildVideoConstraints(): MediaTrackConstraints {
   const advanced: ExtendedTrackConstraintSet[] = [{ focusMode: 'continuous' }]
@@ -109,26 +115,67 @@ function feedbackOnScan() {
   playBeep()
 }
 
-async function startNativeScanner(
-  video: HTMLVideoElement,
-  onDecoded: (text: string) => void,
-): Promise<ScannerHandle> {
+// Common camera setup shared by both engines. Acquires the stream, attaches it
+// to the page's <video>, plays it, and on failure releases tracks so a retry
+// can request the camera again cleanly.
+async function setupCameraStream(video: HTMLVideoElement): Promise<MediaStream> {
   const stream = await navigator.mediaDevices.getUserMedia({
     video: buildVideoConstraints(),
     audio: false,
   })
-
   try {
     video.srcObject = stream
-    video.setAttribute('playsinline', 'true')
-    video.muted = true
     await video.play()
   } catch (err) {
-    // play() can reject before any frame plays (e.g. element detached, autoplay rejection); release the stream.
     try { stream.getTracks().forEach((t) => t.stop()) } catch { /* tracks already ended */ }
     try { video.srcObject = null } catch { /* element detached */ }
     throw err
   }
+  return stream
+}
+
+// Build the ScannerHandle that the page interacts with. stopFn is called first
+// so each engine can flip its internal stopped flag before tracks are released.
+function buildScannerHandle(
+  stream: MediaStream,
+  video: HTMLVideoElement,
+  stopFn: () => void,
+): ScannerHandle {
+  const track = stream.getVideoTracks()[0] ?? null
+  const caps = (track?.getCapabilities?.() as ExtendedTrackCapabilities | undefined) ?? {}
+  const torchSupported = caps.torch === true
+  return {
+    stop: async () => {
+      stopFn()
+      try { stream.getTracks().forEach((t) => t.stop()) } catch { /* track already ended */ }
+      try { video.srcObject = null } catch { /* element detached */ }
+    },
+    applyTorch: async (on) => {
+      if (!track) return
+      await track.applyConstraints({
+        advanced: [{ torch: on } as ExtendedTrackConstraintSet] as MediaTrackConstraintSet[],
+      })
+    },
+    isTorchSupported: () => torchSupported,
+  }
+}
+
+// Schedule the next decode tick on the next decoded video frame, falling back
+// to rAF on browsers without requestVideoFrameCallback (Firefox, older Safari).
+function scheduleNextTick(video: HTMLVideoElement, fn: () => void) {
+  const v = video as HTMLVideoElement & { requestVideoFrameCallback?: (cb: () => void) => number }
+  if (typeof v.requestVideoFrameCallback === 'function') {
+    v.requestVideoFrameCallback(() => fn())
+  } else {
+    requestAnimationFrame(() => fn())
+  }
+}
+
+async function startNativeScanner(
+  video: HTMLVideoElement,
+  onDecoded: (text: string) => void,
+): Promise<ScannerHandle> {
+  const stream = await setupCameraStream(video)
 
   const Ctor = (window as unknown as { BarcodeDetector: BarcodeDetectorCtor }).BarcodeDetector
   const detector = new Ctor({ formats: ['qr_code'] })
@@ -152,34 +199,11 @@ async function startNativeScanner(
         busy = false
       }
     }
-    if (stopped) return
-    const v = video as HTMLVideoElement & { requestVideoFrameCallback?: (cb: () => void) => number }
-    if (typeof v.requestVideoFrameCallback === 'function') {
-      v.requestVideoFrameCallback(() => void tick())
-    } else {
-      requestAnimationFrame(() => void tick())
-    }
+    if (!stopped) scheduleNextTick(video, () => void tick())
   }
   void tick()
 
-  const track = stream.getVideoTracks()[0] ?? null
-  const caps = (track?.getCapabilities?.() as ExtendedTrackCapabilities | undefined) ?? {}
-  const torchSupported = caps.torch === true
-
-  return {
-    stop: async () => {
-      stopped = true
-      try { stream.getTracks().forEach((t) => t.stop()) } catch { /* track already ended */ }
-      try { video.srcObject = null } catch { /* element detached */ }
-    },
-    applyTorch: async (on) => {
-      if (!track) return
-      await track.applyConstraints({
-        advanced: [{ torch: on } as ExtendedTrackConstraintSet] as MediaTrackConstraintSet[],
-      })
-    },
-    isTorchSupported: () => torchSupported,
-  }
+  return buildScannerHandle(stream, video, () => { stopped = true })
 }
 
 // Fallback decoder for browsers without BarcodeDetector (notably iOS Safari and
@@ -195,21 +219,7 @@ async function startJsqrScanner(
   moduleRef.current = jsqrModule
   const jsqr: JsqrFn = jsqrModule.default
 
-  const stream = await navigator.mediaDevices.getUserMedia({
-    video: buildVideoConstraints(),
-    audio: false,
-  })
-
-  try {
-    video.srcObject = stream
-    video.setAttribute('playsinline', 'true')
-    video.muted = true
-    await video.play()
-  } catch (err) {
-    try { stream.getTracks().forEach((t) => t.stop()) } catch { /* tracks already ended */ }
-    try { video.srcObject = null } catch { /* element detached */ }
-    throw err
-  }
+  const stream = await setupCameraStream(video)
 
   const canvas = document.createElement('canvas')
   const ctx = canvas.getContext('2d', { willReadFrequently: true })
@@ -226,15 +236,21 @@ async function startJsqrScanner(
         // QR modules stay square regardless of camera aspect ratio. Cap the
         // sampled side at 720px — bigger crops slow jsQR down without helping
         // decode quality on phone-sized QR codes.
-        const side = Math.min(video.videoWidth, video.videoHeight, 720)
-        canvas.width = side
-        canvas.height = side
-        const sx = (video.videoWidth - Math.min(video.videoWidth, video.videoHeight)) / 2
-        const sy = (video.videoHeight - Math.min(video.videoWidth, video.videoHeight)) / 2
         const sSide = Math.min(video.videoWidth, video.videoHeight)
+        const side = Math.min(sSide, 720)
+        if (canvas.width !== side) {
+          canvas.width = side
+          canvas.height = side
+        }
+        const sx = (video.videoWidth - sSide) / 2
+        const sy = (video.videoHeight - sSide) / 2
         ctx.drawImage(video, sx, sy, sSide, sSide, 0, 0, side, side)
         const image = ctx.getImageData(0, 0, side, side)
-        const result = jsqr(image.data, image.width, image.height, { inversionAttempts: 'attemptBoth' })
+        // Live scanning is always against printed labels (dark modules on light
+        // paper), so dontInvert is ~2x faster than attemptBoth with no impact
+        // on success rate. Image upload uses attemptBoth because users may
+        // upload dark-mode screenshots.
+        const result = jsqr(image.data, image.width, image.height, { inversionAttempts: 'dontInvert' })
         if (!stopped && result?.data) {
           onDecoded(result.data)
         }
@@ -244,46 +260,30 @@ async function startJsqrScanner(
         busy = false
       }
     }
-    if (stopped) return
-    const v = video as HTMLVideoElement & { requestVideoFrameCallback?: (cb: () => void) => number }
-    if (typeof v.requestVideoFrameCallback === 'function') {
-      v.requestVideoFrameCallback(() => tick())
-    } else {
-      requestAnimationFrame(() => tick())
-    }
+    if (!stopped) scheduleNextTick(video, tick)
   }
   tick()
 
-  const track = stream.getVideoTracks()[0] ?? null
-  const caps = (track?.getCapabilities?.() as ExtendedTrackCapabilities | undefined) ?? {}
-  const torchSupported = caps.torch === true
-
-  return {
-    stop: async () => {
-      stopped = true
-      try { stream.getTracks().forEach((t) => t.stop()) } catch { /* track already ended */ }
-      try { video.srcObject = null } catch { /* element detached */ }
-    },
-    applyTorch: async (on) => {
-      if (!track) return
-      await track.applyConstraints({
-        advanced: [{ torch: on } as ExtendedTrackConstraintSet] as MediaTrackConstraintSet[],
-      })
-    },
-    isTorchSupported: () => torchSupported,
-  }
+  return buildScannerHandle(stream, video, () => { stopped = true })
 }
 
 async function decodeImageFile(file: File, jsqr: JsqrFn): Promise<string | null> {
   const bitmap = await createImageBitmap(file)
   try {
+    // Phone photos are easily 12 MP (4032x3024) which produces ~48 MB of
+    // ImageData and makes jsQR take >500 ms. Downscale anything above 1280px
+    // on the long edge — QR codes in photos rarely need more detail than that.
+    const maxDim = 1280
+    const scale = Math.min(1, maxDim / Math.max(bitmap.width, bitmap.height))
+    const w = Math.max(1, Math.round(bitmap.width * scale))
+    const h = Math.max(1, Math.round(bitmap.height * scale))
     const canvas = document.createElement('canvas')
-    canvas.width = bitmap.width
-    canvas.height = bitmap.height
+    canvas.width = w
+    canvas.height = h
     const ctx = canvas.getContext('2d')
     if (!ctx) return null
-    ctx.drawImage(bitmap, 0, 0)
-    const image = ctx.getImageData(0, 0, canvas.width, canvas.height)
+    ctx.drawImage(bitmap, 0, 0, w, h)
+    const image = ctx.getImageData(0, 0, w, h)
     const result = jsqr(image.data, image.width, image.height, { inversionAttempts: 'attemptBoth' })
     return result?.data ?? null
   } finally {
@@ -351,6 +351,22 @@ function ScanPage() {
   const [invalidNotice, setInvalidNotice] = useState('')
   const [successFlash, setSuccessFlash] = useState(false)
 
+  // Show a transient toast above the viewfinder. Pass force=true to bypass the
+  // 2s same-text dedup — used by image upload, where every user action
+  // deserves immediate feedback regardless of what the live scanner showed.
+  const showInvalidNotice = useCallback((message: string, force = false) => {
+    if (force) {
+      lastInvalidTextRef.current = ''
+      lastInvalidAtRef.current = performance.now()
+    }
+    setInvalidNotice(message)
+    if (invalidTimerRef.current !== null) window.clearTimeout(invalidTimerRef.current)
+    invalidTimerRef.current = window.setTimeout(() => {
+      setInvalidNotice('')
+      invalidTimerRef.current = null
+    }, 2200)
+  }, [])
+
   const stopAll = useCallback(async () => {
     if (invalidTimerRef.current !== null) {
       window.clearTimeout(invalidTimerRef.current)
@@ -364,6 +380,7 @@ function ScanPage() {
     setSuccessFlash(false)
     setTorchSupported(false)
     setTorchOn(false)
+    hasScannedRef.current = false
     const handle = handleRef.current
     handleRef.current = null
     if (handle) {
@@ -380,8 +397,9 @@ function ScanPage() {
       setTorchOn(next)
     } catch {
       setTorchSupported(false)
+      showInvalidNotice(t('scan.torch.failed'), true)
     }
-  }, [torchOn])
+  }, [showInvalidNotice, torchOn])
 
   const handleDecodedText = useCallback((decodedText: string) => {
     if (hasScannedRef.current) return
@@ -389,19 +407,15 @@ function ScanPage() {
     const route = routeFromQr(decodedText)
     if (!route) {
       // Invalid Packman QR — keep scanner alive and show a transient toast.
-      // Dedup: same text within 2s does not re-trigger to avoid per-frame spam.
+      // Dedup: same text within 2s does not re-trigger to avoid per-frame spam
+      // when the camera holds steady on a non-Packman QR (Wi-Fi, vCard, etc.).
       const now = performance.now()
       const sameText = decodedText === lastInvalidTextRef.current
       if (sameText && now - lastInvalidAtRef.current < 2000) return
 
       lastInvalidTextRef.current = decodedText
       lastInvalidAtRef.current = now
-      setInvalidNotice(t('scan.invalid.qr'))
-      if (invalidTimerRef.current !== null) window.clearTimeout(invalidTimerRef.current)
-      invalidTimerRef.current = window.setTimeout(() => {
-        setInvalidNotice('')
-        invalidTimerRef.current = null
-      }, 2200)
+      showInvalidNotice(t('scan.invalid.qr'))
       return
     }
 
@@ -419,7 +433,7 @@ function ScanPage() {
     // render, which would make this callback unstable and re-trigger the
     // scanner-start effect on every render (camera flicker / never-starts).
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [navigate, stopAll])
+  }, [navigate, showInvalidNotice, stopAll])
 
   useEffect(() => {
     let cancelled = false
@@ -497,6 +511,22 @@ function ScanPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [handleDecodedText, retryKey, stopAll])
 
+  // iOS Safari pauses <video> when the user backgrounds the tab (switching
+  // apps, locking the phone). On return the element stays paused on the last
+  // frame, leaving the viewfinder lit but frozen. Resume playback whenever
+  // the page becomes visible again.
+  useEffect(() => {
+    const onVisibilityChange = () => {
+      if (document.visibilityState !== 'visible') return
+      const video = videoRef.current
+      if (video && handleRef.current && video.paused) {
+        video.play().catch(() => undefined)
+      }
+    }
+    document.addEventListener('visibilitychange', onVisibilityChange)
+    return () => document.removeEventListener('visibilitychange', onVisibilityChange)
+  }, [])
+
   const scanImage = async (file: File | undefined) => {
     if (!file) return
 
@@ -505,14 +535,7 @@ function ScanPage() {
       jsqrModuleRef.current = jsqrModule
       const decoded = await decodeImageFile(file, jsqrModule.default)
       if (!decoded) {
-        lastInvalidTextRef.current = ''
-        lastInvalidAtRef.current = performance.now()
-        setInvalidNotice(t('scan.invalid.image'))
-        if (invalidTimerRef.current !== null) window.clearTimeout(invalidTimerRef.current)
-        invalidTimerRef.current = window.setTimeout(() => {
-          setInvalidNotice('')
-          invalidTimerRef.current = null
-        }, 4000)
+        showInvalidNotice(t('scan.invalid.image'), true)
         return
       }
       handleDecodedText(decoded)
@@ -523,14 +546,7 @@ function ScanPage() {
       console.error('[scan] image decode failed', err)
       const raw = err instanceof Error ? err.message : String(err ?? '')
       const isLoadFailure = /failed to fetch dynamically imported module|loading chunk|importscripts|networkerror/i.test(raw)
-      lastInvalidTextRef.current = ''
-      lastInvalidAtRef.current = performance.now()
-      setInvalidNotice(isLoadFailure ? `${t('scan.invalid.image')}: ${raw}` : t('scan.invalid.image'))
-      if (invalidTimerRef.current !== null) window.clearTimeout(invalidTimerRef.current)
-      invalidTimerRef.current = window.setTimeout(() => {
-        setInvalidNotice('')
-        invalidTimerRef.current = null
-      }, 4000)
+      showInvalidNotice(isLoadFailure ? `${t('scan.invalid.image')}: ${raw}` : t('scan.invalid.image'), true)
     }
   }
 
@@ -556,22 +572,13 @@ function ScanPage() {
                 className="absolute left-1/2 top-1/2 aspect-square w-[70%] -translate-x-1/2 -translate-y-1/2 rounded-2xl"
                 style={{ boxShadow: '0 0 0 9999px rgba(0,0,0,0.5)' }}
               >
-                <span
-                  className={`absolute left-0 top-0 h-7 w-7 rounded-tl-2xl border-l-2 border-t-2 transition-all duration-150 ${successFlash ? 'border-brand-500' : 'border-white'}`}
-                  style={successFlash ? { filter: 'drop-shadow(0 0 8px rgba(222,39,44,0.95))' } : undefined}
-                />
-                <span
-                  className={`absolute right-0 top-0 h-7 w-7 rounded-tr-2xl border-r-2 border-t-2 transition-all duration-150 ${successFlash ? 'border-brand-500' : 'border-white'}`}
-                  style={successFlash ? { filter: 'drop-shadow(0 0 8px rgba(222,39,44,0.95))' } : undefined}
-                />
-                <span
-                  className={`absolute bottom-0 left-0 h-7 w-7 rounded-bl-2xl border-b-2 border-l-2 transition-all duration-150 ${successFlash ? 'border-brand-500' : 'border-white'}`}
-                  style={successFlash ? { filter: 'drop-shadow(0 0 8px rgba(222,39,44,0.95))' } : undefined}
-                />
-                <span
-                  className={`absolute bottom-0 right-0 h-7 w-7 rounded-br-2xl border-b-2 border-r-2 transition-all duration-150 ${successFlash ? 'border-brand-500' : 'border-white'}`}
-                  style={successFlash ? { filter: 'drop-shadow(0 0 8px rgba(222,39,44,0.95))' } : undefined}
-                />
+                {VIEWFINDER_CORNERS.map((corner, i) => (
+                  <span
+                    key={i}
+                    className={`absolute h-7 w-7 transition-all duration-150 ${corner.className} ${successFlash ? 'border-brand-500' : 'border-white'}`}
+                    style={successFlash ? { filter: 'drop-shadow(0 0 8px rgba(222,39,44,0.95))' } : undefined}
+                  />
+                ))}
               </div>
             </div>
           )}
