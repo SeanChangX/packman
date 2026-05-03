@@ -67,7 +67,16 @@ async function detectNativeSupport(): Promise<boolean> {
   if (!ctor) return false
   try {
     const formats = (await ctor.getSupportedFormats?.()) ?? []
-    return formats.includes('qr_code')
+    if (!formats.includes('qr_code')) return false
+    // iOS Safari sometimes lists qr_code in getSupportedFormats but throws on
+    // the very first detect() call. Verify by actually invoking detect on a
+    // tiny canvas — if construction or detect fails, fall back to html5-qrcode.
+    const probe = document.createElement('canvas')
+    probe.width = 8
+    probe.height = 8
+    const detector = new ctor({ formats: ['qr_code'] })
+    await detector.detect(probe)
+    return true
   } catch {
     return false
   }
@@ -186,7 +195,7 @@ async function startHtml5Scanner(
 
   const scanner = new html5Module.Html5Qrcode(containerId, {
     formatsToSupport: [html5Module.Html5QrcodeSupportedFormats.QR_CODE],
-    verbose: true,
+    verbose: false,
   })
   const cameras = await html5Module.Html5Qrcode.getCameras().catch(() => [])
   const preferred = cameras.find((c) => /back|rear|environment|後|背/i.test(c.label)) ?? cameras[0]
@@ -280,14 +289,8 @@ const SCAN_STYLES = `
   width: 100% !important;
   height: 100% !important;
 }
-/* Hide html5-qrcode's built-in qrbox L-corners and scan line so our own overlay is the only viewfinder UI. */
-#${SCANNER_FALLBACK_ID} > div:not([id]) {
-  border: 0 !important;
-  box-shadow: none !important;
-  background: transparent !important;
-}
-#${SCANNER_FALLBACK_ID} img[alt="Info icon"],
-#${SCANNER_FALLBACK_ID} canvas[id$="qr-shaded-region"] {
+/* Hide every html5-qrcode-injected child except the video and the decode canvas, so the page's own viewfinder is the only UI. */
+#${SCANNER_FALLBACK_ID} > *:not(video):not(canvas) {
   display: none !important;
 }
 `
