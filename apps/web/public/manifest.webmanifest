@@ -1,6 +1,8 @@
 {
   "name": "Packman",
   "short_name": "Packman",
+  "start_url": "/",
+  "scope": "/",
   "icons": [
     {
       "src": "/web-app-manifest-192x192.png",

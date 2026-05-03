@@ -1,11 +1,21 @@
 import { createFileRoute } from '@tanstack/react-router'
+import { useEffect } from 'react'
 import { Package } from 'lucide-react'
+import { authApi } from '../lib/api'
 import { useT } from '../lib/i18n'
 
 function Login() {
   const t = useT()
   const search = new URLSearchParams(window.location.search)
   const error = search.get('error')
+
+  // If the user already has a valid session (e.g. PWA opened with start_url
+  // bookmarked at /login from an earlier launch), skip the login screen and
+  // jump straight into the app.
+  useEffect(() => {
+    if (error) return
+    authApi.me().then(() => { window.location.replace('/') }).catch(() => {})
+  }, [error])
 
   const errorMessages: Record<string, string> = {
     slack_denied: t('login.error.slackDenied'),
