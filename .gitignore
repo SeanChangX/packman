@@ -10,6 +10,9 @@ build/
 # Vite
 .vite/
 
+# TanStack Router (auto-generated route tree tmp files)
+.tanstack/
+
 # Prisma generated client (should be regenerated on each install)
 apps/api/src/generated/
 
