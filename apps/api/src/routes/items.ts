@@ -31,6 +31,17 @@ function imageContentType(objectName: string) {
   return 'image/jpeg'
 }
 
+const PHOTO_MAX_BYTES = 25 * 1024 * 1024 // 25 MB
+const ALLOWED_PHOTO_EXTS = new Set(['jpg', 'jpeg', 'png', 'webp', 'gif', 'heic', 'heif'])
+const ALLOWED_PHOTO_MIMES = new Set([
+  'image/jpeg',
+  'image/png',
+  'image/webp',
+  'image/gif',
+  'image/heic',
+  'image/heif',
+])
+
 export async function itemRoutes(app: FastifyInstance) {
   app.get('/stats', { preHandler: requireAuth }, async () => {
     const eventId = await getActiveEventId()
@@ -177,14 +188,26 @@ export async function itemRoutes(app: FastifyInstance) {
       const item = await prisma.item.findUnique({ where: { id: request.params.id } })
       if (!item) return reply.status(404).send({ message: 'Item not found' })
 
-      const data = await request.file()
-      if (!data) return reply.status(400).send({ message: 'No file uploaded' })
+      const data = await request.file({ limits: { fileSize: PHOTO_MAX_BYTES } })
+      if (!data) return reply.status(400).send({ message: t(request, 'items.error.uploadEmpty') })
 
-      const ext = data.filename.split('.').pop()?.replace(/[^a-zA-Z0-9]/g, '') || 'jpg'
+      const rawExt = data.filename.split('.').pop()?.toLowerCase().replace(/[^a-z0-9]/g, '') ?? ''
+      const ext = ALLOWED_PHOTO_EXTS.has(rawExt) ? (rawExt === 'jpeg' ? 'jpg' : rawExt) : null
+      const mime = (data.mimetype ?? '').toLowerCase()
+      if (!ext || !ALLOWED_PHOTO_MIMES.has(mime)) {
+        return reply.status(415).send({ message: t(request, 'items.error.unsupportedImageType') })
+      }
+
       const objectName = `items/${item.id}/photos/${Date.now()}.${ext}`
-
       const buffer = await data.toBuffer()
-      await uploadToMinio(objectName, buffer, data.mimetype)
+      // Fastify multipart marks the file as truncated when it hits the per-call
+      // limit; the partial buffer is unsafe to keep, so reject explicitly.
+      if (data.file.truncated) {
+        return reply
+          .status(413)
+          .send({ message: t(request, 'items.error.photoTooLarge', { limitMb: PHOTO_MAX_BYTES / (1024 * 1024) }) })
+      }
+      await uploadToMinio(objectName, buffer, mime)
 
       const photoUrl = await getPresignedUrl(objectName)
       const previousObjectName = objectNameFromUrl(item.photoUrl)

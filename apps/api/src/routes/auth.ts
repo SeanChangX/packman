@@ -15,6 +15,7 @@ import { isUserAllowedInActiveEvent } from '../services/events'
 
 const ADMIN_LOGIN_WINDOW_MS = 15 * 60 * 1000
 const ADMIN_LOGIN_MAX_FAILURES = 5
+const ADMIN_LOGIN_GC_INTERVAL_MS = 10 * 60 * 1000
 const adminLoginFailures = new Map<string, { count: number; resetAt: number }>()
 
 function adminLoginKey(request: { ip: string }, username: string) {
@@ -41,7 +42,25 @@ function recordAdminLoginFailure(key: string) {
   adminLoginFailures.set(key, { ...entry, count: entry.count + 1 })
 }
 
+// Periodic sweep so the failures map cannot grow unbounded over time
+// (e.g. distributed brute-force scans hitting unique IP/username pairs).
+function startAdminLoginGc() {
+  const timer = setInterval(() => {
+    const now = Date.now()
+    for (const [key, entry] of adminLoginFailures) {
+      if (now > entry.resetAt) adminLoginFailures.delete(key)
+    }
+  }, ADMIN_LOGIN_GC_INTERVAL_MS)
+  timer.unref?.()
+  return timer
+}
+
 export async function authRoutes(app: FastifyInstance) {
+  const adminLoginGcTimer = startAdminLoginGc()
+  app.addHook('onClose', async () => {
+    clearInterval(adminLoginGcTimer)
+  })
+
   // Initiate Slack OAuth
   app.get('/slack', async (request, reply) => {
     const [{ appUrl }, slack] = await Promise.all([getAppConfig(), getSlackConfig()])

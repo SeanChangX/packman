@@ -186,13 +186,7 @@ function ItemDetailPage() {
                   src={photoSrc}
                   alt={item.name}
                   className="h-full w-full object-contain"
-                  onError={() => {
-                    if (photoSrc !== item.photoUrl && item.photoUrl) {
-                      setPhotoSrc(item.photoUrl)
-                      return
-                    }
-                    setPhotoLoadError(true)
-                  }}
+                  onError={() => setPhotoLoadError(true)}
                 />
               )
               : <div className="flex h-full items-center justify-center px-4 text-center text-sm text-muted">

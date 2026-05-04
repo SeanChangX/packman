@@ -42,6 +42,9 @@ const en: Record<string, string> = {
   // items
   'items.error.noPhotoForAnalysis': 'This item has no photo available for analysis',
   'items.error.aiDisabled': 'AI recognition is currently disabled',
+  'items.error.uploadEmpty': 'No file uploaded',
+  'items.error.unsupportedImageType': 'Unsupported image type. Allowed: JPG, PNG, WebP, GIF, HEIC, HEIF',
+  'items.error.photoTooLarge': 'Photo is too large (limit: {limitMb} MB)',
 
   // upload (xhr)
   'upload.error.responseFormat': 'Invalid response format',
@@ -109,6 +112,9 @@ const zhHant: Record<string, string> = {
 
   'items.error.noPhotoForAnalysis': '此物品尚無可辨識的照片',
   'items.error.aiDisabled': 'AI 辨識目前已停用',
+  'items.error.uploadEmpty': '沒有收到上傳檔案',
+  'items.error.unsupportedImageType': '不支援的圖片格式，僅接受 JPG、PNG、WebP、GIF、HEIC、HEIF',
+  'items.error.photoTooLarge': '照片檔案過大（上限 {limitMb} MB）',
 
   'upload.error.responseFormat': '回應格式錯誤',
   'upload.error.aborted': '上傳已取消',

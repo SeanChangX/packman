@@ -109,7 +109,10 @@ async function build() {
 
 build().then(async (app) => {
   // Seed default groups and boxes on startup. The seed uses upserts, so this is safe to rerun.
-  await seedDefaultData()
+  await seedDefaultData({
+    info: (msg) => app.log.info(msg),
+    error: (err, msg) => app.log.error({ err }, msg ?? 'Seed error'),
+  })
 
   // Ensure MinIO bucket exists on startup
   try {

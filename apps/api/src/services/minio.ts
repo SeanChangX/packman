@@ -2,6 +2,7 @@ import { Client } from 'minio'
 import { Readable } from 'stream'
 
 const BUCKET = process.env.MINIO_BUCKET ?? 'packman-items'
+const PRESIGN_EXPIRY_SECONDS = 60 * 60 // 1 hour
 
 export const minioClient = new Client({
   endPoint: process.env.MINIO_ENDPOINT ?? 'localhost',
@@ -15,21 +16,20 @@ export async function ensureBucket() {
   const exists = await minioClient.bucketExists(BUCKET)
   if (!exists) {
     await minioClient.makeBucket(BUCKET)
-    // Set public read policy for photo URLs
-    await minioClient.setBucketPolicy(
-      BUCKET,
-      JSON.stringify({
-        Version: '2012-10-17',
-        Statement: [
-          {
-            Effect: 'Allow',
-            Principal: { AWS: ['*'] },
-            Action: ['s3:GetObject'],
-            Resource: [`arn:aws:s3:::${BUCKET}/*`],
-          },
-        ],
-      })
-    )
+  }
+  // Always reassert a private policy. ensureBucket runs on every API startup,
+  // so this also fixes any bucket left in legacy public-read state from older
+  // versions of this code.
+  try {
+    const current = await minioClient.getBucketPolicy(BUCKET).catch(() => '')
+    if (current && current !== '{}') {
+      // Empty-string policy in the MinIO SDK is "delete". setBucketPolicy with
+      // an empty object is the canonical "no anonymous access" form.
+      await minioClient.setBucketPolicy(BUCKET, '')
+    }
+  } catch {
+    // Some MinIO versions throw NoSuchBucketPolicy when none is set — that is
+    // already the desired state, so we silently ignore.
   }
 }
 
@@ -63,17 +63,21 @@ export async function getObjectStream(objectName: string): Promise<Readable> {
 }
 
 export async function getPresignedUrl(objectName: string): Promise<string> {
-  // If MinIO is public-read, return a direct URL instead of a presigned one
-  const endpoint = process.env.MINIO_ENDPOINT ?? 'localhost'
-  const port = process.env.MINIO_PORT ?? '9000'
-  const ssl = process.env.MINIO_USE_SSL === 'true'
-  const protocol = ssl ? 'https' : 'http'
+  // Time-limited signed URL. Bucket is private; clients must use either this
+  // (short-lived) URL or the auth-protected /api/items/:id/photo proxy.
+  const signed = await minioClient.presignedGetObject(BUCKET, objectName, PRESIGN_EXPIRY_SECONDS)
 
-  // Use MINIO_PUBLIC_URL for external access if set, otherwise construct from MinIO env.
-  const baseUrl = process.env.MINIO_PUBLIC_URL
-    ?? `${protocol}://${endpoint}:${port}`
-
-  return `${baseUrl}/${BUCKET}/${objectName}`
+  // If MINIO_PUBLIC_URL is set, rewrite the host of the signed URL so external
+  // clients can reach the object (the signature is preserved by URL.parse).
+  const publicBase = process.env.MINIO_PUBLIC_URL
+  if (publicBase) {
+    const signedUrl = new URL(signed)
+    const publicUrl = new URL(publicBase)
+    signedUrl.protocol = publicUrl.protocol
+    signedUrl.host = publicUrl.host
+    return signedUrl.toString()
+  }
+  return signed
 }
 
 export function objectNameFromUrl(url?: string | null): string | null {
@@ -81,7 +85,9 @@ export function objectNameFromUrl(url?: string | null): string | null {
   const marker = `/${BUCKET}/`
   const index = url.indexOf(marker)
   if (index === -1) return null
-  return decodeURIComponent(url.slice(index + marker.length))
+  // Strip query string (presigned URLs include S3 signature params).
+  const pathPart = url.slice(index + marker.length).split('?')[0]
+  return decodeURIComponent(pathPart)
 }
 
 export async function getObjectBuffer(objectName: string): Promise<Buffer> {

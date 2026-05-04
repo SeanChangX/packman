@@ -2,6 +2,16 @@ import { prisma } from './plugins/prisma'
 import { DEFAULT_TAG_PROMPT } from './services/ollama'
 import { getActiveEventId } from './services/events'
 
+interface SeedLogger {
+  info: (msg: string) => void
+  error: (err: unknown, msg?: string) => void
+}
+
+const consoleLogger: SeedLogger = {
+  info: (msg) => console.log(msg),
+  error: (err, msg) => msg ? console.error(msg, err) : console.error(err),
+}
+
 const LEGACY_DEFAULT_BOX_LABELS = [
   '1', '2', '3', '4', '5', '6', '7', '8', '9',
   'A', 'B', 'C', 'D', 'E', 'F', '大機', '推車1號',
@@ -64,8 +74,8 @@ async function ensureExampleBox(eventId: string) {
   })
 }
 
-export async function seedDefaultData() {
-  console.log('Seeding database...')
+export async function seedDefaultData(logger: SeedLogger = consoleLogger) {
+  logger.info('Seeding database...')
 
   const eventId = await ensureDefaultEvent()
 
@@ -153,11 +163,11 @@ export async function seedDefaultData() {
     create: { key: 'ollama.tagPrompt', value: DEFAULT_TAG_PROMPT },
   })
 
-  console.log('Seed complete.')
+  logger.info('Seed complete.')
 }
 
 if (require.main === module) {
   seedDefaultData()
-    .catch(console.error)
+    .catch((err) => consoleLogger.error(err, 'Seed failed'))
     .finally(() => prisma.$disconnect())
 }
