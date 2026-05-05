@@ -113,20 +113,21 @@ export async function itemRoutes(app: FastifyInstance) {
 
     const sortDir = q.sortDir === 'asc' ? 'asc' : 'desc'
     const sortBy = q.sortBy ?? 'createdAt'
-    // `nulls: 'last'` keeps empty values at the bottom regardless of direction.
-    // Prisma's TS types disallow it on non-nullable leaf fields, but the joined
-    // column is effectively nullable via LEFT JOIN — runtime SQL is valid.
+    // `nulls: 'last'` only works on directly-nullable scalar columns; Prisma
+    // rejects it on relation orderings even though the joined value can be
+    // NULL via LEFT JOIN. For relations we fall back to Postgres' default
+    // null ordering (asc → nulls last, desc → nulls first).
     const dirNullsLast = { sort: sortDir, nulls: 'last' as const }
     let orderBy: Record<string, any> | Array<Record<string, any>>
     switch (sortBy) {
       case 'name': orderBy = { name: sortDir }; break
-      case 'owner': orderBy = { owner: { name: dirNullsLast } } as any; break
-      case 'group': orderBy = { group: { name: dirNullsLast } } as any; break
+      case 'owner': orderBy = { owner: { name: sortDir } }; break
+      case 'group': orderBy = { group: { name: sortDir } }; break
       case 'shippingMethod': orderBy = { shippingMethod: dirNullsLast }; break
       case 'quantity': orderBy = { quantity: sortDir }; break
       case 'weight': orderBy = { weightG: dirNullsLast }; break
-      case 'box': orderBy = { box: { label: dirNullsLast } } as any; break
-      case 'status': orderBy = [{ status: sortDir }, { box: { status: dirNullsLast } } as any]; break
+      case 'box': orderBy = { box: { label: sortDir } }; break
+      case 'status': orderBy = [{ status: sortDir }, { box: { status: sortDir } }]; break
       default: orderBy = { createdAt: sortDir }
     }
 
