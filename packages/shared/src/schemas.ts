@@ -17,6 +17,7 @@ export const CreateBoxSchema = z.object({
 
 export const UpdateBoxSchema = CreateBoxSchema.partial().extend({
   ownerId: z.string().uuid().nullable().optional(),
+  notes: z.string().nullable().optional(),
   status: z.enum(['NOT_PACKED', 'PACKED', 'SEALED']).optional(),
 })
 

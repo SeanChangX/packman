@@ -25,6 +25,7 @@ function BoxDetailPage() {
   const [previewing, setPreviewing] = useState(false)
   const [previewBlob, setPreviewBlob] = useState<Blob | null>(null)
   const [rendering, setRendering] = useState(false)
+  const [notesDraft, setNotesDraft] = useState('')
   const canvasRef = useRef<HTMLCanvasElement>(null)
 
   const { data: box, isLoading, isError, error } = useQuery({
@@ -37,6 +38,10 @@ function BoxDetailPage() {
     queryFn: usersApi.list,
     enabled: isAdmin,
   })
+
+  useEffect(() => {
+    if (box) setNotesDraft(box.notes ?? '')
+  }, [box?.id, box?.notes])
 
   // Re-render canvas whenever the blob changes
   useEffect(() => {
@@ -235,6 +240,26 @@ function BoxDetailPage() {
           </button>
         </div>
       </div>
+
+      {/* Notes */}
+      {(isAdmin || (box.notes && box.notes.trim().length > 0)) && (
+        <div className="card p-4">
+          <h2 className="mb-2 text-sm font-semibold text-muted">{t('box.detail.notesTitle')}</h2>
+          {isAdmin
+            ? <textarea
+                className="input min-h-[4rem] resize-y"
+                placeholder={t('box.detail.notesPlaceholder')}
+                value={notesDraft}
+                onChange={(e) => setNotesDraft(e.target.value)}
+                onBlur={() => {
+                  const next = notesDraft.trim()
+                  if (next !== (box.notes ?? '')) updateBox.mutate({ notes: next || null })
+                }}
+              />
+            : <p className="whitespace-pre-wrap text-sm text-app">{box.notes}</p>
+          }
+        </div>
+      )}
 
       {/* Sticker inline preview */}
       {previewBlob && (

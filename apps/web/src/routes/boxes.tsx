@@ -145,6 +145,9 @@ function BoxesPage() {
               </span>
             )}
           </div>
+          {box!.notes && box!.notes.trim().length > 0 && (
+            <p className="mt-2 line-clamp-2 text-sm text-muted">{box!.notes}</p>
+          )}
         </Link>
         <div className="flex shrink-0 items-center gap-2">
           {box!.status === 'SEALED' && (box!.notPackedCount ?? 0) > 0 && (
