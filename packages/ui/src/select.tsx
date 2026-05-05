@@ -68,6 +68,14 @@ export function Select<T extends string>({
   const spaceAbove = rect ? rect.top - MARGIN : 0
   const placeAbove = !!rect && spaceBelow < 200 && spaceAbove > spaceBelow
   const maxHeight = placeAbove ? spaceAbove - GAP : spaceBelow - GAP
+  const PREFERRED_MIN = 180
+  const viewportW = typeof window !== 'undefined' ? window.innerWidth : 0
+  const spaceRight = rect ? viewportW - rect.left - MARGIN : 0
+  const spaceLeftOfRight = rect ? rect.right - MARGIN : 0
+  const anchorRight = !!rect && spaceRight < PREFERRED_MIN && spaceLeftOfRight > spaceRight
+  const maxAvailableW = anchorRight ? spaceLeftOfRight : spaceRight
+  const minWidth = rect ? Math.min(Math.max(rect.width, 140), Math.max(viewportW - 2 * MARGIN, 0)) : 0
+  const maxWidth = Math.max(minWidth, Math.min(maxAvailableW, 400))
 
   return (
     <div ref={ref} className={cn('relative', className)}>
@@ -87,9 +95,10 @@ export function Select<T extends string>({
             position: 'fixed',
             top: placeAbove ? undefined : rect.bottom + GAP,
             bottom: placeAbove ? window.innerHeight - rect.top + GAP : undefined,
-            left: rect.left,
-            minWidth: Math.max(rect.width, 140),
-            maxWidth: Math.max(rect.width, Math.min(window.innerWidth - rect.left - MARGIN, 400)),
+            left: anchorRight ? undefined : rect.left,
+            right: anchorRight ? viewportW - rect.right : undefined,
+            minWidth,
+            maxWidth,
             maxHeight,
             zIndex: 60,
             WebkitOverflowScrolling: 'touch',
