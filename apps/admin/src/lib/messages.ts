@@ -419,7 +419,7 @@ const zhHant: Record<string, string> = {
   'dashboard.items': '物品數',
   'dashboard.boxes': '箱子數',
   'dashboard.batteries': '電池數',
-  'dashboard.packedItems': '已打包物品',
+  'dashboard.packedItems': '已裝箱物品',
   'dashboard.sealedBoxes': '已封箱',
   'dashboard.groups': '組別數',
 

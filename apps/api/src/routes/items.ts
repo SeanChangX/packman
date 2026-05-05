@@ -47,9 +47,21 @@ export async function itemRoutes(app: FastifyInstance) {
     const eventId = await getActiveEventId()
     const [total, notPacked, packed, sealed] = await Promise.all([
       prisma.item.count({ where: { eventId } }),
-      prisma.item.count({ where: { eventId, status: 'NOT_PACKED' } }),
-      prisma.item.count({ where: { eventId, status: 'PACKED' } }),
-      prisma.item.count({ where: { eventId, status: 'SEALED' } }),
+      prisma.item.count({
+        where: {
+          eventId,
+          status: 'NOT_PACKED',
+          OR: [{ boxId: null }, { box: { is: { status: { not: 'SEALED' } } } }],
+        },
+      }),
+      prisma.item.count({
+        where: {
+          eventId,
+          status: 'PACKED',
+          OR: [{ boxId: null }, { box: { is: { status: { not: 'SEALED' } } } }],
+        },
+      }),
+      prisma.item.count({ where: { eventId, box: { is: { status: 'SEALED' } } } }),
     ])
     return { total, NOT_PACKED: notPacked, PACKED: packed, SEALED: sealed }
   })
@@ -75,18 +87,29 @@ export async function itemRoutes(app: FastifyInstance) {
       `
     }
 
+    const andClauses: Array<Record<string, any>> = []
     const where: Record<string, any> = { eventId }
     if (q.groupId) where.groupId = q.groupId
     if (q.boxId) where.boxId = q.boxId
-    if (q.status) where.status = q.status
+    if (q.status === 'SEALED') {
+      where.box = { is: { status: 'SEALED' } }
+    } else if (q.status === 'PACKED' || q.status === 'NOT_PACKED') {
+      where.status = q.status
+      andClauses.push({
+        OR: [{ boxId: null }, { box: { is: { status: { not: 'SEALED' } } } }],
+      })
+    }
     if (q.shippingMethod) where.shippingMethod = q.shippingMethod
     if (search) {
-      where.OR = [
-        // Backed by trigram GIN index (Item_name_trgm_idx)
-        { name: { contains: search, mode: 'insensitive' } },
-        { id: { in: tagMatchedIds.map((row) => row.id) } },
-      ]
+      andClauses.push({
+        OR: [
+          // Backed by trigram GIN index (Item_name_trgm_idx)
+          { name: { contains: search, mode: 'insensitive' } },
+          { id: { in: tagMatchedIds.map((row) => row.id) } },
+        ],
+      })
     }
+    if (andClauses.length > 0) where.AND = andClauses
 
     const [data, total] = await Promise.all([
       prisma.item.findMany({

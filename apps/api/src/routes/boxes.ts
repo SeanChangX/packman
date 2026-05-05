@@ -25,9 +25,10 @@ export async function boxRoutes(app: FastifyInstance) {
     if (boxes.length === 0) return []
 
     const boxIds = boxes.map((b) => b.id)
-    const aggregates = await prisma.$queryRaw<Array<{ boxId: string; itemCount: bigint; totalWeightG: bigint | null }>>`
+    const aggregates = await prisma.$queryRaw<Array<{ boxId: string; itemCount: bigint; totalWeightG: bigint | null; notPackedCount: bigint }>>`
       SELECT "boxId", COUNT(*)::bigint AS "itemCount",
-             COALESCE(SUM(COALESCE("weightG", 0) * "quantity"), 0)::bigint AS "totalWeightG"
+             COALESCE(SUM(COALESCE("weightG", 0) * "quantity"), 0)::bigint AS "totalWeightG",
+             COUNT(*) FILTER (WHERE "status" = 'NOT_PACKED')::bigint AS "notPackedCount"
       FROM "Item"
       WHERE "boxId" = ANY(${boxIds}::text[])
       GROUP BY "boxId"
@@ -39,6 +40,7 @@ export async function boxRoutes(app: FastifyInstance) {
         ...box,
         itemCount: agg ? Number(agg.itemCount) : 0,
         totalWeightG: agg ? Number(agg.totalWeightG ?? 0) : 0,
+        notPackedCount: agg ? Number(agg.notPackedCount) : 0,
       }
     })
   })

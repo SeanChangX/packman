@@ -55,6 +55,7 @@ export interface Box {
   priority?: number
   items?: Item[]
   itemCount?: number
+  notPackedCount?: number
   totalWeightG?: number
   createdAt: string
 }

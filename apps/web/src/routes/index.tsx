@@ -84,7 +84,12 @@ function Dashboard() {
         {totalItems > 0 && (
           <div className="space-y-3">
             {(['NOT_PACKED', 'PACKED', 'SEALED'] as PackingStatus[]).map((s) => (
-              <div key={s}>
+              <Link
+                key={s}
+                to="/items"
+                search={{ status: s }}
+                className="block rounded-xl p-2 -mx-2 transition-colors hover:bg-black/5 dark:hover:bg-white/5"
+              >
                 <div className="flex justify-between text-sm">
                   <span className={cn('badge', STATUS_COLORS[s])}>{t(STATUS_LABEL_KEYS[s])}</span>
                   <span className="text-muted">{statusGroups[s]} / {totalItems}</span>
@@ -99,7 +104,7 @@ function Dashboard() {
                     style={{ width: `${totalItems ? (statusGroups[s] / totalItems) * 100 : 0}%` }}
                   />
                 </div>
-              </div>
+              </Link>
             ))}
           </div>
         )}

@@ -2,7 +2,7 @@ import { createFileRoute, Link } from '@tanstack/react-router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { useForm } from 'react-hook-form'
-import { Package, Plus, Trash2, UserRound, Weight, X } from 'lucide-react'
+import { AlertTriangle, Package, Plus, Trash2, UserRound, Weight, X } from 'lucide-react'
 import { useToast, Modal } from '@packman/ui'
 import { boxesApi, usersApi } from '../lib/api'
 import { STATUS_LABEL_KEYS, STATUS_COLORS, cn, formatApiError } from '../lib/utils'
@@ -145,20 +145,30 @@ function BoxesPage() {
             )}
           </div>
         </Link>
-        {isAdmin
-          ? <Select
-              value={box!.status}
-              onChange={(v) => updateBox.mutate({
-                id: box!.id,
-                data: { status: v as PackingStatus },
-              })}
-              triggerClassName={cn('badge shrink-0 cursor-pointer border-0 px-3 py-1.5 text-sm shadow-sm', STATUS_COLORS[box!.status])}
-              options={STATUS_OPTIONS}
-            />
-          : <span className={cn('badge', STATUS_COLORS[box!.status])}>
-              {t(STATUS_LABEL_KEYS[box!.status])}
+        <div className="flex shrink-0 items-center gap-2">
+          {box!.status === 'SEALED' && (box!.notPackedCount ?? 0) > 0 && (
+            <span
+              title={t('boxes.sealedWithUnpacked', { n: box!.notPackedCount ?? 0 })}
+              className="inline-flex items-center text-amber-600 dark:text-amber-400"
+            >
+              <AlertTriangle className="h-5 w-5" />
             </span>
-        }
+          )}
+          {isAdmin
+            ? <Select
+                value={box!.status}
+                onChange={(v) => updateBox.mutate({
+                  id: box!.id,
+                  data: { status: v as PackingStatus },
+                })}
+                triggerClassName={cn('badge shrink-0 cursor-pointer border-0 px-3 py-1.5 text-sm shadow-sm', STATUS_COLORS[box!.status])}
+                options={STATUS_OPTIONS}
+              />
+            : <span className={cn('badge', STATUS_COLORS[box!.status])}>
+                {t(STATUS_LABEL_KEYS[box!.status])}
+              </span>
+          }
+        </div>
       </div>
 
       <div className="mt-auto border-t border-black/10 pt-4 dark:border-white/10">

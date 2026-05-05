@@ -244,7 +244,18 @@ export async function adminRoutes(app: FastifyInstance) {
       prisma.box.count({ where: scopedWhere }),
       prisma.item.count({ where: scopedWhere }),
       prisma.battery.count({ where: scopedWhere }),
-      prisma.item.count({ where: { ...scopedWhere, status: { in: ['PACKED', 'SEALED'] } } }),
+      prisma.item.count({
+        where: {
+          ...scopedWhere,
+          OR: [
+            { box: { is: { status: 'SEALED' } } },
+            {
+              status: 'PACKED',
+              AND: [{ OR: [{ boxId: null }, { box: { is: { status: { not: 'SEALED' } } } }] }],
+            },
+          ],
+        },
+      }),
       prisma.box.count({ where: { ...scopedWhere, status: 'SEALED' } }),
     ])
     return { users, groups, boxes, items, batteries, packedItems, sealedBoxes }

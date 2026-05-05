@@ -1,7 +1,7 @@
 import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useState, useEffect, useRef } from 'react'
-import { ArrowLeft, Download, Eye, CheckSquare, Square } from 'lucide-react'
+import { ArrowLeft, Download, Eye, CheckSquare, Square, AlertTriangle } from 'lucide-react'
 import * as pdfjsLib from 'pdfjs-dist'
 import pdfjsWorker from 'pdfjs-dist/build/pdf.worker.mjs?url'
 import { boxesApi, itemsApi, usersApi } from '../lib/api'
@@ -143,6 +143,8 @@ function BoxDetailPage() {
 
   const items = box.items ?? []
   const packedCount = items.filter((i) => i.status !== 'NOT_PACKED').length
+  const sealedWithUnpacked = box.status === 'SEALED' && items.some((i) => i.status === 'NOT_PACKED')
+  const unpackedCount = items.filter((i) => i.status === 'NOT_PACKED').length
   const getOwnerOptions = (owner?: Pick<User, 'id' | 'name'>) => [
     { value: '', label: t('common.placeholder.unassigned') },
     ...(owner && !users?.some((u) => u.id === owner.id)
@@ -248,6 +250,12 @@ function BoxDetailPage() {
       <div className="card">
         <div className="border-b border-black/10 px-4 py-3 dark:border-white/10">
           <h2 className="font-semibold">{t('box.detail.itemsTitle', { n: items.length })}</h2>
+          {sealedWithUnpacked && (
+            <div className="mt-2 flex items-start gap-2 rounded-xl border border-amber-300/40 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-400/30 dark:bg-amber-500/10 dark:text-amber-200">
+              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+              <span>{t('box.detail.sealedWithUnpacked', { n: unpackedCount })}</span>
+            </div>
+          )}
         </div>
         {items.length === 0
           ? <p className="py-8 text-center text-sm text-muted">{t('box.detail.empty')}</p>
@@ -255,8 +263,15 @@ function BoxDetailPage() {
             <ul className="divide-y divide-black/5 dark:divide-white/10">
               {items.map((item) => {
                 const isPacked = item.status !== 'NOT_PACKED'
+                const flagged = box.status === 'SEALED' && !isPacked
                 return (
-                  <li key={item.id} className="flex items-center gap-1 pr-2 active:bg-white/5">
+                  <li
+                    key={item.id}
+                    className={cn(
+                      'flex items-center gap-1 pr-2 active:bg-white/5',
+                      flagged && 'bg-amber-50 dark:bg-amber-500/10',
+                    )}
+                  >
                     <button
                       type="button"
                       aria-label={isPacked ? t('box.detail.markNotPacked') : t('box.detail.markPacked')}

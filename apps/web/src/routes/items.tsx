@@ -16,10 +16,11 @@ function ItemsPage() {
   const { user } = useAuth()
   const { showToast } = useToast()
   const isAdmin = user?.role === 'ADMIN'
+  const { status: statusFromUrl } = Route.useSearch()
 
   const [search, setSearch] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
-  const [statusFilter, setStatusFilter] = useState<PackingStatus | ''>('')
+  const [statusFilter, setStatusFilter] = useState<PackingStatus | ''>(statusFromUrl ?? '')
   const [shippingFilter, setShippingFilter] = useState('')
   const [groupFilter, setGroupFilter] = useState('')
   const [selected, setSelected] = useState<Set<string>>(new Set())
@@ -149,6 +150,7 @@ function ItemsPage() {
             { value: '', label: t('items.filter.allStatus') },
             { value: 'NOT_PACKED', label: t('status.NOT_PACKED') },
             { value: 'PACKED', label: t('status.PACKED') },
+            { value: 'SEALED', label: t('status.SEALED') },
           ]}
         />
         <Select
@@ -431,4 +433,15 @@ function ItemsPage() {
   )
 }
 
-export const Route = createFileRoute('/items')({ component: ItemsPage })
+export const Route = createFileRoute('/items')({
+  component: ItemsPage,
+  validateSearch: (search: Record<string, unknown>) => {
+    const status = search.status
+    return {
+      status:
+        status === 'NOT_PACKED' || status === 'PACKED' || status === 'SEALED'
+          ? (status as PackingStatus)
+          : undefined,
+    }
+  },
+})
