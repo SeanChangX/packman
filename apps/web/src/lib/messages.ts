@@ -297,6 +297,8 @@ const en: Record<string, string> = {
   'batteries.new.submit': 'Add',
   'batteries.row.notesPlaceholder': 'Notes',
   'batteries.row.empty': '— None —',
+  'batteries.sort.label': 'Sort',
+  'batteries.field.notes': 'Notes',
 
   // Scan
   'scan.title': 'Scan QR Code',
@@ -611,6 +613,8 @@ const zhHant: Record<string, string> = {
   'batteries.new.submit': '新增',
   'batteries.row.notesPlaceholder': '說明',
   'batteries.row.empty': '— 無 —',
+  'batteries.sort.label': '排序',
+  'batteries.field.notes': '說明',
 
   // Scan
   'scan.title': '掃描 QR Code',
