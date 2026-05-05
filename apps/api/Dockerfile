@@ -1,4 +1,4 @@
-FROM node:24-alpine AS base
+FROM node:25-alpine AS base
 RUN apk add --no-cache openssl font-noto-cjk
 RUN corepack enable && corepack prepare pnpm@latest --activate
 WORKDIR /app
