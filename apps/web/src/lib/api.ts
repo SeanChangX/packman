@@ -93,6 +93,7 @@ export const boxesApi = {
 }
 
 // ─── Items ─────────────────────────────────────────────────────────
+export type ItemSortKey = 'createdAt' | 'name' | 'owner' | 'group' | 'shippingMethod' | 'quantity' | 'weight' | 'box' | 'status'
 interface ItemsQuery {
   groupId?: string
   boxId?: string
@@ -101,6 +102,8 @@ interface ItemsQuery {
   search?: string
   page?: number
   pageSize?: number
+  sortBy?: ItemSortKey
+  sortDir?: 'asc' | 'desc'
 }
 
 export const itemsApi = {
@@ -114,6 +117,8 @@ export const itemsApi = {
     if (q?.search) params.set('search', q.search)
     if (q?.page) params.set('page', String(q.page))
     if (q?.pageSize) params.set('pageSize', String(q.pageSize))
+    if (q?.sortBy) params.set('sortBy', q.sortBy)
+    if (q?.sortDir) params.set('sortDir', q.sortDir)
     const qs = params.toString()
     return request<PaginatedResponse<Item>>(`${BASE}/items${qs ? `?${qs}` : ''}`)
   },

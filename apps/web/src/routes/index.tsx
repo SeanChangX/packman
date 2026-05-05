@@ -1,8 +1,9 @@
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { useQuery } from '@tanstack/react-query'
 import { Package, Box, Battery, CheckCircle2 } from 'lucide-react'
-import { itemsApi, boxesApi, batteriesApi } from '../lib/api'
-import { STATUS_LABEL_KEYS, STATUS_COLORS, cn } from '../lib/utils'
+import { itemsApi, boxesApi, batteriesApi, selectOptionsApi } from '../lib/api'
+import { STATUS_LABEL_KEYS, STATUS_COLORS, cn, getLabelFromOptions } from '../lib/utils'
+import { useAuth } from '../lib/auth-context'
 import { useT } from '../lib/i18n'
 import type { PackingStatus } from '@packman/shared'
 
@@ -32,6 +33,7 @@ const BOX_STATUS_CARD_COLORS: Record<PackingStatus, string> = {
 
 function Dashboard() {
   const t = useT()
+  const { user } = useAuth()
   const { data: stats } = useQuery({
     queryKey: ['items', 'stats'],
     queryFn: () => itemsApi.stats(),
@@ -44,6 +46,14 @@ function Dashboard() {
     queryKey: ['batteries'],
     queryFn: () => batteriesApi.list(),
   })
+  const { data: batteryTypeOpts = [] } = useQuery({
+    queryKey: ['options', 'BATTERY_TYPE'],
+    queryFn: () => selectOptionsApi.list('BATTERY_TYPE'),
+  })
+
+  const myBoxes = (boxes ?? []).filter((b) => b.owner?.id === user?.id)
+  const myBatteries = (batteries ?? []).filter((b) => b.owner?.id === user?.id)
+  const hasLuggage = myBoxes.length > 0 || myBatteries.length > 0
 
   const totalItems = stats?.total ?? 0
   const packedItems = (stats?.PACKED ?? 0) + (stats?.SEALED ?? 0)
@@ -135,6 +145,62 @@ function Dashboard() {
           ))}
         </div>
       </div>
+
+      {/* My luggage */}
+      {user && (
+        <div className="card p-6">
+          <h2 className="mb-4 font-semibold text-app">{t('dashboard.myLuggage')}</h2>
+          {!hasLuggage ? (
+            <p className="text-sm text-muted">{t('dashboard.myLuggage.empty')}</p>
+          ) : (
+            <div className="space-y-5">
+              {myBoxes.length > 0 && (
+                <div>
+                  <h3 className="mb-2 text-sm font-semibold text-muted">{t('dashboard.myLuggage.boxes')}</h3>
+                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+                    {myBoxes.map((box) => (
+                      <Link
+                        key={box.id}
+                        to="/boxes/$id"
+                        params={{ id: box.id }}
+                        className={cn(
+                          'flex min-h-24 flex-col items-center justify-center rounded-[22px] border p-3 text-center transition-transform hover:-translate-y-0.5',
+                          BOX_STATUS_CARD_COLORS[box.status]
+                        )}
+                      >
+                        <span className="block max-w-full truncate text-lg font-bold" title={box.label}>{box.label}</span>
+                        <span className="text-xs opacity-70">{t(STATUS_LABEL_KEYS[box.status])}</span>
+                        {(box.itemCount ?? 0) > 0 && (
+                          <span className="mt-0.5 text-xs opacity-60">
+                            {(box.itemCount ?? 0) - (box.notPackedCount ?? 0)}/{box.itemCount}
+                          </span>
+                        )}
+                      </Link>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {myBatteries.length > 0 && (
+                <div>
+                  <h3 className="mb-2 text-sm font-semibold text-muted">{t('dashboard.myLuggage.batteries')}</h3>
+                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+                    {myBatteries.map((b) => (
+                      <Link
+                        key={b.id}
+                        to="/batteries"
+                        className="flex min-w-0 flex-col items-center justify-center rounded-2xl border border-black/10 bg-black/5 px-3 py-3 text-center transition-colors hover:bg-black/10 dark:border-white/10 dark:bg-white/5 dark:hover:bg-white/10"
+                      >
+                        <span className="block w-full truncate font-mono text-sm font-semibold" title={b.batteryId}>{b.batteryId}</span>
+                        <span className="mt-1 block w-full truncate text-xs text-muted">{getLabelFromOptions(batteryTypeOpts, b.batteryType)}</span>
+                      </Link>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   )
 }

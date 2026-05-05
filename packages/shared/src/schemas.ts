@@ -78,6 +78,9 @@ export const UpdateUserSchema = z.object({
   groupId: z.string().uuid().nullable().optional(),
 })
 
+export const ITEM_SORT_KEYS = ['createdAt', 'name', 'owner', 'group', 'shippingMethod', 'quantity', 'weight', 'box', 'status'] as const
+export type ItemSortKey = typeof ITEM_SORT_KEYS[number]
+
 export const ItemsQuerySchema = z.object({
   groupId: z.string().uuid().optional(),
   boxId: z.string().uuid().optional(),
@@ -86,6 +89,8 @@ export const ItemsQuerySchema = z.object({
   search: z.string().optional(),
   page: z.coerce.number().int().min(1).default(1),
   pageSize: z.coerce.number().int().min(1).max(100).default(50),
+  sortBy: z.enum(ITEM_SORT_KEYS).optional(),
+  sortDir: z.enum(['asc', 'desc']).optional(),
 })
 
 export const StickerRequestSchema = z.object({

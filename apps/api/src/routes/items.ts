@@ -111,11 +111,30 @@ export async function itemRoutes(app: FastifyInstance) {
     }
     if (andClauses.length > 0) where.AND = andClauses
 
+    const sortDir = q.sortDir === 'asc' ? 'asc' : 'desc'
+    const sortBy = q.sortBy ?? 'createdAt'
+    // `nulls: 'last'` keeps empty values at the bottom regardless of direction.
+    // Prisma's TS types disallow it on non-nullable leaf fields, but the joined
+    // column is effectively nullable via LEFT JOIN — runtime SQL is valid.
+    const dirNullsLast = { sort: sortDir, nulls: 'last' as const }
+    let orderBy: Record<string, any> | Array<Record<string, any>>
+    switch (sortBy) {
+      case 'name': orderBy = { name: sortDir }; break
+      case 'owner': orderBy = { owner: { name: dirNullsLast } } as any; break
+      case 'group': orderBy = { group: { name: dirNullsLast } } as any; break
+      case 'shippingMethod': orderBy = { shippingMethod: dirNullsLast }; break
+      case 'quantity': orderBy = { quantity: sortDir }; break
+      case 'weight': orderBy = { weightG: dirNullsLast }; break
+      case 'box': orderBy = { box: { label: dirNullsLast } } as any; break
+      case 'status': orderBy = [{ status: sortDir }, { box: { status: dirNullsLast } } as any]; break
+      default: orderBy = { createdAt: sortDir }
+    }
+
     const [data, total] = await Promise.all([
       prisma.item.findMany({
         where,
         include: itemInclude,
-        orderBy: { createdAt: 'desc' },
+        orderBy,
         skip: (page - 1) * pageSize,
         take: pageSize,
       }),

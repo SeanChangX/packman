@@ -1,9 +1,9 @@
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { useQuery, useMutation, useQueryClient, useInfiniteQuery } from '@tanstack/react-query'
 import { useState, useEffect, useRef } from 'react'
-import { Plus, Search, Trash2 } from 'lucide-react'
+import { Plus, Search, Trash2, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react'
 import { useToast } from '@packman/ui'
-import { itemsApi, groupsApi, selectOptionsApi } from '../lib/api'
+import { itemsApi, groupsApi, selectOptionsApi, type ItemSortKey } from '../lib/api'
 import { STATUS_COLORS, getLabelFromOptions, cn, formatApiError } from '../lib/utils'
 import { Select } from '../lib/select'
 import { useAuth } from '../lib/auth-context'
@@ -23,8 +23,24 @@ function ItemsPage() {
   const [statusFilter, setStatusFilter] = useState<PackingStatus | ''>(statusFromUrl ?? '')
   const [shippingFilter, setShippingFilter] = useState('')
   const [groupFilter, setGroupFilter] = useState('')
+  const [sortBy, setSortBy] = useState<ItemSortKey>('createdAt')
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const sentinelRef = useRef<HTMLDivElement>(null)
+
+  const toggleSort = (key: ItemSortKey) => {
+    if (sortBy === key) {
+      setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))
+    } else {
+      setSortBy(key)
+      setSortDir(key === 'createdAt' ? 'desc' : 'asc')
+    }
+  }
+
+  const SortIcon = ({ k }: { k: ItemSortKey }) => {
+    if (sortBy !== k) return <ArrowUpDown className="h-3 w-3 opacity-50" />
+    return sortDir === 'asc' ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />
+  }
 
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedSearch(search), 300)
@@ -33,12 +49,14 @@ function ItemsPage() {
 
   const PAGE_SIZE = 50
   const { data, isLoading, fetchNextPage, hasNextPage, isFetchingNextPage } = useInfiniteQuery({
-    queryKey: ['items', debouncedSearch, statusFilter, shippingFilter, groupFilter],
+    queryKey: ['items', debouncedSearch, statusFilter, shippingFilter, groupFilter, sortBy, sortDir],
     queryFn: ({ pageParam = 1 }) => itemsApi.list({
       search: debouncedSearch || undefined,
       status: statusFilter || undefined,
       shippingMethod: shippingFilter || undefined,
       groupId: groupFilter || undefined,
+      sortBy,
+      sortDir,
       page: pageParam as number,
       pageSize: PAGE_SIZE,
     }),
@@ -184,6 +202,34 @@ function ItemsPage() {
           onChange={setGroupFilter}
           options={[{ value: '', label: t('items.filter.allGroups') }, ...(groups?.map((g) => ({ value: g.id, label: g.name })) ?? [])]}
         />
+        <Select
+          className="w-full md:hidden"
+          value={`${sortBy}:${sortDir}`}
+          onChange={(v) => {
+            const [k, d] = v.split(':') as [ItemSortKey, 'asc' | 'desc']
+            setSortBy(k); setSortDir(d)
+          }}
+          options={[
+            { value: 'createdAt:desc', label: `${t('items.sort.label')}: ${t('items.sort.newest')}` },
+            { value: 'createdAt:asc', label: `${t('items.sort.label')}: ${t('items.sort.oldest')}` },
+            { value: 'name:asc', label: `${t('items.sort.label')}: ${t('items.col.item')} ↑` },
+            { value: 'name:desc', label: `${t('items.sort.label')}: ${t('items.col.item')} ↓` },
+            { value: 'owner:asc', label: `${t('items.sort.label')}: ${t('items.col.owner')} ↑` },
+            { value: 'owner:desc', label: `${t('items.sort.label')}: ${t('items.col.owner')} ↓` },
+            { value: 'group:asc', label: `${t('items.sort.label')}: ${t('items.col.group')} ↑` },
+            { value: 'group:desc', label: `${t('items.sort.label')}: ${t('items.col.group')} ↓` },
+            { value: 'shippingMethod:asc', label: `${t('items.sort.label')}: ${t('items.col.shipping')} ↑` },
+            { value: 'shippingMethod:desc', label: `${t('items.sort.label')}: ${t('items.col.shipping')} ↓` },
+            { value: 'quantity:asc', label: `${t('items.sort.label')}: ${t('items.col.quantity')} ↑` },
+            { value: 'quantity:desc', label: `${t('items.sort.label')}: ${t('items.col.quantity')} ↓` },
+            { value: 'weight:asc', label: `${t('items.sort.label')}: ${t('items.col.weight')} ↑` },
+            { value: 'weight:desc', label: `${t('items.sort.label')}: ${t('items.col.weight')} ↓` },
+            { value: 'box:asc', label: `${t('items.sort.label')}: ${t('items.col.box')} ↑` },
+            { value: 'box:desc', label: `${t('items.sort.label')}: ${t('items.col.box')} ↓` },
+            { value: 'status:asc', label: `${t('items.sort.label')}: ${t('items.col.status')} ↑` },
+            { value: 'status:desc', label: `${t('items.sort.label')}: ${t('items.col.status')} ↓` },
+          ]}
+        />
       </div>
 
       {/* Mobile list */}
@@ -326,19 +372,23 @@ function ItemsPage() {
                     />
                   </th>
                 )}
-                {[
-                  t('items.col.item'),
-                  t('items.col.owner'),
-                  t('items.col.group'),
-                  t('items.col.shipping'),
-                  t('items.col.quantity'),
-                  t('items.col.weight'),
-                  t('items.col.box'),
-                  t('items.col.status'),
-                  '',
-                ].map((h, idx) => (
-                  <th key={h || `empty-${idx}`} className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted">{h}</th>
+                {([
+                  ['name', t('items.col.item')],
+                  ['owner', t('items.col.owner')],
+                  ['group', t('items.col.group')],
+                  ['shippingMethod', t('items.col.shipping')],
+                  ['quantity', t('items.col.quantity')],
+                  ['weight', t('items.col.weight')],
+                  ['box', t('items.col.box')],
+                  ['status', t('items.col.status')],
+                ] as Array<[ItemSortKey, string]>).map(([k, h]) => (
+                  <th key={k} className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted">
+                    <button type="button" onClick={() => toggleSort(k)} className="inline-flex items-center gap-1.5 hover:text-app">
+                      {h} <SortIcon k={k} />
+                    </button>
+                  </th>
                 ))}
+                <th className="px-4 py-3" />
               </tr>
             </thead>
             <tbody className="divide-y divide-black/5 dark:divide-white/10">
