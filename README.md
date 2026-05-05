@@ -134,7 +134,7 @@ In production, only the Web (`3000`) and Admin (`3001`) nginx containers are rea
 
 > **Admin URL note.** The Admin URL configured in **Admin → Settings** is added to the API's CORS allowlist. With the default same-origin reverse-proxy deployment (admin nginx serves the SPA *and* proxies `/api/*` to the API on the same host:port), CORS doesn't trigger for day-to-day admin use, so a mismatched Admin URL won't lock you out. The setting matters in cross-origin deployments — if you serve the admin SPA from a different host than the API, the value must match the admin origin or the browser will CORS-reject the requests. Either way, exposing port `3001` only on a private network or behind a VPN is recommended.
 
-Docker images are built on every push to `main` via [GitHub Actions](.github/workflows/build-and-push.yml) and pushed to `ghcr.io/seanchangx/packman-{api,web,admin}` with `latest`, branch, sha, and semver tags.
+Docker images are built via [GitHub Actions](.github/workflows/build-and-push.yml) when a `v*` tag is pushed (or the workflow is dispatched manually) and pushed to `ghcr.io/seanchangx/packman-{api,web,admin}` with `latest` and semver tags.
 
 ---
 
@@ -235,7 +235,7 @@ docker compose exec api node dist/seed.js
 
 ### Releasing
 
-Push to `main` triggers a [GitHub Actions](.github/workflows/build-and-push.yml) build that pushes 3 images to GHCR with `latest` + branch + sha tags. Push a `v*` tag to also publish semver tags:
+Pushing a `v*` tag triggers a [GitHub Actions](.github/workflows/build-and-push.yml) build that pushes 3 images to GHCR with `latest` + semver tags. The workflow can also be run manually via **workflow_dispatch**:
 
 ```bash
 git tag v1.0.0 && git push --tags

@@ -134,7 +134,7 @@
 
 > **Admin URL 注意事項。** 在 **管理後台 → 系統設定** 中設定的 Admin URL 會加入 API 的 CORS 允許清單。在預設的同源反代部署下（admin nginx 同時提供 SPA 並把 `/api/*` 反代到同 host:port 的 API），日常後台操作不會觸發 CORS 檢查，**Admin URL 設錯也不會把你鎖死**。此設定在跨來源部署才有實質作用 — 若 admin 與 API 來自不同 host，必須匹配 admin 的 origin，否則瀏覽器會 CORS 拒絕請求。無論如何，建議將 `3001` 僅綁在內部網路或透過 VPN 存取。
 
-每次推送到 `main` 都會透過 [GitHub Actions](.github/workflows/build-and-push.yml) 自動 build 並推送到 `ghcr.io/seanchangx/packman-{api,web,admin}`，會打上 `latest`、branch、sha、semver 等多個 tag。
+推送 `v*` tag(或手動觸發 workflow_dispatch)時，[GitHub Actions](.github/workflows/build-and-push.yml) 會自動 build 並推送到 `ghcr.io/seanchangx/packman-{api,web,admin}`，並打上 `latest` 與 semver tag。
 
 ---
 
@@ -235,7 +235,7 @@ docker compose exec api node dist/seed.js
 
 ### 發版
 
-推送到 `main` 會觸發 [GitHub Actions](.github/workflows/build-and-push.yml) 自動 build 三個 image 推到 GHCR，並打上 `latest` + branch + sha 標籤。推送 `v*` tag 還會多打 semver 標籤：
+推送 `v*` tag 會觸發 [GitHub Actions](.github/workflows/build-and-push.yml) 自動 build 三個 image 推到 GHCR，並打上 `latest` + semver 標籤；workflow 也支援手動 workflow_dispatch 觸發：
 
 ```bash
 git tag v1.0.0 && git push --tags
