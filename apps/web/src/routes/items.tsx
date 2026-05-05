@@ -368,11 +368,12 @@ function ItemsPage() {
                           />
                         </td>
                       )}
-                      <td className="px-4 py-3">
+                      <td className="max-w-[16rem] px-4 py-3 align-top">
                         <Link
                           to="/items/$id"
                           params={{ id: item.id }}
-                          className="font-semibold text-brand-600 hover:underline"
+                          className="block truncate font-semibold text-brand-600 hover:underline"
+                          title={item.name}
                           onClick={(e) => e.stopPropagation()}
                         >
                           {item.name}
@@ -380,35 +381,41 @@ function ItemsPage() {
                         {item.tags.length > 0 && (
                           <div className="mt-1 flex flex-wrap gap-1">
                             {item.tags.slice(0, 3).map((tag) => (
-                              <span key={tag} className="badge bg-black/5 text-muted dark:bg-white/10">{tag}</span>
+                              <span key={tag} className="badge max-w-[8rem] truncate bg-black/5 text-muted dark:bg-white/10">{tag}</span>
                             ))}
                           </div>
                         )}
                       </td>
-                      <td className="px-4 py-3 text-muted">
+                      <td className="max-w-[10rem] whitespace-nowrap px-4 py-3 text-muted">
                         {item.owner
                           ? <span className="flex items-center gap-1">
-                              {item.owner.avatarUrl && <img src={item.owner.avatarUrl} className="h-5 w-5 rounded-full" alt="" />}
-                              {item.owner.name}
+                              {item.owner.avatarUrl && <img src={item.owner.avatarUrl} className="h-5 w-5 shrink-0 rounded-full" alt="" />}
+                              <span className="truncate" title={item.owner.name}>{item.owner.name}</span>
                             </span>
                           : '—'}
                       </td>
-                      <td className="px-4 py-3">
+                      <td className="max-w-[10rem] px-4 py-3">
                         {item.group
-                          ? <span className="badge" style={{ backgroundColor: item.group.color + '20', color: item.group.color }}>{item.group.name}</span>
+                          ? <span
+                              className="badge max-w-full truncate"
+                              style={{ backgroundColor: item.group.color + '20', color: item.group.color }}
+                              title={item.group.name}
+                            >
+                              {item.group.name}
+                            </span>
                           : '—'}
                       </td>
-                      <td className="px-4 py-3 text-muted">
+                      <td className="whitespace-nowrap px-4 py-3 text-muted">
                         {item.shippingMethod ? getLabelFromOptions(shippingOpts, item.shippingMethod) : '—'}
                       </td>
-                      <td className="px-4 py-3 text-muted">{item.quantity}</td>
-                      <td className="px-4 py-3 text-muted">
+                      <td className="whitespace-nowrap px-4 py-3 text-muted">{item.quantity}</td>
+                      <td className="whitespace-nowrap px-4 py-3 text-muted">
                         {item.weightG != null ? `${item.weightG.toLocaleString()} g` : '—'}
                       </td>
-                      <td className="px-4 py-3 text-muted">
+                      <td className="max-w-[10rem] truncate whitespace-nowrap px-4 py-3 text-muted" title={item.box?.label}>
                         {item.box?.label ?? '—'}
                       </td>
-                      <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                      <td className="whitespace-nowrap px-4 py-3" onClick={(e) => e.stopPropagation()}>
                         <Select
                           value={item.status}
                           onChange={(v) => updateStatus.mutate({ id: item.id, status: v as PackingStatus })}

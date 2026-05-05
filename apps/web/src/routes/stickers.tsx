@@ -37,7 +37,18 @@ function StickersPage() {
 
   const { data: items } = useQuery({
     queryKey: ['items', 'all'],
-    queryFn: () => itemsApi.list({ pageSize: 500 }),
+    queryFn: async () => {
+      const all: Awaited<ReturnType<typeof itemsApi.list>>['data'] = []
+      let page = 1
+      const PAGE_SIZE = 500
+      while (true) {
+        const res = await itemsApi.list({ page, pageSize: PAGE_SIZE })
+        all.push(...res.data)
+        if (all.length >= res.total || res.data.length === 0) break
+        page++
+      }
+      return all
+    },
   })
   const { data: boxes } = useQuery({
     queryKey: ['boxes'],
@@ -45,7 +56,7 @@ function StickersPage() {
   })
 
   const list = mode === 'items'
-    ? (items?.data ?? [])
+    ? (items ?? [])
     : (boxes ?? [])
   const selectedKey = useMemo(() => Array.from(selectedIds).sort().join('|'), [selectedIds])
 
@@ -258,10 +269,9 @@ function StickersPage() {
                   onClick={(e) => e.stopPropagation()}
                   className="h-4 w-4 cursor-pointer accent-brand-500"
                 />
-                <div className="flex-1">
-                  <p className="font-medium">{isItem ? i.name : i.label}</p>
-                  {isItem && i.owner && <p className="text-xs text-muted">{i.owner.name}</p>}
-                  {!isItem && i.owner && <p className="text-xs text-muted">{t('stickers.box.owner', { name: i.owner.name })}</p>}
+                <div className="min-w-0 flex-1">
+                  <p className="truncate font-medium" title={isItem ? i.name : i.label}>{isItem ? i.name : i.label}</p>
+                  {i.owner && <p className="truncate text-xs text-muted" title={i.owner.name}>{i.owner.name}</p>}
                 </div>
                 {isItem && (
                   <span className={cn('badge', STATUS_COLORS[status])}>{t(STATUS_LABEL_KEYS[status])}</span>

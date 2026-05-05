@@ -124,7 +124,7 @@ function Dashboard() {
                 BOX_STATUS_CARD_COLORS[box.status]
               )}
             >
-              <span className="text-lg font-bold">{box.label}</span>
+              <span className="block max-w-full truncate text-lg font-bold" title={box.label}>{box.label}</span>
               <span className="text-xs opacity-70">{t(STATUS_LABEL_KEYS[box.status])}</span>
               {(box.totalWeightG ?? 0) > 0 && (
                 <span className="mt-0.5 text-xs opacity-60">

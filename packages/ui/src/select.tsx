@@ -10,6 +10,7 @@ function cn(...classes: Array<string | false | null | undefined>) {
 export interface SelectOption<T extends string> {
   value: T
   label: string
+  hint?: string
 }
 
 export function Select<T extends string>({
@@ -88,6 +89,7 @@ export function Select<T extends string>({
             bottom: placeAbove ? window.innerHeight - rect.top + GAP : undefined,
             left: rect.left,
             minWidth: Math.max(rect.width, 140),
+            maxWidth: Math.max(rect.width, Math.min(window.innerWidth - rect.left - MARGIN, 400)),
             maxHeight,
             zIndex: 60,
             WebkitOverflowScrolling: 'touch',
@@ -101,7 +103,7 @@ export function Select<T extends string>({
               key={option.value}
               type="button"
               className={cn(
-                'flex min-h-11 w-full items-center justify-between rounded-xl px-3 text-left text-sm font-semibold text-white transition-colors hover:bg-white/10',
+                'flex min-h-11 w-full items-center justify-between gap-2 rounded-xl px-3 py-1.5 text-left text-sm font-semibold text-white transition-colors hover:bg-white/10',
                 option.value === value && 'bg-brand-500'
               )}
               onClick={() => {
@@ -109,8 +111,15 @@ export function Select<T extends string>({
                 setOpen(false)
               }}
             >
-              {option.label}
-              {option.value === value && <Check className="h-4 w-4" />}
+              <span className="min-w-0 flex-1">
+                <span className="block truncate">{option.label}</span>
+                {option.hint && (
+                  <span className={cn('mt-0.5 block truncate text-xs font-normal', option.value === value ? 'text-white/80' : 'text-muted')}>
+                    {option.hint}
+                  </span>
+                )}
+              </span>
+              {option.value === value && <Check className="h-4 w-4 shrink-0" />}
             </button>
           ))}
         </div>,

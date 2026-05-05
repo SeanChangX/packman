@@ -104,7 +104,6 @@ const en: Record<string, string> = {
   'stickers.size.A4_SHEET': 'A4 (2×4 grid)',
   'stickers.fail.generate': 'Sticker generation failed',
   'stickers.fail.preview': 'Preview failed',
-  'stickers.box.owner': 'Owner: {name}',
 
   // Common extensions
   'common.opFailed': 'Operation failed',
@@ -419,7 +418,6 @@ const zhHant: Record<string, string> = {
   'stickers.size.A4_SHEET': 'A4 (2×4 格)',
   'stickers.fail.generate': '貼紙生成失敗',
   'stickers.fail.preview': '預覽失敗',
-  'stickers.box.owner': '負責人: {name}',
 
   // Common extensions
   'common.opFailed': '操作失敗',

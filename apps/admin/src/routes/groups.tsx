@@ -136,18 +136,22 @@ function GroupsPage() {
               ? Array.from({ length: 3 }).map((_, i) => <tr key={i}><td colSpan={3} className="px-4 py-3"><div className="h-4 animate-pulse rounded bg-white/10" /></td></tr>)
               : groups?.map((g) => (
                   <tr key={g.id} className="hover:bg-black/5 dark:hover:bg-white/5">
-                    <td className="px-4 py-3">
-                      <span className="badge" style={{ backgroundColor: g.color + '20', color: g.color }}>
+                    <td className="max-w-[16rem] px-4 py-3">
+                      <span
+                        className="badge max-w-full truncate"
+                        style={{ backgroundColor: g.color + '20', color: g.color }}
+                        title={g.name}
+                      >
                         {g.name}
                       </span>
                     </td>
-                    <td className="px-4 py-3">
+                    <td className="whitespace-nowrap px-4 py-3">
                       <div className="flex items-center gap-2">
-                        <span className="inline-block h-5 w-5 rounded-full" style={{ backgroundColor: g.color }} />
+                        <span className="inline-block h-5 w-5 shrink-0 rounded-full" style={{ backgroundColor: g.color }} />
                         <code className="text-xs text-muted">{g.color.toUpperCase()}</code>
                       </div>
                     </td>
-                    <td className="px-4 py-3 flex gap-2">
+                    <td className="whitespace-nowrap px-4 py-3 flex gap-2">
                       <button className="btn-secondary px-2 py-1 text-xs gap-1" onClick={() => setModal(g)}>
                         <Pencil className="h-3 w-3" /> {t('common.edit')}
                       </button>

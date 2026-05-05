@@ -74,7 +74,7 @@ function OptionRow({
   return (
     <tr className="hover:bg-white/5">
       <td className="min-w-0 px-4 py-3 font-medium">
-        <span className="block truncate">{opt.label}</span>
+        <span className="block truncate" title={opt.label}>{opt.label}</span>
       </td>
       <td className="w-36 px-4 py-3">
         <div className="flex items-center justify-end gap-3">

@@ -71,8 +71,8 @@ function UsersPage() {
                             : <div className="flex h-7 w-7 items-center justify-center rounded-full bg-brand-500 text-xs text-white">{user.name[0]}</div>
                           }
                           <div className="min-w-0">
-                            <p className="font-medium">{user.name}</p>
-                            {user.email && <p className="truncate text-xs text-muted">{user.email}</p>}
+                            <p className="truncate font-medium" title={user.name}>{user.name}</p>
+                            {user.email && <p className="truncate text-xs text-muted" title={user.email}>{user.email}</p>}
                           </div>
                         </div>
                       </td>

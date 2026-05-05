@@ -191,22 +191,25 @@ function BatteryRow({
 
   return (
     <tr className="hover:bg-black/5 dark:hover:bg-white/5">
-      <td className="px-4 py-3 font-mono font-medium">{b.batteryId}</td>
-      <td className="px-4 py-3">
-        <span className={`badge ${BATTERY_COLORS[b.batteryType] ?? 'bg-white/10 text-app ring-1 ring-white/10'}`}>
+      <td className="max-w-[12rem] truncate whitespace-nowrap px-4 py-3 font-mono font-medium" title={b.batteryId}>{b.batteryId}</td>
+      <td className="max-w-[12rem] px-4 py-3">
+        <span
+          className={`badge max-w-full truncate ${BATTERY_COLORS[b.batteryType] ?? 'bg-white/10 text-app ring-1 ring-white/10'}`}
+          title={getLabelFromOptions(batteryTypeOpts, b.batteryType)}
+        >
           {getLabelFromOptions(batteryTypeOpts, b.batteryType)}
         </span>
       </td>
-      <td className="px-4 py-3">
+      <td className="max-w-[10rem] whitespace-nowrap px-4 py-3">
         {b.owner
           ? <span className="flex items-center gap-1">
-              {b.owner.avatarUrl && <img src={b.owner.avatarUrl} className="h-5 w-5 rounded-full" alt="" />}
-              {b.owner.name}
+              {b.owner.avatarUrl && <img src={b.owner.avatarUrl} className="h-5 w-5 shrink-0 rounded-full" alt="" />}
+              <span className="truncate" title={b.owner.name}>{b.owner.name}</span>
             </span>
           : '—'}
       </td>
-      <td className="px-4 py-3 text-muted">{b.notes ?? '—'}</td>
-      <td className="px-4 py-3">
+      <td className="max-w-[20rem] truncate whitespace-nowrap px-4 py-3 text-muted" title={b.notes ?? undefined}>{b.notes ?? '—'}</td>
+      <td className="whitespace-nowrap px-4 py-3">
         <div className="flex items-center gap-3">
           <button
             className="text-muted hover:text-app"

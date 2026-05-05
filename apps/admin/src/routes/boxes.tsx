@@ -182,12 +182,12 @@ function BoxesPage() {
                   </tr>
                 ) : (
                   <tr key={box.id}>
-                    <td className="px-4 py-3 font-semibold">{box.label}</td>
-                    <td className="px-4 py-3 text-muted">{box.shippingMethod === 'CHECKED' ? t('boxes.shipping.checked') : t('boxes.shipping.carryOn')}</td>
-                    <td className="px-4 py-3 text-muted">{box.owner?.name ?? '-'}</td>
-                    <td className="px-4 py-3 text-muted">{box.status}</td>
-                    <td className="px-4 py-3 text-muted">{box.notes ?? '-'}</td>
-                    <td className="px-4 py-3">
+                    <td className="max-w-[12rem] truncate whitespace-nowrap px-4 py-3 font-semibold" title={box.label}>{box.label}</td>
+                    <td className="whitespace-nowrap px-4 py-3 text-muted">{box.shippingMethod === 'CHECKED' ? t('boxes.shipping.checked') : t('boxes.shipping.carryOn')}</td>
+                    <td className="max-w-[10rem] truncate whitespace-nowrap px-4 py-3 text-muted" title={box.owner?.name ?? undefined}>{box.owner?.name ?? '-'}</td>
+                    <td className="whitespace-nowrap px-4 py-3 text-muted">{box.status}</td>
+                    <td className="max-w-[20rem] truncate whitespace-nowrap px-4 py-3 text-muted" title={box.notes ?? undefined}>{box.notes ?? '-'}</td>
+                    <td className="whitespace-nowrap px-4 py-3">
                       <div className="flex gap-2">
                         <button className="btn-secondary px-3" onClick={() => startEdit(box)}>
                           <Pencil className="h-4 w-4" />

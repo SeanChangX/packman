@@ -370,7 +370,11 @@ function ItemDetailPage() {
                       emptyValue="null"
                       options={[
                         { value: '', label: t('items.new.placeholderUnassigned') },
-                        ...(boxes?.map((b) => ({ value: b.id, label: b.label })) ?? []),
+                        ...(boxes?.map((b) => ({
+                          value: b.id,
+                          label: b.label,
+                          hint: b.notes?.trim() || undefined,
+                        })) ?? []),
                       ]}
                     />
                 </div>

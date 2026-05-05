@@ -333,7 +333,10 @@ function BoxDetailPage() {
                       className="flex min-w-0 flex-1 items-center gap-3 py-4 pr-2 text-left"
                     >
                       <span className="min-w-0 flex-1">
-                        <span className={cn('block font-medium', isPacked && 'text-muted line-through')}>
+                        <span
+                          className={cn('block truncate font-medium', isPacked && 'text-muted line-through')}
+                          title={item.name}
+                        >
                           {item.name}
                         </span>
                         <span className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted">
