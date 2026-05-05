@@ -8,7 +8,7 @@ import { STATUS_COLORS, getLabelFromOptions, cn, formatApiError } from '../lib/u
 import { Select } from '../lib/select'
 import { useAuth } from '../lib/auth-context'
 import { useT } from '../lib/i18n'
-import type { PackingStatus } from '@packman/shared'
+import type { Item, PackingStatus, PaginatedResponse } from '@packman/shared'
 
 function ItemsPage() {
   const t = useT()
@@ -67,7 +67,22 @@ function ItemsPage() {
   const updateStatus = useMutation({
     mutationFn: ({ id, status }: { id: string; status: PackingStatus }) =>
       itemsApi.update(id, { status }),
-    onSuccess: (_, { id }) => {
+    onSuccess: (updated, { id }) => {
+      // Patch the affected item in-place across all loaded pages so the
+      // infinite list does not collapse back to page 1.
+      qc.setQueriesData<{ pages: PaginatedResponse<Item>[] }>(
+        { queryKey: ['items'] },
+        (old) => {
+          if (!old?.pages) return old
+          return {
+            ...old,
+            pages: old.pages.map((p) => ({
+              ...p,
+              data: p.data.map((it) => (it.id === id ? { ...it, ...updated } : it)),
+            })),
+          }
+        },
+      )
       qc.invalidateQueries({ queryKey: ['items'] })
       qc.invalidateQueries({ queryKey: ['item', id] })
       qc.invalidateQueries({ queryKey: ['boxes'] })
@@ -81,6 +96,7 @@ function ItemsPage() {
       ids.forEach((id) => qc.removeQueries({ queryKey: ['item', id] }))
       setSelected(new Set())
       qc.invalidateQueries({ queryKey: ['items'] })
+      qc.invalidateQueries({ queryKey: ['boxes'] })
       showToast(t('items.batchDelete.success'), 'success')
     },
     onError: (e: unknown) => showToast(formatApiError(e, t('common.opFailed'), t('common.requiredHint')), 'error'),

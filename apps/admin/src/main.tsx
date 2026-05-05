@@ -8,7 +8,16 @@ import { LocaleProvider } from './lib/i18n'
 import { routeTree } from './routeTree.gen'
 import './index.css'
 
-const qc = new QueryClient({ defaultOptions: { queries: { staleTime: 30_000, retry: 1 } } })
+const qc = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 30_000,
+      retry: 1,
+      refetchOnWindowFocus: 'always',
+      refetchOnReconnect: 'always',
+    },
+  },
+})
 const router = createRouter({ routeTree })
 
 declare module '@tanstack/react-router' { interface Register { router: typeof router } }

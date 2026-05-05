@@ -9,7 +9,7 @@ import { STATUS_LABEL_KEYS, STATUS_COLORS, SHIPPING_LABEL_KEYS, cn, formatApiErr
 import { Select } from '../lib/select'
 import { useT } from '../lib/i18n'
 import { useAuth } from '../lib/auth-context'
-import type { PackingStatus, UpdateBoxInput, User } from '@packman/shared'
+import type { Item, PackingStatus, PaginatedResponse, UpdateBoxInput, User } from '@packman/shared'
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker
 
@@ -117,10 +117,24 @@ function BoxDetailPage() {
   const updateItem = useMutation({
     mutationFn: ({ itemId, status }: { itemId: string; status: PackingStatus }) =>
       itemsApi.update(itemId, { status }),
-    onSuccess: (_, { itemId }) => {
+    onSuccess: (updated, { itemId }) => {
+      qc.setQueryData(['item', itemId], updated)
+      qc.setQueriesData<{ pages: PaginatedResponse<Item>[] }>(
+        { queryKey: ['items'] },
+        (old) => {
+          if (!old?.pages) return old
+          return {
+            ...old,
+            pages: old.pages.map((p) => ({
+              ...p,
+              data: p.data.map((it) => (it.id === itemId ? { ...it, ...updated } : it)),
+            })),
+          }
+        },
+      )
       qc.invalidateQueries({ queryKey: ['box', id] })
+      qc.invalidateQueries({ queryKey: ['boxes'] })
       qc.invalidateQueries({ queryKey: ['items'] })
-      qc.invalidateQueries({ queryKey: ['item', itemId] })
     },
   })
 
@@ -129,6 +143,7 @@ function BoxDetailPage() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['box', id] })
       qc.invalidateQueries({ queryKey: ['boxes'] })
+      qc.invalidateQueries({ queryKey: ['items'] })
     },
   })
 

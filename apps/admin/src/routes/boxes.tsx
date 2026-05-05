@@ -38,6 +38,7 @@ function BoxesPage() {
       }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['admin-boxes'] })
+      qc.invalidateQueries({ queryKey: ['admin-stats'] })
       reset()
       setOwnerId('')
       showToast(t('boxes.create.saved'), 'success')
@@ -47,13 +48,22 @@ function BoxesPage() {
   const update = useMutation({
     mutationFn: ({ id, data }: { id: string; data: { label: string; shippingMethod: string; ownerId: string | null; notes?: string } }) =>
       adminApi.updateBox(id, data),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['admin-boxes'] }); setEditingId(null); showToast(t('boxes.update.saved'), 'success') },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['admin-boxes'] })
+      qc.invalidateQueries({ queryKey: ['admin-stats'] })
+      setEditingId(null)
+      showToast(t('boxes.update.saved'), 'success')
+    },
     onError: (e: unknown) => showToast((e as Error)?.message ?? t('boxes.update.failed'), 'error'),
   })
 
   const del = useMutation({
     mutationFn: adminApi.deleteBox,
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['admin-boxes'] }); showToast(t('boxes.delete.saved'), 'success') },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['admin-boxes'] })
+      qc.invalidateQueries({ queryKey: ['admin-stats'] })
+      showToast(t('boxes.delete.saved'), 'success')
+    },
     onError: (e: unknown) => showToast((e as Error)?.message ?? t('boxes.delete.failed'), 'error'),
   })
 

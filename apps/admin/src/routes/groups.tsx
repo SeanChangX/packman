@@ -31,7 +31,11 @@ function GroupModal({ initial, onClose }: { initial?: { id: string; name: string
   const save = useMutation({
     mutationFn: (data: { name: string; color: string }) =>
       initial ? adminApi.updateGroup(initial.id, data) : adminApi.createGroup(data),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['admin-groups'] }); onClose() },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['admin-groups'] })
+      qc.invalidateQueries({ queryKey: ['admin-stats'] })
+      onClose()
+    },
   })
 
   return (
@@ -97,7 +101,11 @@ function GroupsPage() {
 
   const del = useMutation({
     mutationFn: adminApi.deleteGroup,
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['admin-groups'] }); showToast(t('groups.delete.saved'), 'success') },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['admin-groups'] })
+      qc.invalidateQueries({ queryKey: ['admin-stats'] })
+      showToast(t('groups.delete.saved'), 'success')
+    },
     onError: (e: unknown) => showToast((e as Error)?.message ?? t('groups.delete.failed'), 'error'),
   })
 

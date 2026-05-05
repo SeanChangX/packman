@@ -101,6 +101,7 @@ function BoxesPage() {
     onSuccess: (_, id) => {
       qc.removeQueries({ queryKey: ['box', id] })
       qc.invalidateQueries({ queryKey: ['boxes'] })
+      qc.invalidateQueries({ queryKey: ['items'] })
       showToast(t('boxes.action.deleted'), 'success')
     },
     onError: (e: unknown) => showToast(formatApiError(e, t('common.opFailed'), t('common.requiredHint')), 'error'),

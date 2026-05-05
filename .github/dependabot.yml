@@ -29,6 +29,8 @@ updates:
           - 'node'
           - 'nginx'
     ignore:
-      # Skip non-LTS (odd-numbered) Node majors — only follow LTS line.
+      # Pin Node to its current LTS major. Crossing a major (e.g. 24 -> 26 LTS,
+      # or jumping to a non-LTS odd release) needs manual review for native
+      # module ABI changes, so block automated major bumps entirely.
       - dependency-name: 'node'
-        versions: ['25.x', '27.x', '29.x', '31.x']
+        update-types: ['version-update:semver-major']

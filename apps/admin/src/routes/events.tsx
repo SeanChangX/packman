@@ -1,5 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { useState, useEffect } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { Calendar, Plus, Pencil, Trash2, CheckCircle, Circle, Users, X } from 'lucide-react'
 import { Modal, useToast } from '@packman/ui'
 import { adminApi } from '../lib/api'
@@ -152,6 +153,7 @@ function MembersModal({ event, onClose }: { event: { id: string; name: string };
 
 function EventsPage() {
   const t = useT()
+  const qc = useQueryClient()
   const [events, setEvents] = useState<Event[]>([])
   const [loading, setLoading] = useState(true)
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -202,6 +204,8 @@ function EventsPage() {
     try {
       await adminApi.activateEvent(id)
       await load()
+      qc.invalidateQueries({ queryKey: ['admin-stats'] })
+      qc.invalidateQueries({ queryKey: ['admin-boxes'] })
     } catch (e: any) {
       setError(e.message)
     }
@@ -213,6 +217,8 @@ function EventsPage() {
     try {
       await adminApi.deleteEvent(id)
       await load()
+      qc.invalidateQueries({ queryKey: ['admin-stats'] })
+      qc.invalidateQueries({ queryKey: ['admin-boxes'] })
     } catch (e: any) {
       setError(e.message)
     }

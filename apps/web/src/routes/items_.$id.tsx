@@ -8,7 +8,7 @@ import { itemsApi, groupsApi, boxesApi, usersApi, selectOptionsApi } from '../li
 import { STATUS_LABEL_KEYS, STATUS_COLORS, getLabelFromOptions, optionsToSelectItems, cn, formatApiError, formatTimestamp } from '../lib/utils'
 import { SelectController } from '../lib/select'
 import { useT } from '../lib/i18n'
-import type { UpdateItemInput, PackingStatus } from '@packman/shared'
+import type { Item, PackingStatus, PaginatedResponse, UpdateItemInput } from '@packman/shared'
 
 function ItemDetailPage() {
   const t = useT()
@@ -64,8 +64,21 @@ function ItemDetailPage() {
 
   const update = useMutation({
     mutationFn: (data: UpdateItemInput) => itemsApi.update(id, data),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['item', id] })
+    onSuccess: (updated) => {
+      qc.setQueryData(['item', id], updated)
+      qc.setQueriesData<{ pages: PaginatedResponse<Item>[] }>(
+        { queryKey: ['items'] },
+        (old) => {
+          if (!old?.pages) return old
+          return {
+            ...old,
+            pages: old.pages.map((p) => ({
+              ...p,
+              data: p.data.map((it) => (it.id === id ? { ...it, ...updated } : it)),
+            })),
+          }
+        },
+      )
       qc.invalidateQueries({ queryKey: ['items'] })
       qc.invalidateQueries({ queryKey: ['boxes'] })
       setEditing(false)

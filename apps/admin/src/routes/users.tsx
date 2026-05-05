@@ -16,13 +16,21 @@ function UsersPage() {
   const updateUser = useMutation({
     mutationFn: ({ id, data }: { id: string; data: { role?: string; groupId?: string | null } }) =>
       adminApi.updateUser(id, data),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['admin-users'] }); showToast(t('users.update.saved'), 'success') },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['admin-users'] })
+      qc.invalidateQueries({ queryKey: ['admin-stats'] })
+      showToast(t('users.update.saved'), 'success')
+    },
     onError: (e: unknown) => showToast((e as Error)?.message ?? t('users.update.failed'), 'error'),
   })
 
   const deleteUser = useMutation({
     mutationFn: adminApi.deleteUser,
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['admin-users'] }); showToast(t('users.delete.saved'), 'success') },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['admin-users'] })
+      qc.invalidateQueries({ queryKey: ['admin-stats'] })
+      showToast(t('users.delete.saved'), 'success')
+    },
     onError: (e: unknown) => showToast((e as Error)?.message ?? t('users.delete.failed'), 'error'),
   })
 
