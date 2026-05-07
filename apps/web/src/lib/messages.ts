@@ -108,6 +108,11 @@ const en: Record<string, string> = {
   'stickers.size.A4_SHEET': 'A4 (2×4 grid)',
   'stickers.fail.generate': 'Sticker generation failed',
   'stickers.fail.preview': 'Preview failed',
+  'stickers.limit.hint': 'Up to {max} stickers per export',
+  'stickers.limit.exceeded': 'Selected {n}, exceeds the {max} limit',
+  'stickers.page.indicator': 'Page {current} / {total}',
+  'stickers.page.prev': 'Previous page',
+  'stickers.page.next': 'Next page',
 
   // Common extensions
   'common.opFailed': 'Operation failed',
@@ -432,6 +437,11 @@ const zhHant: Record<string, string> = {
   'stickers.size.A4_SHEET': 'A4 (2×4 格)',
   'stickers.fail.generate': '貼紙生成失敗',
   'stickers.fail.preview': '預覽失敗',
+  'stickers.limit.hint': '單次最多可列印 {max} 張貼紙',
+  'stickers.limit.exceeded': '已選 {n} 個，超過 {max} 張上限',
+  'stickers.page.indicator': '第 {current} / {total} 頁',
+  'stickers.page.prev': '上一頁',
+  'stickers.page.next': '下一頁',
 
   // Common extensions
   'common.opFailed': '操作失敗',

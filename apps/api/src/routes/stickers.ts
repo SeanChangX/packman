@@ -20,11 +20,13 @@ export async function stickerRoutes(app: FastifyInstance) {
         box: { select: { label: true } },
       },
     })
+    const itemMap = new Map(items.map((i) => [i.id, i]))
+    const ordered = body.ids.map((id) => itemMap.get(id)).filter((i): i is NonNullable<typeof i> => i != null)
 
     const [{ appUrl }, brand] = await Promise.all([getAppConfig(), getBrandConfig()])
     const logoBuffer = await getBrandLogoBuffer()
       ?? (brand.logoObjectName ? await getObjectBuffer(brand.logoObjectName).catch(() => null) : null)
-    const pdfBuffer = await generateItemStickerPdf(items, appUrl, body.size, logoBuffer, brand.name, resolveLocale(request))
+    const pdfBuffer = await generateItemStickerPdf(ordered, appUrl, body.size, logoBuffer, brand.name, resolveLocale(request))
 
     reply
       .header('Content-Type', 'application/pdf')
@@ -43,11 +45,13 @@ export async function stickerRoutes(app: FastifyInstance) {
         _count: { select: { items: true } },
       },
     })
+    const boxMap = new Map(boxes.map((b) => [b.id, b]))
+    const ordered = body.ids.map((id) => boxMap.get(id)).filter((b): b is NonNullable<typeof b> => b != null)
 
     const [{ appUrl }, brand] = await Promise.all([getAppConfig(), getBrandConfig()])
     const logoBuffer = await getBrandLogoBuffer()
       ?? (brand.logoObjectName ? await getObjectBuffer(brand.logoObjectName).catch(() => null) : null)
-    const pdfBuffer = await generateBoxStickerPdf(boxes, appUrl, body.size, logoBuffer, brand.name, resolveLocale(request))
+    const pdfBuffer = await generateBoxStickerPdf(ordered, appUrl, body.size, logoBuffer, brand.name, resolveLocale(request))
 
     reply
       .header('Content-Type', 'application/pdf')

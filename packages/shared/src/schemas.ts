@@ -94,7 +94,7 @@ export const ItemsQuerySchema = z.object({
 })
 
 export const StickerRequestSchema = z.object({
-  ids: z.array(z.string().uuid()).min(1).max(50),
+  ids: z.array(z.string().uuid()).min(1).max(80),
   size: z.enum(['SMALL', 'MEDIUM', 'LARGE', 'A4_SHEET']).default('MEDIUM'),
 })
 

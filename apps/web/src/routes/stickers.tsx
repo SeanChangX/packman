@@ -1,7 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { useQuery, useMutation } from '@tanstack/react-query'
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Printer, Package, Box, Eye } from 'lucide-react'
+import { Printer, Package, Box, Eye, ChevronLeft, ChevronRight } from 'lucide-react'
 import * as pdfjsLib from 'pdfjs-dist'
 import pdfjsWorker from 'pdfjs-dist/build/pdf.worker.mjs?url'
 import { useToast } from '@packman/ui'
@@ -15,6 +15,9 @@ import type { PackingStatus } from '@packman/shared'
 pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker
 
 type StickerSize = 'SMALL' | 'MEDIUM' | 'LARGE' | 'A4_SHEET'
+
+const STICKER_LIMIT = 80
+const PAGE_SIZE = STICKER_LIMIT
 
 const SIZE_LABEL_KEYS: Record<StickerSize, string> = {
   SMALL: 'stickers.size.SMALL',
@@ -30,6 +33,7 @@ function StickersPage() {
   const [mode, setMode] = useState<'items' | 'boxes'>('items')
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [size, setSize] = useState<StickerSize>('MEDIUM')
+  const [page, setPage] = useState(0)
   const [previewing, setPreviewing] = useState(false)
   const [previewBlob, setPreviewBlob] = useState<Blob | null>(null)
   const [rendering, setRendering] = useState(false)
@@ -58,7 +62,19 @@ function StickersPage() {
   const list = mode === 'items'
     ? (items ?? [])
     : (boxes ?? [])
-  const selectedKey = useMemo(() => Array.from(selectedIds).sort().join('|'), [selectedIds])
+  const selectedKey = useMemo(() => Array.from(selectedIds).join('|'), [selectedIds])
+  const overLimit = selectedIds.size > STICKER_LIMIT
+  const totalPages = Math.max(1, Math.ceil(list.length / PAGE_SIZE))
+  const safePage = Math.min(page, totalPages - 1)
+  const pageItems = useMemo(
+    () => list.slice(safePage * PAGE_SIZE, (safePage + 1) * PAGE_SIZE),
+    [list, safePage],
+  )
+  const pageSelectedCount = pageItems.filter((i: { id: string }) => selectedIds.has(i.id)).length
+  const allOnPageSelected = pageItems.length > 0 && pageSelectedCount === pageItems.length
+  const someOnPageSelected = pageSelectedCount > 0 && pageSelectedCount < pageItems.length
+
+  useEffect(() => { setPage(0) }, [mode])
 
   const fetchStickerBlob = async () => {
     const ids = Array.from(selectedIds)
@@ -148,8 +164,16 @@ function StickersPage() {
   }
 
   const toggleAll = () => {
-    if (selectedIds.size === list.length) setSelectedIds(new Set())
-    else setSelectedIds(new Set(list.map((i) => i.id)))
+    setSelectedIds((prev: Set<string>) => {
+      const next = new Set(prev)
+      const allSelected = pageItems.length > 0 && pageItems.every((i: { id: string }) => next.has(i.id))
+      if (allSelected) {
+        for (const i of pageItems) next.delete(i.id)
+      } else {
+        for (const i of pageItems) next.add(i.id)
+      }
+      return next
+    })
   }
 
   if (user?.role !== 'ADMIN') {
@@ -200,7 +224,7 @@ function StickersPage() {
           <div className="grid gap-2 justify-self-stretch sm:grid-cols-2 lg:justify-self-end">
             <button
               className="btn-secondary justify-center gap-1"
-              disabled={selectedIds.size === 0 || previewing || download.isPending}
+              disabled={selectedIds.size === 0 || overLimit || previewing || download.isPending}
               onClick={previewSticker}
             >
               <Eye className="h-4 w-4" />
@@ -208,7 +232,7 @@ function StickersPage() {
             </button>
             <button
               className="btn-primary justify-center gap-1"
-              disabled={selectedIds.size === 0 || download.isPending || previewing}
+              disabled={selectedIds.size === 0 || overLimit || download.isPending || previewing}
               onClick={() => download.mutate()}
             >
               <Printer className="h-4 w-4" />
@@ -238,21 +262,53 @@ function StickersPage() {
       )}
 
       <div className="card overflow-hidden">
-        <div className="flex items-center gap-3 border-b border-black/10 px-4 py-3 dark:border-white/10">
-          <input
-            type="checkbox"
-            checked={selectedIds.size === list.length && list.length > 0}
-            ref={(el) => { if (el) el.indeterminate = selectedIds.size > 0 && selectedIds.size < list.length }}
-            onChange={toggleAll}
-            className="h-4 w-4 cursor-pointer accent-brand-500"
-          />
-          <span className="text-sm text-muted">
-            {t('stickers.selected', { n: selectedIds.size, total: list.length })}
-          </span>
+        <div className="border-b border-black/10 px-4 py-3 dark:border-white/10">
+          <div className="flex items-center gap-3">
+            <input
+              type="checkbox"
+              checked={allOnPageSelected}
+              ref={(el) => { if (el) el.indeterminate = someOnPageSelected }}
+              onChange={toggleAll}
+              className="h-4 w-4 cursor-pointer accent-brand-500"
+            />
+            <span className="text-sm text-muted">
+              {t('stickers.selected', { n: selectedIds.size, total: list.length })}
+            </span>
+            {totalPages > 1 && (
+              <div className="ml-auto flex items-center gap-1 rounded-2xl border border-black/10 bg-black/5 p-1 dark:border-white/10 dark:bg-white/5">
+                <button
+                  type="button"
+                  className="flex h-8 w-8 items-center justify-center rounded-xl text-muted transition-colors hover:bg-white/40 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent dark:hover:bg-white/10"
+                  disabled={safePage === 0}
+                  onClick={() => setPage(safePage - 1)}
+                  aria-label={t('stickers.page.prev')}
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </button>
+                <span className="px-2 text-xs font-medium tabular-nums text-muted">
+                  {t('stickers.page.indicator', { current: safePage + 1, total: totalPages })}
+                </span>
+                <button
+                  type="button"
+                  className="flex h-8 w-8 items-center justify-center rounded-xl text-muted transition-colors hover:bg-white/40 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent dark:hover:bg-white/10"
+                  disabled={safePage >= totalPages - 1}
+                  onClick={() => setPage(safePage + 1)}
+                  aria-label={t('stickers.page.next')}
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </button>
+              </div>
+            )}
+          </div>
+          <p className={cn('mt-1 pl-7 text-xs', overLimit ? 'font-semibold text-red-500' : 'text-muted')}>
+            {overLimit
+              ? t('stickers.limit.exceeded', { n: selectedIds.size, max: STICKER_LIMIT })
+              : t('stickers.limit.hint', { max: STICKER_LIMIT })}
+          </p>
         </div>
 
         <ul className="divide-y divide-black/5 dark:divide-white/10">
-          {list.map((item) => {
+          {pageItems.map((item: { id: string }) => {
             const isItem = mode === 'items'
             const i = item as any
             const status = i.status as PackingStatus
