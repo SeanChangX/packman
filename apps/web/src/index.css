@@ -91,7 +91,9 @@
 
   @media (min-width: 768px) {
     .page {
-      padding-bottom: 2rem;
+      /* Clear the floating QR FAB (~80px tall) so form actions at the
+         bottom of a page aren't covered when scrolled to the end. */
+      padding-bottom: 6rem;
     }
   }
 

@@ -115,12 +115,16 @@ export async function seedDefaultData(logger: SeedLogger = consoleLogger) {
     { type: 'BATTERY_TYPE'    as const, value: 'POWER_BANK',     label: '行動電源',    sortOrder: 1 },
     { type: 'BATTERY_TYPE'    as const, value: 'LIFEPO4',        label: '磁酸鋰鐵電池', sortOrder: 2 },
   ]
-  for (const opt of defaultSelectOptions) {
-    await prisma.selectOption.upsert({
-      where: { type_value: { type: opt.type, value: opt.value } },
-      update: {},
-      create: opt,
-    })
+  // Seed each SelectOptionType bucket only when empty so admin deletions
+  // (e.g. removing 「往返物品」) survive container restarts.
+  const optionTypes = [...new Set(defaultSelectOptions.map((o) => o.type))]
+  for (const type of optionTypes) {
+    const existing = await prisma.selectOption.count({ where: { type } })
+    if (existing === 0) {
+      await prisma.selectOption.createMany({
+        data: defaultSelectOptions.filter((o) => o.type === type),
+      })
+    }
   }
 
   const endpointCount = await prisma.ollamaEndpoint.count()
