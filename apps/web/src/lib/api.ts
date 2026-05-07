@@ -97,6 +97,7 @@ export type ItemSortKey = 'createdAt' | 'name' | 'owner' | 'group' | 'shippingMe
 interface ItemsQuery {
   groupId?: string
   boxId?: string
+  ownerId?: string
   status?: string
   shippingMethod?: string
   search?: string
@@ -112,6 +113,7 @@ export const itemsApi = {
     const params = new URLSearchParams()
     if (q?.groupId) params.set('groupId', q.groupId)
     if (q?.boxId) params.set('boxId', q.boxId)
+    if (q?.ownerId) params.set('ownerId', q.ownerId)
     if (q?.status) params.set('status', q.status)
     if (q?.shippingMethod) params.set('shippingMethod', q.shippingMethod)
     if (q?.search) params.set('search', q.search)

@@ -3,8 +3,8 @@ import { useQuery, useMutation, useQueryClient, useInfiniteQuery } from '@tansta
 import { useState, useEffect, useRef } from 'react'
 import { Plus, Search, Trash2, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react'
 import { useToast } from '@packman/ui'
-import { itemsApi, groupsApi, selectOptionsApi, type ItemSortKey } from '../lib/api'
-import { STATUS_COLORS, getLabelFromOptions, cn, formatApiError } from '../lib/utils'
+import { itemsApi, groupsApi, usersApi, selectOptionsApi, type ItemSortKey } from '../lib/api'
+import { STATUS_COLORS, getLabelFromOptions, cn, formatApiError, sortUsersForOwnerSelect } from '../lib/utils'
 import { Select } from '../lib/select'
 import { useAuth } from '../lib/auth-context'
 import { useT } from '../lib/i18n'
@@ -23,6 +23,7 @@ function ItemsPage() {
   const [statusFilter, setStatusFilter] = useState<PackingStatus | ''>(statusFromUrl ?? '')
   const [shippingFilter, setShippingFilter] = useState('')
   const [groupFilter, setGroupFilter] = useState('')
+  const [ownerFilter, setOwnerFilter] = useState('')
   const [sortBy, setSortBy] = useState<ItemSortKey>('createdAt')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
   const [selected, setSelected] = useState<Set<string>>(new Set())
@@ -49,12 +50,13 @@ function ItemsPage() {
 
   const PAGE_SIZE = 50
   const { data, isLoading, fetchNextPage, hasNextPage, isFetchingNextPage } = useInfiniteQuery({
-    queryKey: ['items', debouncedSearch, statusFilter, shippingFilter, groupFilter, sortBy, sortDir],
+    queryKey: ['items', debouncedSearch, statusFilter, shippingFilter, groupFilter, ownerFilter, sortBy, sortDir],
     queryFn: ({ pageParam = 1 }) => itemsApi.list({
       search: debouncedSearch || undefined,
       status: statusFilter || undefined,
       shippingMethod: shippingFilter || undefined,
       groupId: groupFilter || undefined,
+      ownerId: ownerFilter || undefined,
       sortBy,
       sortDir,
       page: pageParam as number,
@@ -80,6 +82,7 @@ function ItemsPage() {
   }, [hasNextPage, isFetchingNextPage, fetchNextPage])
 
   const { data: groups } = useQuery({ queryKey: ['groups'], queryFn: groupsApi.list })
+  const { data: users } = useQuery({ queryKey: ['users'], queryFn: usersApi.list })
   const { data: shippingOpts = [] } = useQuery({ queryKey: ['options', 'SHIPPING_METHOD'], queryFn: () => selectOptionsApi.list('SHIPPING_METHOD') })
 
   const updateStatus = useMutation({
@@ -166,7 +169,7 @@ function ItemsPage() {
       </div>
 
       {/* Filters */}
-      <div className="card grid gap-3 p-4 lg:grid-cols-[minmax(16rem,1fr)_auto_auto_auto]">
+      <div className="card grid gap-3 p-4 lg:grid-cols-[minmax(14rem,1fr)_auto_auto_auto_auto]">
         <div className="relative min-w-0">
           <Search className="absolute left-3 top-3.5 h-4 w-4 text-muted" />
           <input
@@ -201,6 +204,12 @@ function ItemsPage() {
           value={groupFilter}
           onChange={setGroupFilter}
           options={[{ value: '', label: t('items.filter.allGroups') }, ...(groups?.map((g) => ({ value: g.id, label: g.name })) ?? [])]}
+        />
+        <Select
+          className="w-full lg:w-40"
+          value={ownerFilter}
+          onChange={setOwnerFilter}
+          options={[{ value: '', label: t('items.filter.allOwners') }, ...sortUsersForOwnerSelect(users, user).map((u) => ({ value: u.id, label: u.name }))]}
         />
         <Select
           className="w-full md:hidden"
@@ -346,15 +355,6 @@ function ItemsPage() {
               )}
       </div>
 
-      {/* Mobile sentinel */}
-      <div ref={sentinelRef} className="md:hidden">
-        {isFetchingNextPage && (
-          <div className="flex justify-center py-4">
-            <div className="h-6 w-6 animate-spin rounded-full border-4 border-brand-500 border-t-transparent" />
-          </div>
-        )}
-      </div>
-
       {/* Table */}
       <div className="card table-shell hidden md:block">
         <div className="table-scroll">
@@ -493,15 +493,13 @@ function ItemsPage() {
         </div>
       </div>
 
-      {/* Desktop sentinel */}
-      <div className="hidden md:block">
-        <div ref={sentinelRef} />
-        {isFetchingNextPage && (
-          <div className="flex justify-center py-4">
-            <div className="h-6 w-6 animate-spin rounded-full border-4 border-brand-500 border-t-transparent" />
-          </div>
-        )}
-      </div>
+      {/* Sentinel (shared by mobile cards and desktop table) */}
+      <div ref={sentinelRef} />
+      {isFetchingNextPage && (
+        <div className="flex justify-center py-4">
+          <div className="h-6 w-6 animate-spin rounded-full border-4 border-brand-500 border-t-transparent" />
+        </div>
+      )}
     </div>
   )
 }

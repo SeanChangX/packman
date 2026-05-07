@@ -5,7 +5,7 @@ import { useForm } from 'react-hook-form'
 import { AlertTriangle, Package, Plus, Trash2, UserRound, Weight, X } from 'lucide-react'
 import { useToast, Modal } from '@packman/ui'
 import { boxesApi, usersApi } from '../lib/api'
-import { STATUS_LABEL_KEYS, STATUS_COLORS, cn, formatApiError } from '../lib/utils'
+import { STATUS_LABEL_KEYS, STATUS_COLORS, cn, formatApiError, sortUsersForOwnerSelect } from '../lib/utils'
 import { Select, SelectController } from '../lib/select'
 import { useT } from '../lib/i18n'
 import type { CreateBoxInput, PackingStatus, UpdateBoxInput, User } from '@packman/shared'
@@ -14,6 +14,7 @@ import { useAuth } from '../lib/auth-context'
 function NewBoxModal({ onClose }: { onClose: () => void }) {
   const t = useT()
   const qc = useQueryClient()
+  const { user: me } = useAuth()
   const { data: users } = useQuery({ queryKey: ['users'], queryFn: usersApi.list })
   const { register, handleSubmit, control } = useForm<CreateBoxInput>()
 
@@ -56,7 +57,7 @@ function NewBoxModal({ onClose }: { onClose: () => void }) {
               placeholder={t('common.placeholder.select')}
               options={[
                 { value: '', label: t('common.placeholder.select') },
-                ...(users?.map((u) => ({ value: u.id, label: u.name })) ?? []),
+                ...sortUsersForOwnerSelect(users, me).map((u) => ({ value: u.id, label: u.name })),
               ]}
             />
           </div>
@@ -125,7 +126,7 @@ function BoxesPage() {
     ...(owner && !users?.some((u) => u.id === owner.id)
       ? [{ value: owner.id, label: owner.name }]
       : []),
-    ...(users?.map((u) => ({ value: u.id, label: u.name })) ?? []),
+    ...sortUsersForOwnerSelect(users, user).map((u) => ({ value: u.id, label: u.name })),
   ]
 
   const BoxCard = ({ box }: { box: typeof boxes extends (infer T)[] | undefined ? T : never }) => (

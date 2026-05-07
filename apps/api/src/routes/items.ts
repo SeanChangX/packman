@@ -91,6 +91,7 @@ export async function itemRoutes(app: FastifyInstance) {
     const where: Record<string, any> = { eventId }
     if (q.groupId) where.groupId = q.groupId
     if (q.boxId) where.boxId = q.boxId
+    if (q.ownerId) where.ownerId = q.ownerId
     if (q.status === 'SEALED') {
       where.box = { is: { status: 'SEALED' } }
     } else if (q.status === 'PACKED' || q.status === 'NOT_PACKED') {

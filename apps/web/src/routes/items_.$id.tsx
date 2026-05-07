@@ -5,8 +5,9 @@ import { useState, useRef, useEffect } from 'react'
 import { ArrowLeft, RefreshCw, Tag, Trash2, Upload, X } from 'lucide-react'
 import { useToast } from '@packman/ui'
 import { itemsApi, groupsApi, boxesApi, usersApi, selectOptionsApi } from '../lib/api'
-import { STATUS_LABEL_KEYS, STATUS_COLORS, getLabelFromOptions, optionsToSelectItems, cn, formatApiError, formatTimestamp } from '../lib/utils'
+import { STATUS_LABEL_KEYS, STATUS_COLORS, getLabelFromOptions, optionsToSelectItems, cn, formatApiError, formatTimestamp, sortUsersForOwnerSelect } from '../lib/utils'
 import { SelectController } from '../lib/select'
+import { useAuth } from '../lib/auth-context'
 import { useT } from '../lib/i18n'
 import type { Item, PackingStatus, PaginatedResponse, UpdateItemInput } from '@packman/shared'
 
@@ -16,6 +17,7 @@ function ItemDetailPage() {
   const navigate = useNavigate()
   const qc = useQueryClient()
   const { showToast, updateToast, dismissToast } = useToast()
+  const { user: me } = useAuth()
   const fileRef = useRef<HTMLInputElement>(null)
   const [editing, setEditing] = useState(false)
   const [tags, setTags] = useState<string[]>([])
@@ -296,7 +298,7 @@ function ItemDetailPage() {
                     emptyValue="null"
                     options={[
                       { value: '', label: t('common.placeholder.select') },
-                      ...(users?.map((u) => ({ value: u.id, label: u.name })) ?? []),
+                      ...sortUsersForOwnerSelect(users, me).map((u) => ({ value: u.id, label: u.name })),
                     ]}
                   />
                 </div>

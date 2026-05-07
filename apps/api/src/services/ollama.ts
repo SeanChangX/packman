@@ -13,6 +13,17 @@ const DEFAULT_MODEL = 'llava'
 const DEFAULT_ENABLED = true
 const DEFAULT_GENERATE_TIMEOUT_MS = 60_000
 const DEFAULT_HEALTH_TIMEOUT_MS = 5_000
+// Cadence at which the AI tag queue retries the recovery probe while every
+// Ollama server appears unreachable. Coordinated across API replicas via the
+// SystemSetting row below so N replicas don't multiply the probe load.
+export const RECOVERY_PROBE_INTERVAL_MS = Math.max(
+  5_000,
+  parseInt(process.env.AI_TAG_RECOVERY_PROBE_INTERVAL_MS ?? '30000', 10),
+)
+const RECOVERY_PROBE_AT_KEY = 'ollama.lastRecoveryProbeAt'
+// Tiny prompt + num_predict: 1 turns the verify call into a single token, so
+// it's barely more expensive than /api/tags but proves /api/generate works.
+const VERIFY_PROMPT = 'ping'
 
 export const DEFAULT_TAG_PROMPT = [
   'Create search tags for the main visible object.',
@@ -39,9 +50,86 @@ type EndpointCandidate = {
   avgLatencyMs: number | null
   requestCount: number
   failureCount: number
+  lastSuccessAt?: Date | null
+  lastErrorAt?: Date | null
   healthAvgLatencyMs?: number | null
   healthCheckCount?: number
   healthFailureCount?: number
+  healthLastSuccessAt?: Date | null
+  healthLastErrorAt?: Date | null
+}
+
+// An endpoint counts as reachable when its most recent contact (probe or
+// generate, whichever is later) succeeded — or when it has no history yet.
+// Recovery from a failure state happens via the queue worker's periodic
+// health probe, not via a time-based cool-off, so we don't burn job attempts
+// on a known-bad endpoint while waiting for it to come back.
+function endpointReachable(endpoint: {
+  lastSuccessAt?: Date | null
+  lastErrorAt?: Date | null
+  healthLastSuccessAt?: Date | null
+  healthLastErrorAt?: Date | null
+}): boolean {
+  const lastSuccess = Math.max(
+    endpoint.lastSuccessAt?.getTime() ?? 0,
+    endpoint.healthLastSuccessAt?.getTime() ?? 0,
+  )
+  const lastError = Math.max(
+    endpoint.lastErrorAt?.getTime() ?? 0,
+    endpoint.healthLastErrorAt?.getTime() ?? 0,
+  )
+  if (lastSuccess === 0 && lastError === 0) return true
+  return lastSuccess >= lastError
+}
+
+// Returns true if at least one enabled endpoint is reachable AND has the
+// active model in cache. The queue worker uses this to pause job processing
+// entirely when every server is down or no server has the active model
+// loaded — jobs sit QUEUED instead of burning attempts.
+export async function hasReachableEndpoint(): Promise<boolean> {
+  const [endpoints, activeModel] = await Promise.all([
+    prisma.ollamaEndpoint.findMany({
+      where: { enabled: true },
+      select: {
+        baseUrl: true,
+        lastSuccessAt: true,
+        lastErrorAt: true,
+        healthLastSuccessAt: true,
+        healthLastErrorAt: true,
+      },
+    }),
+    getActiveOllamaModel(),
+  ])
+  if (endpoints.length === 0) {
+    return defaultBaseUrls().length > 0
+  }
+  const now = Date.now()
+  return endpoints.some((endpoint: typeof endpoints[number]) => {
+    if (!endpointReachable(endpoint)) return false
+    const cached = modelCache.get(normalizeBaseUrl(endpoint.baseUrl))
+    // Cache stale/empty (cold start, or 60s of inactivity): give the endpoint
+    // a chance — the recovery probe will refresh state if it actually fails.
+    if (!cached || cached.expiresAt <= now) return true
+    return cached.models.includes(activeModel)
+  })
+}
+
+// Atomic cross-replica claim of the next recovery-probe slot. Two replicas
+// racing this statement serialize on the row lock; the second one's UPDATE
+// WHERE clause sees the just-written timestamp and is skipped, returning 0
+// rows. Returns true iff this replica should run the probe.
+export async function tryClaimRecoveryProbe(): Promise<boolean> {
+  const now = Date.now()
+  const cutoff = now - RECOVERY_PROBE_INTERVAL_MS
+  const result = await prisma.$queryRaw<Array<{ key: string }>>`
+    INSERT INTO "SystemSetting" ("key", "value", "createdAt", "updatedAt")
+    VALUES (${RECOVERY_PROBE_AT_KEY}, ${String(now)}, NOW(), NOW())
+    ON CONFLICT ("key") DO UPDATE
+      SET "value" = EXCLUDED."value", "updatedAt" = NOW()
+      WHERE CAST("SystemSetting"."value" AS BIGINT) < ${BigInt(cutoff)}
+    RETURNING "key"
+  `
+  return result.length > 0
 }
 
 export type OllamaAnalysisResult = {
@@ -214,9 +302,12 @@ async function fetchEndpointModels(baseUrl: string, timeoutMs = DEFAULT_HEALTH_T
   const cached = modelCache.get(normalized)
   if (cached && cached.expiresAt > Date.now()) return cached.models
 
+  // AbortSignal.timeout is belt-and-suspenders alongside axios timeout: axios
+  // timer can occasionally fail to fire (e.g. DNS resolution stalls), and we
+  // never want a stuck probe to dominate request latency.
   const res = await axios.get<{ models: { name: string }[] }>(
     `${normalized}/api/tags`,
-    { timeout: timeoutMs }
+    { timeout: timeoutMs, signal: AbortSignal.timeout(timeoutMs) }
   )
   const models = res.data.models?.map((model) => model.name) ?? []
   modelCache.set(normalized, { models, expiresAt: Date.now() + 60_000 })
@@ -370,14 +461,21 @@ export async function analyzeImageWithOllama(imageBuffer: Buffer): Promise<Ollam
     throw new LocalizedError('ollama.error.noEndpointWithModel', 503, { model })
   }
 
+  // Skip endpoints that just failed within the cool-off window. Otherwise
+  // every job spends another generateTimeoutMs hitting a known-down server.
+  const reachable = compatibleEndpoints.filter(endpointReachable)
+  if (reachable.length === 0) {
+    throw new LocalizedError('ollama.error.allUnavailable', 503)
+  }
+
   let lastError: unknown
-  for (const endpoint of orderedEndpoints(compatibleEndpoints)) {
+  for (const endpoint of orderedEndpoints(reachable)) {
     const startedAt = Date.now()
     try {
       const response = await axios.post<{ response: string }>(
         `${normalizeBaseUrl(endpoint.baseUrl)}/api/generate`,
         { model, prompt: tagPrompt, images: [base64Image], stream: false },
-        { timeout: timeouts.generateTimeoutMs }
+        { timeout: timeouts.generateTimeoutMs, signal: AbortSignal.timeout(timeouts.generateTimeoutMs) }
       )
 
       const latencyMs = Date.now() - startedAt
@@ -389,7 +487,7 @@ export async function analyzeImageWithOllama(imageBuffer: Buffer): Promise<Ollam
         const weightResponse = await axios.post<{ response: string }>(
           `${normalizeBaseUrl(endpoint.baseUrl)}/api/generate`,
           { model, prompt: weightPrompt, images: [base64Image], stream: false },
-          { timeout: timeouts.generateTimeoutMs }
+          { timeout: timeouts.generateTimeoutMs, signal: AbortSignal.timeout(timeouts.generateTimeoutMs) }
         )
         weightG = parseWeightG(weightResponse.data.response)
       } catch { /* weight estimation is best-effort */ }
@@ -404,6 +502,9 @@ export async function analyzeImageWithOllama(imageBuffer: Buffer): Promise<Ollam
       }
     } catch (error) {
       const latencyMs = Date.now() - startedAt
+      // Drop the cached model list so the next request re-probes this endpoint
+      // instead of staying in the candidate set for the full 60s cache TTL.
+      modelCache.delete(normalizeBaseUrl(endpoint.baseUrl))
       await recordGenerateResult(endpoint, latencyMs, error)
       lastError = error
     }
@@ -412,7 +513,11 @@ export async function analyzeImageWithOllama(imageBuffer: Buffer): Promise<Ollam
   throw lastError instanceof Error ? lastError : new LocalizedError('ollama.error.requestFailed', 503)
 }
 
-export async function listOllamaModelStatus() {
+// `verifyGenerate` enables a tiny `/api/generate` call against the active
+// model on each /api/tags-healthy endpoint. This catches the case where tags
+// works but the model is missing/broken at runtime — the recovery probe path
+// uses this so the queue doesn't keep waking up just to burn job attempts.
+export async function listOllamaModelStatus(options: { verifyGenerate?: boolean } = {}) {
   await ensureOllamaDefaults()
   const [enabled, activeModel, endpoints, timeouts, tagPrompt, weightPrompt] = await Promise.all([
     isAiTaggingEnabled(),
@@ -429,7 +534,7 @@ export async function listOllamaModelStatus() {
       try {
         const res = await axios.get<{ models: { name: string }[] }>(
           `${normalizeBaseUrl(endpoint.baseUrl)}/api/tags`,
-          { timeout: timeouts.healthTimeoutMs }
+          { timeout: timeouts.healthTimeoutMs, signal: AbortSignal.timeout(timeouts.healthTimeoutMs) }
         )
         const models = res.data.models?.map((model) => model.name) ?? []
         modelCache.set(normalizeBaseUrl(endpoint.baseUrl), { models, expiresAt: Date.now() + 60_000 })
@@ -446,13 +551,79 @@ export async function listOllamaModelStatus() {
           ...endpoint,
           ...healthMetrics,
           ok: false,
-          models: [],
+          models: [] as string[],
           message: error instanceof Error ? error.message : 'Ollama unreachable',
         }
       }
     })
   )
 
+  if (options.verifyGenerate && activeModel) {
+    await Promise.all(
+      statuses.map(async (status: typeof statuses[number]) => {
+        if (!status.ok || !status.models.includes(activeModel)) return
+        const startedAt = Date.now()
+        try {
+          await axios.post(
+            `${normalizeBaseUrl(status.baseUrl)}/api/generate`,
+            { model: activeModel, prompt: VERIFY_PROMPT, stream: false, options: { num_predict: 1 } },
+            { timeout: timeouts.generateTimeoutMs, signal: AbortSignal.timeout(timeouts.generateTimeoutMs) }
+          )
+          await recordGenerateResult(status, Date.now() - startedAt)
+        } catch (error) {
+          // Generate failed despite tags working — clear cached model list so
+          // selection re-probes, and mark a generate failure so endpointReachable
+          // reports this server as down until it actually recovers.
+          modelCache.delete(normalizeBaseUrl(status.baseUrl))
+          await recordGenerateResult(status, Date.now() - startedAt, error)
+        }
+      })
+    )
+  }
+
   const models = [...new Set(statuses.flatMap((endpoint) => endpoint.models))].sort()
   return { enabled, activeModel, ...timeouts, tagPrompt, defaultTagPrompt: DEFAULT_TAG_PROMPT, weightPrompt, defaultWeightPrompt: DEFAULT_WEIGHT_PROMPT, models, endpoints: statuses }
+}
+
+// Pure DB read with no HTTP probes. Used when responding to mutations so that
+// save/enable/disable never block on a downed Ollama server.
+export async function listOllamaModelStatusSnapshot() {
+  await ensureOllamaDefaults()
+  const [enabled, activeModel, endpoints, timeouts, tagPrompt, weightPrompt] = await Promise.all([
+    isAiTaggingEnabled(),
+    getActiveOllamaModel(),
+    prisma.ollamaEndpoint.findMany({ orderBy: { createdAt: 'asc' } }),
+    getOllamaTimeouts(),
+    getTagPrompt(),
+    getWeightPrompt(),
+  ])
+
+  const now = Date.now()
+  const statuses = endpoints.map((endpoint) => {
+    const cached = modelCache.get(normalizeBaseUrl(endpoint.baseUrl))
+    const models = cached && cached.expiresAt > now ? cached.models : []
+    const ok = endpointReachable(endpoint)
+    const message = ok
+      ? undefined
+      : endpoint.healthLastError ?? endpoint.lastError ?? undefined
+    return {
+      ...endpoint,
+      ok,
+      models,
+      message,
+    }
+  })
+
+  const allModels = [...new Set(statuses.flatMap((endpoint) => endpoint.models))].sort()
+  return {
+    enabled,
+    activeModel,
+    ...timeouts,
+    tagPrompt,
+    defaultTagPrompt: DEFAULT_TAG_PROMPT,
+    weightPrompt,
+    defaultWeightPrompt: DEFAULT_WEIGHT_PROMPT,
+    models: allModels,
+    endpoints: statuses,
+  }
 }

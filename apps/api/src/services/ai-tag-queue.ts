@@ -2,7 +2,14 @@ import type { FastifyInstance } from 'fastify'
 import { randomUUID } from 'crypto'
 import { prisma } from '../plugins/prisma'
 import { getObjectBuffer } from './minio'
-import { analyzeImageWithOllama, isAiTaggingEnabled } from './ollama'
+import {
+  analyzeImageWithOllama,
+  hasReachableEndpoint,
+  isAiTaggingEnabled,
+  listOllamaModelStatus,
+  RECOVERY_PROBE_INTERVAL_MS,
+  tryClaimRecoveryProbe,
+} from './ollama'
 
 const WORKER_ID = `ai-tag-${process.pid}-${randomUUID()}`
 const POLL_INTERVAL_MS = 2000
@@ -202,6 +209,7 @@ async function processJob(job: ClaimedJob, app: FastifyInstance) {
 export function startAiTagQueueWorker(app: FastifyInstance) {
   let active = 0
   let stopped = false
+  let lastRecoveryProbeAt = 0
 
   const tick = async () => {
     if (stopped) return
@@ -209,6 +217,28 @@ export function startAiTagQueueWorker(app: FastifyInstance) {
       // Skip the entire tick when AI tagging is disabled. Existing QUEUED jobs
       // are left untouched so they resume automatically once re-enabled.
       if (!(await isAiTaggingEnabled())) return
+
+      // Same treatment when every Ollama endpoint is unreachable — pause
+      // instead of burning attempts. Probe periodically so the queue resumes
+      // automatically once any server comes back. The DB-backed claim makes
+      // this safe across multiple API replicas; the in-memory timestamp is a
+      // fast-path so we don't hit the DB every 2s tick when paused.
+      if (!(await hasReachableEndpoint())) {
+        const now = Date.now()
+        if (now - lastRecoveryProbeAt >= RECOVERY_PROBE_INTERVAL_MS) {
+          lastRecoveryProbeAt = now
+          if (await tryClaimRecoveryProbe()) {
+            // verifyGenerate exercises the active model with a 1-token request
+            // so we don't resume the queue on an endpoint that has /api/tags
+            // up but generate broken (model missing, GPU OOM, etc.).
+            await listOllamaModelStatus({ verifyGenerate: true }).catch((err) => {
+              app.log.debug({ err }, 'AI tag queue recovery probe failed')
+            })
+          }
+        }
+        return
+      }
+
       await reclaimStaleJobs()
       await syncFailedItems()
       const limit = await concurrencyLimit()

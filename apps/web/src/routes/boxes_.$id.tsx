@@ -5,7 +5,7 @@ import { ArrowLeft, Download, Eye, CheckSquare, Square, AlertTriangle } from 'lu
 import * as pdfjsLib from 'pdfjs-dist'
 import pdfjsWorker from 'pdfjs-dist/build/pdf.worker.mjs?url'
 import { boxesApi, itemsApi, usersApi } from '../lib/api'
-import { STATUS_LABEL_KEYS, STATUS_COLORS, SHIPPING_LABEL_KEYS, cn, formatApiError } from '../lib/utils'
+import { STATUS_LABEL_KEYS, STATUS_COLORS, SHIPPING_LABEL_KEYS, cn, formatApiError, sortUsersForOwnerSelect } from '../lib/utils'
 import { Select } from '../lib/select'
 import { useT } from '../lib/i18n'
 import { useAuth } from '../lib/auth-context'
@@ -170,7 +170,7 @@ function BoxDetailPage() {
     ...(owner && !users?.some((u) => u.id === owner.id)
       ? [{ value: owner.id, label: owner.name }]
       : []),
-    ...(users?.map((u) => ({ value: u.id, label: u.name })) ?? []),
+    ...sortUsersForOwnerSelect(users, user).map((u) => ({ value: u.id, label: u.name })),
   ]
 
   return (

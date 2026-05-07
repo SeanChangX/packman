@@ -7,7 +7,6 @@ import type {
   BatteryRegulation,
   SelectOption,
   OllamaConfig,
-  OllamaEndpoint,
   SystemSettings,
 } from '@packman/shared'
 import { getLocale, translate as t } from './i18n'
@@ -181,11 +180,11 @@ export const adminApi = {
   updateOllamaConfig: (data: { enabled?: boolean; activeModel?: string; generateTimeoutMs?: number; healthTimeoutMs?: number; tagPrompt?: string; weightPrompt?: string }) =>
     req<OllamaConfig>('/api/admin/ollama-config', { method: 'PATCH', body: JSON.stringify(data) }),
   createOllamaEndpoint: (data: { baseUrl: string; enabled?: boolean }) =>
-    req<OllamaEndpoint>('/api/admin/ollama-endpoints', { method: 'POST', body: JSON.stringify(data) }),
+    req<OllamaConfig>('/api/admin/ollama-endpoints', { method: 'POST', body: JSON.stringify(data) }),
   updateOllamaEndpoint: (id: string, data: { baseUrl?: string; enabled?: boolean }) =>
-    req<OllamaEndpoint>(`/api/admin/ollama-endpoints/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
+    req<OllamaConfig>(`/api/admin/ollama-endpoints/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
   deleteOllamaEndpoint: (id: string) =>
-    req<void>(`/api/admin/ollama-endpoints/${id}`, { method: 'DELETE' }),
+    req<OllamaConfig>(`/api/admin/ollama-endpoints/${id}`, { method: 'DELETE' }),
 
   settings: () => req<SystemSettings>('/api/admin/settings'),
   updateAppSettings: (data: { appUrl: string; adminUrl: string }) =>

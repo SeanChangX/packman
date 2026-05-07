@@ -57,6 +57,7 @@ const en: Record<string, string> = {
   'ollama.error.noEndpointWithModel': 'No Ollama endpoint available with model {model} downloaded',
   'ollama.error.requestFailed': 'Ollama request failed',
   'ollama.error.unreachable': 'Ollama is unreachable',
+  'ollama.error.allUnavailable': 'AI image recognition is temporarily unavailable - every Ollama server is offline',
 
   // pdf labels
   'pdf.label.owner': 'Owner',
@@ -125,6 +126,7 @@ const zhHant: Record<string, string> = {
   'ollama.error.noEndpointWithModel': '沒有可用且已下載 {model} 的 Ollama endpoint',
   'ollama.error.requestFailed': 'Ollama 請求失敗',
   'ollama.error.unreachable': 'Ollama 無法連線',
+  'ollama.error.allUnavailable': 'AI 圖像辨識暫時無法使用 - 所有 Ollama server 都離線',
 
   'pdf.label.owner': '負責人',
 

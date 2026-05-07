@@ -5,11 +5,11 @@ import { useState } from 'react'
 import { Plus, X, AlertTriangle, Pencil, Check, XCircle, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react'
 import { useToast, Modal } from '@packman/ui'
 import { batteriesApi, batteryRegulationsApi, usersApi, selectOptionsApi } from '../lib/api'
-import { getLabelFromOptions, formatApiError } from '../lib/utils'
+import { getLabelFromOptions, formatApiError, sortUsersForOwnerSelect } from '../lib/utils'
 import { Select, SelectController } from '../lib/select'
 import { useAuth } from '../lib/auth-context'
 import { useT } from '../lib/i18n'
-import type { CreateBatteryInput, UpdateBatteryInput, SelectOption } from '@packman/shared'
+import type { CreateBatteryInput, UpdateBatteryInput, SelectOption, User } from '@packman/shared'
 
 const BATTERY_COLORS: Record<string, string> = {
   POWER_TOOL: 'bg-red-500/10 text-brand-600 ring-1 ring-red-500/15',
@@ -49,6 +49,7 @@ function BatteryRegulations() {
 function NewBatteryModal({ onClose, batteryTypeOpts }: { onClose: () => void; batteryTypeOpts: SelectOption[] }) {
   const t = useT()
   const qc = useQueryClient()
+  const { user: me } = useAuth()
   const { data: users } = useQuery({ queryKey: ['users'], queryFn: usersApi.list })
   const { register, handleSubmit, control } = useForm<CreateBatteryInput>()
 
@@ -88,7 +89,7 @@ function NewBatteryModal({ onClose, batteryTypeOpts }: { onClose: () => void; ba
               placeholder={t('common.placeholder.select')}
               options={[
                 { value: '', label: t('common.placeholder.select') },
-                ...(users?.map((u) => ({ value: u.id, label: u.name })) ?? []),
+                ...sortUsersForOwnerSelect(users, me).map((u) => ({ value: u.id, label: u.name })),
               ]}
             />
           </div>
@@ -116,12 +117,13 @@ function BatteryRow({
   onDelete,
 }: {
   b: NonNullable<ReturnType<typeof useQuery<any>>['data']>[number]
-  users: { id: string; name: string; avatarUrl?: string | null }[] | undefined
+  users: User[] | undefined
   batteryTypeOpts: SelectOption[]
   onDelete?: (id: string) => void
 }) {
   const t = useT()
   const qc = useQueryClient()
+  const { user: me } = useAuth()
   const { showToast } = useToast()
   const [editing, setEditing] = useState(false)
   const { control, handleSubmit, reset, register } = useForm<UpdateBatteryInput>({
@@ -161,7 +163,7 @@ function BatteryRow({
             emptyValue="null"
             options={[
               { value: '', label: t('batteries.row.empty') },
-              ...(users?.map((u) => ({ value: u.id, label: u.name })) ?? []),
+              ...sortUsersForOwnerSelect(users, me).map((u) => ({ value: u.id, label: u.name })),
             ]}
           />
         </td>
@@ -238,12 +240,13 @@ function BatteryCard({
   onDelete,
 }: {
   b: NonNullable<ReturnType<typeof useQuery<any>>['data']>[number]
-  users: { id: string; name: string; avatarUrl?: string | null }[] | undefined
+  users: User[] | undefined
   batteryTypeOpts: SelectOption[]
   onDelete?: (id: string) => void
 }) {
   const t = useT()
   const qc = useQueryClient()
+  const { user: me } = useAuth()
   const { showToast } = useToast()
   const [editing, setEditing] = useState(false)
   const { control, handleSubmit, reset, register } = useForm<UpdateBatteryInput>({
@@ -287,7 +290,7 @@ function BatteryCard({
             emptyValue="null"
             options={[
               { value: '', label: t('batteries.row.empty') },
-              ...(users?.map((u) => ({ value: u.id, label: u.name })) ?? []),
+              ...sortUsersForOwnerSelect(users, me).map((u) => ({ value: u.id, label: u.name })),
             ]}
           />
         </div>

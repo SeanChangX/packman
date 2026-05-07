@@ -15,6 +15,7 @@ import {
 import {
   analyzeImageWithOllama,
   listOllamaModelStatus,
+  listOllamaModelStatusSnapshot,
   updateOllamaConfig,
 } from '../services/ollama'
 import {
@@ -59,19 +60,27 @@ function toCsv(headers: string[], rows: Record<string, unknown>[]): string {
   return [headers.join(','), ...rows.map(toCsvRow)].join('\n')
 }
 
-async function ollamaConfigWithJobStats() {
-  const [config, queued, running, done, failed, cancelled] = await Promise.all([
-    listOllamaModelStatus(),
+async function aiTagJobCounts() {
+  const [queued, running, done, failed, cancelled] = await Promise.all([
     prisma.aiTagJob.count({ where: { status: 'QUEUED' } }),
     prisma.aiTagJob.count({ where: { status: 'RUNNING' } }),
     prisma.aiTagJob.count({ where: { status: 'DONE' } }),
     prisma.aiTagJob.count({ where: { status: 'FAILED' } }),
     prisma.aiTagJob.count({ where: { status: 'CANCELLED' } }),
   ])
-  return {
-    ...config,
-    aiTagJobs: { queued, running, done, failed, cancelled },
-  }
+  return { queued, running, done, failed, cancelled }
+}
+
+async function ollamaConfigWithJobStats() {
+  const [config, aiTagJobs] = await Promise.all([listOllamaModelStatus(), aiTagJobCounts()])
+  return { ...config, aiTagJobs }
+}
+
+// Snapshot variant: skip the HTTP health probe entirely so mutations return
+// instantly even when every Ollama server is down.
+async function ollamaConfigWithJobStatsSnapshot() {
+  const [config, aiTagJobs] = await Promise.all([listOllamaModelStatusSnapshot(), aiTagJobCounts()])
+  return { ...config, aiTagJobs }
 }
 
 const brandLogoUrl = '/api/admin/settings/brand/logo'
@@ -356,21 +365,21 @@ export async function adminRoutes(app: FastifyInstance) {
   app.patch('/ollama-config', async (request) => {
     const body = UpdateOllamaConfigSchema.parse(request.body)
     await updateOllamaConfig(body)
-    return ollamaConfigWithJobStats()
+    return ollamaConfigWithJobStatsSnapshot()
   })
 
   app.post('/ollama-endpoints', async (request, reply) => {
     const body = CreateOllamaEndpointSchema.parse(request.body)
-    const endpoint = await prisma.ollamaEndpoint.create({
+    await prisma.ollamaEndpoint.create({
       data: { ...body, baseUrl: body.baseUrl.replace(/\/+$/, '') },
     })
-    return reply.status(201).send(endpoint)
+    return reply.status(201).send(await ollamaConfigWithJobStatsSnapshot())
   })
 
   app.patch<{ Params: { id: string } }>('/ollama-endpoints/:id', async (request, reply) => {
     const body = UpdateOllamaEndpointSchema.parse(request.body)
     try {
-      return await prisma.ollamaEndpoint.update({
+      await prisma.ollamaEndpoint.update({
         where: { id: request.params.id },
         data: {
           ...body,
@@ -380,15 +389,16 @@ export async function adminRoutes(app: FastifyInstance) {
     } catch {
       return reply.status(404).send({ message: 'Ollama endpoint not found' })
     }
+    return ollamaConfigWithJobStatsSnapshot()
   })
 
   app.delete<{ Params: { id: string } }>('/ollama-endpoints/:id', async (request, reply) => {
     try {
       await prisma.ollamaEndpoint.delete({ where: { id: request.params.id } })
-      return reply.status(204).send()
     } catch {
       return reply.status(404).send({ message: 'Ollama endpoint not found' })
     }
+    return ollamaConfigWithJobStatsSnapshot()
   })
 
   app.post('/ollama-test', async (request, reply) => {

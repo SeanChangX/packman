@@ -30,8 +30,8 @@ function OllamaTest() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [baseUrl, setBaseUrl] = useState('')
-  const [generateTimeoutSeconds, setGenerateTimeoutSeconds] = useState('60')
-  const [healthTimeoutSeconds, setHealthTimeoutSeconds] = useState('5')
+  const [generateTimeoutSeconds, setGenerateTimeoutSeconds] = useState('')
+  const [healthTimeoutSeconds, setHealthTimeoutSeconds] = useState('')
   const [tagPrompt, setTagPrompt] = useState('')
   const [weightPrompt, setWeightPrompt] = useState('')
   const [editingEndpointId, setEditingEndpointId] = useState<string | null>(null)
@@ -53,12 +53,15 @@ function OllamaTest() {
     setWeightPrompt(config.weightPrompt || config.defaultWeightPrompt || '')
   }, [config])
 
-  const refreshConfig = () => qc.invalidateQueries({ queryKey: ['ollama-config'] })
+  // Mutations return a snapshot of the full config, so we apply it directly
+  // instead of invalidating — invalidation would trigger a refetch that runs
+  // the live HTTP probe and stalls 5–60s when every Ollama server is down.
+  const applyConfig = (next: OllamaConfig) => qc.setQueryData(['ollama-config'], next)
 
   const updateEnabled = useMutation({
     mutationFn: (enabled: boolean) => adminApi.updateOllamaConfig({ enabled }),
-    onSuccess: (_data, enabled) => {
-      refreshConfig()
+    onSuccess: (data, enabled) => {
+      applyConfig(data)
       showToast(enabled ? t('ollama.toast.aiEnabled') : t('ollama.toast.aiDisabled'), 'success')
     },
     onError: (e: unknown) => showToast((e as Error)?.message ?? t('ollama.toast.updateFailed'), 'error'),
@@ -66,8 +69,8 @@ function OllamaTest() {
 
   const updateModel = useMutation({
     mutationFn: (activeModel: string) => adminApi.updateOllamaConfig({ activeModel }),
-    onSuccess: () => {
-      refreshConfig()
+    onSuccess: (data) => {
+      applyConfig(data)
       showToast(t('ollama.toast.modelUpdated'), 'success')
     },
     onError: (e: unknown) => showToast((e as Error)?.message ?? t('ollama.toast.modelUpdateFailed'), 'error'),
@@ -78,8 +81,8 @@ function OllamaTest() {
       generateTimeoutMs: Math.round(generateTimeoutValue * 1000),
       healthTimeoutMs: Math.round(healthTimeoutValue * 1000),
     }),
-    onSuccess: () => {
-      refreshConfig()
+    onSuccess: (data) => {
+      applyConfig(data)
       showToast(t('ollama.toast.timeoutUpdated'), 'success')
     },
     onError: (e: unknown) => showToast((e as Error)?.message ?? t('ollama.toast.timeoutUpdateFailed'), 'error'),
@@ -87,8 +90,8 @@ function OllamaTest() {
 
   const updateTagPrompt = useMutation({
     mutationFn: (prompt: string) => adminApi.updateOllamaConfig({ tagPrompt: prompt }),
-    onSuccess: () => {
-      refreshConfig()
+    onSuccess: (data) => {
+      applyConfig(data)
       showToast(t('ollama.toast.tagPromptUpdated'), 'success')
     },
     onError: (e: unknown) => showToast((e as Error)?.message ?? t('ollama.toast.promptUpdateFailed'), 'error'),
@@ -96,8 +99,8 @@ function OllamaTest() {
 
   const updateWeightPrompt = useMutation({
     mutationFn: (prompt: string) => adminApi.updateOllamaConfig({ weightPrompt: prompt }),
-    onSuccess: () => {
-      refreshConfig()
+    onSuccess: (data) => {
+      applyConfig(data)
       showToast(t('ollama.toast.weightPromptUpdated'), 'success')
     },
     onError: (e: unknown) => showToast((e as Error)?.message ?? t('ollama.toast.promptUpdateFailed'), 'error'),
@@ -105,9 +108,9 @@ function OllamaTest() {
 
   const createEndpoint = useMutation({
     mutationFn: () => adminApi.createOllamaEndpoint({ baseUrl }),
-    onSuccess: () => {
+    onSuccess: (data) => {
       setBaseUrl('')
-      refreshConfig()
+      applyConfig(data)
       showToast(t('ollama.toast.urlAdded'), 'success')
     },
     onError: (e: unknown) => showToast((e as Error)?.message ?? t('ollama.toast.urlAddFailed'), 'error'),
@@ -116,18 +119,18 @@ function OllamaTest() {
   const updateEndpoint = useMutation({
     mutationFn: ({ id, data }: { id: string; data: { enabled?: boolean; baseUrl?: string } }) =>
       adminApi.updateOllamaEndpoint(id, data),
-    onSuccess: () => {
+    onSuccess: (data) => {
       setEditingEndpointId(null)
       setEditingBaseUrl('')
-      refreshConfig()
+      applyConfig(data)
     },
     onError: (e: unknown) => showToast((e as Error)?.message ?? t('ollama.toast.urlUpdateFailed'), 'error'),
   })
 
   const deleteEndpoint = useMutation({
     mutationFn: adminApi.deleteOllamaEndpoint,
-    onSuccess: () => {
-      refreshConfig()
+    onSuccess: (data) => {
+      applyConfig(data)
       showToast(t('ollama.toast.urlDeleted'), 'success')
     },
     onError: (e: unknown) => showToast((e as Error)?.message ?? t('ollama.toast.urlDeleteFailed'), 'error'),
@@ -157,7 +160,9 @@ function OllamaTest() {
       if (!res.ok) setError(json.message ?? t('ollama.test.parseFailed'))
       else {
         setResult(json)
-        refreshConfig()
+        // Test succeeded → at least one endpoint is alive, so a probe-backed
+        // refetch will return promptly. Updates request/latency stats.
+        qc.invalidateQueries({ queryKey: ['ollama-config'] })
       }
     } catch {
       setError(t('ollama.test.requestFailed'))
@@ -332,12 +337,14 @@ function OllamaTest() {
                 {t('common.save')}
               </button>
             </div>
-            <p className="mt-2 text-xs text-muted">
-              {t('ollama.timeout.current', {
-                generate: Math.round((config?.generateTimeoutMs ?? 60_000) / 1000),
-                health: Math.round((config?.healthTimeoutMs ?? 5_000) / 1000),
-              })}
-            </p>
+            {config && (
+              <p className="mt-2 text-xs text-muted">
+                {t('ollama.timeout.current', {
+                  generate: Math.round(config.generateTimeoutMs / 1000),
+                  health: Math.round(config.healthTimeoutMs / 1000),
+                })}
+              </p>
+            )}
           </div>
 
           <div className="card p-5">

@@ -1,12 +1,13 @@
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useForm } from 'react-hook-form'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { ArrowLeft, Upload, X } from 'lucide-react'
 import { useToast } from '@packman/ui'
 import { itemsApi, groupsApi, boxesApi, usersApi, selectOptionsApi } from '../lib/api'
 import { SelectController } from '../lib/select'
-import { cn, formatApiError, optionsToSelectItems } from '../lib/utils'
+import { useAuth } from '../lib/auth-context'
+import { cn, formatApiError, optionsToSelectItems, sortUsersForOwnerSelect } from '../lib/utils'
 import { useT } from '../lib/i18n'
 import type { CreateItemInput } from '@packman/shared'
 
@@ -14,6 +15,7 @@ function NewItemPage() {
   const t = useT()
   const navigate = useNavigate()
   const qc = useQueryClient()
+  const { user } = useAuth()
   const { showToast, updateToast, dismissToast } = useToast()
   const [photoFile, setPhotoFile] = useState<File | null>(null)
   const [photoPreview, setPhotoPreview] = useState('')
@@ -23,9 +25,22 @@ function NewItemPage() {
   const { data: shippingOpts } = useQuery({ queryKey: ['options', 'SHIPPING_METHOD'], queryFn: () => selectOptionsApi.list('SHIPPING_METHOD') })
   const { data: categoryOpts } = useQuery({ queryKey: ['options', 'USE_CATEGORY'], queryFn: () => selectOptionsApi.list('USE_CATEGORY') })
 
-  const { register, handleSubmit, control, formState: { errors } } = useForm<CreateItemInput>({
+  const { register, handleSubmit, control, setValue, formState: { errors } } = useForm<CreateItemInput>({
     defaultValues: { quantity: 1, tags: [] },
   })
+
+  // Pre-fill owner/group with the current user when they belong to a group, so
+  // the common case of "I'm adding my own item" needs zero dropdown picking.
+  // The dropdown still lets them clear the selection, and we only fire once so
+  // a user re-edit isn't clobbered if auth resolves late.
+  const prefilledRef = useRef(false)
+  useEffect(() => {
+    if (prefilledRef.current) return
+    if (!user?.groupId) return
+    prefilledRef.current = true
+    setValue('ownerId', user.id)
+    setValue('groupId', user.groupId)
+  }, [user, setValue])
 
   useEffect(() => {
     if (!photoFile) {
@@ -148,7 +163,7 @@ function NewItemPage() {
               placeholder={t('common.placeholder.select')}
               options={[
                 { value: '', label: t('common.placeholder.select') },
-                ...(users?.map((u) => ({ value: u.id, label: u.name })) ?? []),
+                ...sortUsersForOwnerSelect(users, user).map((u) => ({ value: u.id, label: u.name })),
               ]}
             />
           </div>

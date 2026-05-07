@@ -1,6 +1,6 @@
 import { clsx, type ClassValue } from 'clsx'
 import { twMerge } from 'tailwind-merge'
-import type { PackingStatus, ShippingMethod, SelectOption } from '@packman/shared'
+import type { PackingStatus, ShippingMethod, SelectOption, User } from '@packman/shared'
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
@@ -44,6 +44,37 @@ export function formatTimestamp(iso: string) {
     year: 'numeric', month: '2-digit', day: '2-digit',
     hour: '2-digit', minute: '2-digit', hour12: false,
   }).format(new Date(iso))
+}
+
+// Order owner-select candidates so the most likely picks come first:
+//   1. The current user
+//   2. Other members of the current user's group, by name
+//   3. Everyone else, grouped by group name then by name
+//   4. Users with no group, by name (last)
+// Returning a new array — callers can still .map to whatever option shape they need.
+export function sortUsersForOwnerSelect<T extends Pick<User, 'id' | 'name' | 'groupId' | 'group'>>(
+  users: T[] | undefined,
+  me: { id: string; groupId?: string | null } | null | undefined,
+): T[] {
+  if (!users) return []
+  const meId = me?.id
+  const myGroupId = me?.groupId
+  return [...users].sort((a, b) => {
+    if (a.id === meId) return -1
+    if (b.id === meId) return 1
+    const aMine = !!myGroupId && a.groupId === myGroupId
+    const bMine = !!myGroupId && b.groupId === myGroupId
+    if (aMine !== bMine) return aMine ? -1 : 1
+    // Both in/out of my group: sort by group name (no group last), then name.
+    const aGroup = a.group?.name ?? ''
+    const bGroup = b.group?.name ?? ''
+    if (aGroup !== bGroup) {
+      if (!aGroup) return 1
+      if (!bGroup) return -1
+      return aGroup.localeCompare(bGroup)
+    }
+    return a.name.localeCompare(b.name)
+  })
 }
 
 export function formatApiError(error: unknown, fallback = 'Operation failed', requiredHint = 'Please ensure all required fields are filled in correctly'): string {
