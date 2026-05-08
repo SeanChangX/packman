@@ -155,7 +155,7 @@ function ItemDetailPage() {
       qc.invalidateQueries({ queryKey: ['items'] })
       qc.invalidateQueries({ queryKey: ['boxes'] })
       showToast(t('items.action.deleted'), 'success')
-      navigate({ to: '/items' })
+      navigate({ to: '/items', search: { status: undefined } })
     },
     onError: (e: unknown) => showToast(formatApiError(e, t('common.opFailed'), t('common.requiredHint')), 'error'),
   })
@@ -183,7 +183,7 @@ function ItemDetailPage() {
   return (
     <div className="mx-auto max-w-3xl page-stack">
       <div className="flex items-center gap-3">
-        <button onClick={() => navigate({ to: '/items' })} className="rounded-2xl p-2 text-muted transition-colors hover:bg-white/10 hover:text-app">
+        <button onClick={() => navigate({ to: '/items', search: { status: undefined } })} className="rounded-2xl p-2 text-muted transition-colors hover:bg-white/10 hover:text-app">
           <ArrowLeft className="h-5 w-5" />
         </button>
         <div className="flex-1">

@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo, useRef } from 'react'
 import { ArrowLeft, Download, Eye, CheckSquare, Square, AlertTriangle } from 'lucide-react'
 import * as pdfjsLib from 'pdfjs-dist'
 import pdfjsWorker from 'pdfjs-dist/build/pdf.worker.mjs?url'
+import { useToast } from '@packman/ui'
 import { boxesApi, itemsApi, usersApi } from '../lib/api'
 import { STATUS_LABEL_KEYS, STATUS_COLORS, SHIPPING_LABEL_KEYS, cn, formatApiError, sortUsersForOwnerSelect } from '../lib/utils'
 import { Select } from '../lib/select'
@@ -18,6 +19,7 @@ function BoxDetailPage() {
   const { id } = Route.useParams()
   const navigate = useNavigate()
   const qc = useQueryClient()
+  const { showToast } = useToast()
   const { user } = useAuth()
   const isAdmin = user?.role === 'ADMIN'
   const [stickerSize, setStickerSize] = useState<'SMALL' | 'MEDIUM' | 'LARGE' | 'A4_SHEET'>('MEDIUM')
@@ -97,7 +99,7 @@ function BoxDetailPage() {
     try {
       setPreviewBlob(await fetchStickerBlob())
     } catch (err) {
-      alert(err instanceof Error ? err.message : t('box.sticker.failPreview'))
+      showToast(err instanceof Error ? err.message : t('box.sticker.failPreview'), 'error')
     } finally {
       setPreviewing(false)
     }
@@ -116,7 +118,7 @@ function BoxDetailPage() {
       document.body.removeChild(a)
       setTimeout(() => URL.revokeObjectURL(url), 1000)
     } catch (err) {
-      alert(err instanceof Error ? err.message : t('box.sticker.failDownload'))
+      showToast(err instanceof Error ? err.message : t('box.sticker.failDownload'), 'error')
     } finally {
       setDownloading(false)
     }
