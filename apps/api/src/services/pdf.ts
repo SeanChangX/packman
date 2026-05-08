@@ -45,6 +45,11 @@ const SIZES: Record<StickerSize, StickerDimensions> = {
   },
 }
 
+// Safe margin per side for A4 sheet so non-borderless printers don't trim
+// content. ~5 mm (1 mm ≈ 2.83 pt). Each sticker is uniformly scaled down
+// while keeping its cell-center position unchanged.
+const A4_SAFE_INSET_PT = 14
+
 const CJK_FONT_PATHS = [
   '/usr/share/fonts/noto-cjk/NotoSansCJK-Regular.ttc',
   '/usr/share/fonts/noto/NotoSansCJK-Regular.ttc',
@@ -429,6 +434,11 @@ export async function generateBoxStickerPdf(
       if (isA4) {
         const cellW = Math.floor(dim.width / dim.columns)
         const cellH = Math.floor(dim.height / dim.rows)
+        const scale = Math.min(
+          (cellW - 2 * A4_SAFE_INSET_PT) / cellW,
+          (cellH - 2 * A4_SAFE_INSET_PT) / cellH,
+        )
+        const cellDim = { ...dim, width: cellW, height: cellH }
         const perPage = dim.columns * dim.rows
         for (let i = 0; i < boxes.length; i += perPage) {
           doc.addPage()
@@ -436,7 +446,12 @@ export async function generateBoxStickerPdf(
           for (let j = 0; j < page.length; j++) {
             const col = j % dim.columns
             const row = Math.floor(j / dim.columns)
-            await drawBoxLabel(doc, page[j], appUrl, col * cellW, row * cellH, { ...dim, width: cellW, height: cellH }, logoBuffer, brandName, printDate, headerFont, ownerLabel)
+            const offsetX = col * cellW + (cellW * (1 - scale)) / 2
+            const offsetY = row * cellH + (cellH * (1 - scale)) / 2
+            doc.save()
+            doc.translate(offsetX, offsetY).scale(scale)
+            await drawBoxLabel(doc, page[j], appUrl, 0, 0, cellDim, logoBuffer, brandName, printDate, headerFont, ownerLabel)
+            doc.restore()
           }
         }
       } else {
@@ -480,6 +495,11 @@ export async function generateItemStickerPdf(
       if (isA4) {
         const cellW = Math.floor(dim.width / dim.columns)
         const cellH = Math.floor(dim.height / dim.rows)
+        const scale = Math.min(
+          (cellW - 2 * A4_SAFE_INSET_PT) / cellW,
+          (cellH - 2 * A4_SAFE_INSET_PT) / cellH,
+        )
+        const cellDim = { ...dim, width: cellW, height: cellH }
         const perPage = dim.columns * dim.rows
         for (let i = 0; i < items.length; i += perPage) {
           doc.addPage()
@@ -487,7 +507,12 @@ export async function generateItemStickerPdf(
           for (let j = 0; j < page.length; j++) {
             const col = j % dim.columns
             const row = Math.floor(j / dim.columns)
-            await drawItemLabel(doc, page[j], appUrl, col * cellW, row * cellH, { ...dim, width: cellW, height: cellH }, logoBuffer, brandName, printDate, headerFont, ownerLabel)
+            const offsetX = col * cellW + (cellW * (1 - scale)) / 2
+            const offsetY = row * cellH + (cellH * (1 - scale)) / 2
+            doc.save()
+            doc.translate(offsetX, offsetY).scale(scale)
+            await drawItemLabel(doc, page[j], appUrl, 0, 0, cellDim, logoBuffer, brandName, printDate, headerFont, ownerLabel)
+            doc.restore()
           }
         }
       } else {

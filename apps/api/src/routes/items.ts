@@ -273,6 +273,29 @@ export async function itemRoutes(app: FastifyInstance) {
     }
   )
 
+  // Delete photo: remove from MinIO + clear DB fields
+  app.delete<{ Params: { id: string } }>(
+    '/:id/photo',
+    { preHandler: requireAuth },
+    async (request, reply) => {
+      const item = await prisma.item.findUnique({ where: { id: request.params.id } })
+      if (!item) return reply.status(404).send({ message: 'Item not found' })
+      if (!item.photoUrl) return reply.status(204).send()
+
+      const objectName = objectNameFromUrl(item.photoUrl)
+      await prisma.item.update({
+        where: { id: item.id },
+        data: { photoUrl: null, aiTagStatus: 'NONE' },
+      })
+      if (objectName) {
+        deleteObject(objectName).catch((err) =>
+          app.log.warn({ err, itemId: item.id, objectName }, 'Item photo cleanup failed on delete')
+        )
+      }
+      return reply.status(204).send()
+    }
+  )
+
   app.post<{ Params: { id: string } }>(
     '/:id/retag',
     { preHandler: requireAuth },

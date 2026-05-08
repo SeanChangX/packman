@@ -168,6 +168,8 @@ export const itemsApi = {
       xhr.send(form)
     })
   },
+  deletePhoto: (id: string) =>
+    request<void>(`${BASE}/items/${id}/photo`, { method: 'DELETE' }),
   reanalyzePhoto: (id: string) =>
     request<{ ok: boolean }>(`${BASE}/items/${id}/retag`, { method: 'POST' }),
   photoUrl: (id: string) => `${BASE}/items/${id}/photo`,

@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useForm } from 'react-hook-form'
 import { useState, useRef, useEffect } from 'react'
 import { ArrowLeft, RefreshCw, Tag, Trash2, Upload, X } from 'lucide-react'
-import { useToast } from '@packman/ui'
+import { useToast, useConfirm } from '@packman/ui'
 import { itemsApi, groupsApi, boxesApi, usersApi, selectOptionsApi } from '../lib/api'
 import { STATUS_LABEL_KEYS, STATUS_COLORS, getLabelFromOptions, optionsToSelectItems, cn, formatApiError, formatTimestamp, sortUsersForOwnerSelect } from '../lib/utils'
 import { SelectController } from '../lib/select'
@@ -17,6 +17,7 @@ function ItemDetailPage() {
   const navigate = useNavigate()
   const qc = useQueryClient()
   const { showToast, updateToast, dismissToast } = useToast()
+  const { confirm, dialog: confirmDialog } = useConfirm()
   const { user: me } = useAuth()
   const fileRef = useRef<HTMLInputElement>(null)
   const [editing, setEditing] = useState(false)
@@ -45,7 +46,7 @@ function ItemDetailPage() {
       reset({ ...item, groupId: item.groupId ?? undefined, boxId: item.boxId ?? undefined, ownerId: item.ownerId ?? undefined })
       setTags(item.tags)
       setTagDraft('')
-      setPhotoSrc(item.photoUrl ? itemsApi.photoUrl(id) : '')
+      setPhotoSrc(item.photoUrl ? `${itemsApi.photoUrl(id)}?v=${encodeURIComponent(item.updatedAt)}` : '')
       setPhotoLoadError(false)
     }
   }, [id, item, reset])
@@ -137,6 +138,16 @@ function ItemDetailPage() {
     onError: (e: unknown) => showToast(formatApiError(e, t('common.opFailed'), t('common.requiredHint')), 'error'),
   })
 
+  const deletePhoto = useMutation({
+    mutationFn: () => itemsApi.deletePhoto(id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['items'] })
+      refetch()
+      showToast(t('items.action.photoDeleted'), 'success')
+    },
+    onError: (e: unknown) => showToast(formatApiError(e, t('common.opFailed'), t('common.requiredHint')), 'error'),
+  })
+
   const deleteItem = useMutation({
     mutationFn: () => itemsApi.delete(id),
     onSuccess: () => {
@@ -183,7 +194,16 @@ function ItemDetailPage() {
           </div>
         </div>
         <button
-          onClick={() => { if (confirm(t('items.detail.deleteConfirm', { name: item.name }))) deleteItem.mutate() }}
+          onClick={async () => {
+            const ok = await confirm({
+              title: t('items.detail.delete'),
+              message: t('items.detail.deleteConfirm', { name: item.name }),
+              confirmLabel: t('common.delete'),
+              cancelLabel: t('common.cancel'),
+              danger: true,
+            })
+            if (ok) deleteItem.mutate()
+          }}
           className="rounded-2xl p-2 text-brand-500 transition-colors hover:bg-brand-500/10"
           title={t('items.detail.delete')}
         >
@@ -194,15 +214,38 @@ function ItemDetailPage() {
       <div className="grid gap-6 md:grid-cols-2">
         {/* Photo + QR */}
         <div className="card space-y-4 p-4">
-          <div className="aspect-square overflow-hidden rounded-[22px] bg-black/5 p-2 dark:bg-white/10 sm:aspect-[4/3]">
+          <div className="relative aspect-square overflow-hidden rounded-[22px] bg-black/5 p-2 dark:bg-white/10 sm:aspect-[4/3]">
             {photoSrc && !photoLoadError
               ? (
-                <img
-                  src={photoSrc}
-                  alt={item.name}
-                  className="h-full w-full object-contain"
-                  onError={() => setPhotoLoadError(true)}
-                />
+                <>
+                  <img
+                    src={photoSrc}
+                    alt={item.name}
+                    className="h-full w-full object-contain"
+                    onError={() => setPhotoLoadError(true)}
+                  />
+                  {item.photoUrl && (
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        const ok = await confirm({
+                          title: t('items.detail.deletePhoto'),
+                          message: t('items.detail.deletePhotoConfirm'),
+                          confirmLabel: t('common.delete'),
+                          cancelLabel: t('common.cancel'),
+                          danger: true,
+                        })
+                        if (ok) deletePhoto.mutate()
+                      }}
+                      disabled={deletePhoto.isPending}
+                      className="absolute right-3 top-3 rounded-full bg-black/60 p-2 text-white shadow transition-colors hover:bg-red-500/80 disabled:opacity-50"
+                      title={t('items.detail.deletePhoto')}
+                      aria-label={t('items.detail.deletePhoto')}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  )}
+                </>
               )
               : <div className="flex h-full items-center justify-center px-4 text-center text-sm text-muted">
                   {photoLoadError ? t('items.detail.photoLoadFailed') : t('items.detail.noPhoto')}
@@ -468,6 +511,7 @@ function ItemDetailPage() {
           }
         </div>
       </div>
+      {confirmDialog}
     </div>
   )
 }

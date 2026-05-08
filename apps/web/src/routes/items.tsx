@@ -2,7 +2,7 @@ import { createFileRoute, Link } from '@tanstack/react-router'
 import { useQuery, useMutation, useQueryClient, useInfiniteQuery } from '@tanstack/react-query'
 import { useState, useEffect, useRef } from 'react'
 import { Plus, Search, Trash2, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react'
-import { useToast } from '@packman/ui'
+import { useToast, useConfirm } from '@packman/ui'
 import { itemsApi, groupsApi, usersApi, selectOptionsApi, type ItemSortKey } from '../lib/api'
 import { STATUS_COLORS, getLabelFromOptions, cn, formatApiError, sortUsersForOwnerSelect } from '../lib/utils'
 import { Select } from '../lib/select'
@@ -15,6 +15,7 @@ function ItemsPage() {
   const qc = useQueryClient()
   const { user } = useAuth()
   const { showToast } = useToast()
+  const { confirm, dialog: confirmDialog } = useConfirm()
   const isAdmin = user?.role === 'ADMIN'
   const { status: statusFromUrl } = Route.useSearch()
 
@@ -140,8 +141,15 @@ function ItemsPage() {
     })
   }
 
-  const handleBatchDelete = () => {
-    if (!confirm(t('items.batchDelete.confirm', { n: selected.size }))) return
+  const handleBatchDelete = async () => {
+    const ok = await confirm({
+      title: t('items.batchDelete.title'),
+      message: t('items.batchDelete.confirm', { n: selected.size }),
+      confirmLabel: t('common.delete'),
+      cancelLabel: t('common.cancel'),
+      danger: true,
+    })
+    if (!ok) return
     batchDelete.mutate([...selected])
   }
 
@@ -500,6 +508,7 @@ function ItemsPage() {
           <div className="h-6 w-6 animate-spin rounded-full border-4 border-brand-500 border-t-transparent" />
         </div>
       )}
+      {confirmDialog}
     </div>
   )
 }

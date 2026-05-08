@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useForm } from 'react-hook-form'
 import { useState } from 'react'
 import { Plus, X, AlertTriangle, Pencil, Check, XCircle, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react'
-import { useToast, Modal } from '@packman/ui'
+import { useToast, Modal, useConfirm } from '@packman/ui'
 import { batteriesApi, batteryRegulationsApi, usersApi, selectOptionsApi } from '../lib/api'
 import { getLabelFromOptions, formatApiError, sortUsersForOwnerSelect } from '../lib/utils'
 import { Select, SelectController } from '../lib/select'
@@ -222,7 +222,7 @@ function BatteryRow({
           {onDelete && (
             <button
               className="text-xs font-semibold text-brand-600 hover:text-brand-700"
-              onClick={() => { if (confirm(t('batteries.deleteConfirm'))) onDelete(b.id) }}
+              onClick={() => onDelete(b.id)}
             >
               {t('common.delete')}
             </button>
@@ -347,7 +347,7 @@ function BatteryCard({
           {onDelete && (
             <button
               className="text-xs font-semibold text-brand-600 hover:text-brand-700"
-              onClick={() => { if (confirm(t('batteries.deleteConfirm'))) onDelete(b.id) }}
+              onClick={() => onDelete(b.id)}
             >
               {t('common.delete')}
             </button>
@@ -369,8 +369,20 @@ function BatteriesPage() {
   const [sortDir, setSortDir] = useState<SortDir>('asc')
   const qc = useQueryClient()
   const { showToast } = useToast()
+  const { confirm, dialog: confirmDialog } = useConfirm()
   const { user } = useAuth()
   const isAdmin = user?.role === 'ADMIN'
+
+  const requestDelete = async (id: string) => {
+    const ok = await confirm({
+      title: t('batteries.deleteTitle'),
+      message: t('batteries.deleteConfirm'),
+      confirmLabel: t('common.delete'),
+      cancelLabel: t('common.cancel'),
+      danger: true,
+    })
+    if (ok) deleteBattery.mutate(id)
+  }
 
   const { data: batteries, isLoading } = useQuery({
     queryKey: ['batteries', typeFilter],
@@ -493,7 +505,7 @@ function BatteriesPage() {
                   b={b}
                   users={users}
                   batteryTypeOpts={batteryTypeOpts}
-                  onDelete={isAdmin ? (id) => deleteBattery.mutate(id) : undefined}
+                  onDelete={isAdmin ? requestDelete : undefined}
                 />
               ))}
             </div>
@@ -540,7 +552,7 @@ function BatteriesPage() {
                         b={b}
                         users={users}
                         batteryTypeOpts={batteryTypeOpts}
-                        onDelete={isAdmin ? (id) => deleteBattery.mutate(id) : undefined}
+                        onDelete={isAdmin ? requestDelete : undefined}
                       />
                     ))
                 }
@@ -551,6 +563,7 @@ function BatteriesPage() {
       </div>
 
       {showNew && <NewBatteryModal onClose={() => setShowNew(false)} batteryTypeOpts={batteryTypeOpts} />}
+      {confirmDialog}
     </div>
   )
 }

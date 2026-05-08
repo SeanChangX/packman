@@ -1,6 +1,6 @@
 import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { ArrowLeft, Download, Eye, CheckSquare, Square, AlertTriangle } from 'lucide-react'
 import * as pdfjsLib from 'pdfjs-dist'
 import pdfjsWorker from 'pdfjs-dist/build/pdf.worker.mjs?url'
@@ -21,6 +21,9 @@ function BoxDetailPage() {
   const { user } = useAuth()
   const isAdmin = user?.role === 'ADMIN'
   const [stickerSize, setStickerSize] = useState<'SMALL' | 'MEDIUM' | 'LARGE' | 'A4_SHEET'>('MEDIUM')
+  type ItemSortKey = 'name' | 'weight' | 'owner' | 'group' | 'status'
+  const [sortBy, setSortBy] = useState<ItemSortKey>('name')
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
   const [downloading, setDownloading] = useState(false)
   const [previewing, setPreviewing] = useState(false)
   const [previewBlob, setPreviewBlob] = useState<Blob | null>(null)
@@ -152,6 +155,44 @@ function BoxDetailPage() {
     },
   })
 
+  const items = box?.items ?? []
+  const sortedItems = useMemo(() => {
+    const dir = sortDir === 'asc' ? 1 : -1
+    const collator = new Intl.Collator(undefined, { sensitivity: 'base', numeric: true })
+    // Returns [cmp, didNullSort]. didNullSort entries always rank nulls last
+    // regardless of `dir`; non-null comparisons get multiplied by `dir`.
+    const cmpStr = (a?: string | null, b?: string | null): [number, boolean] => {
+      const aHas = a != null && a !== ''
+      const bHas = b != null && b !== ''
+      if (!aHas && !bHas) return [0, true]
+      if (!aHas) return [1, true]
+      if (!bHas) return [-1, true]
+      return [collator.compare(a!, b!), false]
+    }
+    const cmpNum = (a?: number | null, b?: number | null): [number, boolean] => {
+      const aHas = a != null
+      const bHas = b != null
+      if (!aHas && !bHas) return [0, true]
+      if (!aHas) return [1, true]
+      if (!bHas) return [-1, true]
+      return [a! - b!, false]
+    }
+    return [...items].sort((a, b) => {
+      let result: [number, boolean]
+      switch (sortBy) {
+        case 'weight': result = cmpNum(a.weightG, b.weightG); break
+        case 'owner': result = cmpStr(a.owner?.name, b.owner?.name); break
+        case 'group': result = cmpStr(a.group?.name, b.group?.name); break
+        case 'status': result = cmpStr(a.status, b.status); break
+        case 'name':
+        default: result = cmpStr(a.name, b.name); break
+      }
+      const [cmp, isNullSort] = result
+      if (cmp === 0) return collator.compare(a.name, b.name)
+      return isNullSort ? cmp : cmp * dir
+    })
+  }, [items, sortBy, sortDir])
+
   if (isError && (error as { status?: number })?.status === 404) {
     return <p className="py-12 text-center text-muted">{t('box.detail.notFound')}</p>
   }
@@ -161,7 +202,6 @@ function BoxDetailPage() {
   if (isLoading) return <div className="flex justify-center py-12"><div className="h-8 w-8 animate-spin rounded-full border-4 border-brand-500 border-t-transparent" /></div>
   if (!box) return <p className="py-12 text-center text-muted">{t('box.detail.notFound')}</p>
 
-  const items = box.items ?? []
   const packedCount = items.filter((i) => i.status !== 'NOT_PACKED').length
   const sealedWithUnpacked = box.status === 'SEALED' && items.some((i) => i.status === 'NOT_PACKED')
   const unpackedCount = items.filter((i) => i.status === 'NOT_PACKED').length
@@ -289,7 +329,31 @@ function BoxDetailPage() {
       {/* Items checklist */}
       <div className="card">
         <div className="border-b border-black/10 px-4 py-3 dark:border-white/10">
-          <h2 className="font-semibold">{t('box.detail.itemsTitle', { n: items.length })}</h2>
+          <div className="flex items-center justify-between gap-2">
+            <h2 className="font-semibold">{t('box.detail.itemsTitle', { n: items.length })}</h2>
+            {items.length > 1 && (
+              <Select
+                className="w-44 sm:w-56"
+                value={`${sortBy}:${sortDir}`}
+                onChange={(v) => {
+                  const [k, d] = v.split(':') as [ItemSortKey, 'asc' | 'desc']
+                  setSortBy(k); setSortDir(d)
+                }}
+                options={[
+                  { value: 'name:asc', label: `${t('items.sort.label')}: ${t('items.col.item')} ↑` },
+                  { value: 'name:desc', label: `${t('items.sort.label')}: ${t('items.col.item')} ↓` },
+                  { value: 'weight:desc', label: `${t('items.sort.label')}: ${t('items.col.weight')} ↓` },
+                  { value: 'weight:asc', label: `${t('items.sort.label')}: ${t('items.col.weight')} ↑` },
+                  { value: 'owner:asc', label: `${t('items.sort.label')}: ${t('items.col.owner')} ↑` },
+                  { value: 'owner:desc', label: `${t('items.sort.label')}: ${t('items.col.owner')} ↓` },
+                  { value: 'group:asc', label: `${t('items.sort.label')}: ${t('items.col.group')} ↑` },
+                  { value: 'group:desc', label: `${t('items.sort.label')}: ${t('items.col.group')} ↓` },
+                  { value: 'status:asc', label: `${t('items.sort.label')}: ${t('items.col.status')} ↑` },
+                  { value: 'status:desc', label: `${t('items.sort.label')}: ${t('items.col.status')} ↓` },
+                ]}
+              />
+            )}
+          </div>
           {sealedWithUnpacked && (
             <div className="mt-2 flex items-start gap-2 rounded-xl border border-amber-300/40 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-400/30 dark:bg-amber-500/10 dark:text-amber-200">
               <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
@@ -301,7 +365,7 @@ function BoxDetailPage() {
           ? <p className="py-8 text-center text-sm text-muted">{t('box.detail.empty')}</p>
           : (
             <ul className="divide-y divide-black/5 dark:divide-white/10">
-              {items.map((item) => {
+              {sortedItems.map((item) => {
                 const isPacked = item.status !== 'NOT_PACKED'
                 const flagged = box.status === 'SEALED' && !isPacked
                 return (
@@ -348,6 +412,9 @@ function BoxDetailPage() {
                               : t('common.ungrouped')}
                           </span>
                           <span>{t('box.detail.itemQty', { n: item.quantity })}</span>
+                          {item.weightG != null && (
+                            <span>{t('box.detail.itemWeight', { g: item.weightG.toLocaleString() })}</span>
+                          )}
                         </span>
                       </span>
                       <span className={cn('badge shrink-0 text-xs', STATUS_COLORS[item.status])}>

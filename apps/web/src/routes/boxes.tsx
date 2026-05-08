@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { AlertTriangle, Package, Plus, Trash2, UserRound, Weight, X } from 'lucide-react'
-import { useToast, Modal } from '@packman/ui'
+import { useToast, Modal, useConfirm } from '@packman/ui'
 import { boxesApi, usersApi } from '../lib/api'
 import { STATUS_LABEL_KEYS, STATUS_COLORS, cn, formatApiError, sortUsersForOwnerSelect } from '../lib/utils'
 import { Select, SelectController } from '../lib/select'
@@ -83,6 +83,7 @@ function BoxesPage() {
   const qc = useQueryClient()
   const { user } = useAuth()
   const { showToast } = useToast()
+  const { confirm, dialog: confirmDialog } = useConfirm()
   const isAdmin = user?.role === 'ADMIN'
   const [showNew, setShowNew] = useState(false)
   const STATUS_OPTIONS = [
@@ -198,7 +199,16 @@ function BoxesPage() {
               type="button"
               aria-label={t('boxes.deleteAria', { label: box!.label })}
               title={t('boxes.deleteTitle')}
-              onClick={() => { if (confirm(t('boxes.deleteConfirm', { label: box!.label }))) deleteBox.mutate(box!.id) }}
+              onClick={async () => {
+                const ok = await confirm({
+                  title: t('boxes.deleteTitle'),
+                  message: t('boxes.deleteConfirm', { label: box!.label }),
+                  confirmLabel: t('common.delete'),
+                  cancelLabel: t('common.cancel'),
+                  danger: true,
+                })
+                if (ok) deleteBox.mutate(box!.id)
+              }}
               className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-black/10 text-muted transition-colors hover:border-brand-500/30 hover:bg-brand-500/10 hover:text-brand-500 dark:border-white/10"
             >
               <Trash2 className="h-4 w-4" />
@@ -260,6 +270,7 @@ function BoxesPage() {
       }
 
       {showNew && <NewBoxModal onClose={() => setShowNew(false)} />}
+      {confirmDialog}
     </div>
   )
 }
