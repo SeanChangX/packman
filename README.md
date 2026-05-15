@@ -12,16 +12,34 @@
 
 <table>
 <tr>
-<td width="50%" align="center"><img src="docs/images/Dashboard.png" alt="Dashboard" width="100%"><br><strong>Dashboard</strong><br>Packing progress, box status grid</td>
-<td width="50%" align="center"><img src="docs/images/Items.png" alt="Items" width="100%"><br><strong>Items</strong><br>Searchable, filter by group / box / status</td>
+<td colspan="2" align="center"><img src="docs/images/Web_Dashboard.png" alt="Dashboard" width="100%"></td>
 </tr>
 <tr>
-<td width="50%" align="center"><img src="docs/images/Boxes.png" alt="Boxes" width="100%"><br><strong>Boxes</strong><br>Per-box weight, item count, QR sticker</td>
-<td width="50%" align="center"><img src="docs/images/ItemDetail.png" alt="Item detail" width="100%"><br><strong>Item detail</strong><br>Photo upload, AI auto-tagging via Ollama</td>
+<td colspan="2" align="center"><strong>Dashboard</strong><br>Packing progress, box status grid</td>
 </tr>
 <tr>
-<td width="50%" align="center"><img src="docs/images/AdminEvents.png" alt="Admin Events" width="100%"><br><strong>Admin — Events</strong><br>Per-event scoping, switch active event</td>
-<td width="50%" align="center"><img src="docs/images/AdminBackup.png" alt="Admin Backup" width="100%"><br><strong>Admin — Backup & restore</strong><br>Full ZIP export including photos</td>
+<td width="50%" align="center"><img src="docs/images/Web_Items.png" alt="Items" width="100%"></td>
+<td width="50%" align="center"><img src="docs/images/Web_Boxes.png" alt="Boxes" width="100%"></td>
+</tr>
+<tr>
+<td width="50%" align="center"><strong>Items</strong><br>Searchable, filter by group / box / status</td>
+<td width="50%" align="center"><strong>Boxes</strong><br>Per-box weight, item count, QR sticker</td>
+</tr>
+<tr>
+<td width="50%" align="center"><img src="docs/images/Web_ItemDetail.png" alt="Item detail" width="100%"></td>
+<td width="50%" align="center"><img src="docs/images/Web_Stickers.png" alt="Stickers" width="30%"></td>
+</tr>
+<tr>
+<td width="50%" align="center"><strong>Item detail</strong><br>Photo upload, AI auto-tagging via Ollama</td>
+<td width="50%" align="center"><strong>Stickers (mobile)</strong><br>Bulk-select items / boxes, generate A4 PDF</td>
+</tr>
+<tr>
+<td width="50%" align="center"><img src="docs/images/Admin_Events.png" alt="Admin Events" width="100%"></td>
+<td width="50%" align="center"><img src="docs/images/Admin_Ollama.png" alt="Admin Ollama" width="100%"></td>
+</tr>
+<tr>
+<td width="50%" align="center"><strong>Admin — Events</strong><br>Per-event scoping, switch active event</td>
+<td width="50%" align="center"><strong>Admin — Ollama</strong><br>Vision model setup &amp; auto-tagging queue</td>
 </tr>
 </table>
 

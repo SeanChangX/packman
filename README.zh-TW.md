@@ -12,16 +12,34 @@
 
 <table>
 <tr>
-<td width="50%" align="center"><img src="docs/images/Dashboard.png" alt="儀表板" width="100%"><br><strong>儀表板</strong><br>打包進度與箱子狀態總覽</td>
-<td width="50%" align="center"><img src="docs/images/Items.png" alt="物品清單" width="100%"><br><strong>物品清單</strong><br>支援搜尋，可依組別 / 箱子 / 狀態過濾</td>
+<td colspan="2" align="center"><img src="docs/images/Web_Dashboard.png" alt="儀表板" width="100%"></td>
 </tr>
 <tr>
-<td width="50%" align="center"><img src="docs/images/Boxes.png" alt="箱子清單" width="100%"><br><strong>箱子清單</strong><br>每箱重量、件數、QR 貼紙</td>
-<td width="50%" align="center"><img src="docs/images/ItemDetail.png" alt="物品詳情" width="100%"><br><strong>物品詳情</strong><br>照片上傳、Ollama AI 自動標籤</td>
+<td colspan="2" align="center"><strong>儀表板</strong><br>打包進度與箱子狀態總覽</td>
 </tr>
 <tr>
-<td width="50%" align="center"><img src="docs/images/AdminEvents.png" alt="活動管理" width="100%"><br><strong>管理 — 活動管理</strong><br>多活動分區、即時切換使用中</td>
-<td width="50%" align="center"><img src="docs/images/AdminBackup.png" alt="備份還原" width="100%"><br><strong>管理 — 備份還原</strong><br>含照片的完整 ZIP 匯出</td>
+<td width="50%" align="center"><img src="docs/images/Web_Items.png" alt="物品清單" width="100%"></td>
+<td width="50%" align="center"><img src="docs/images/Web_Boxes.png" alt="箱子清單" width="100%"></td>
+</tr>
+<tr>
+<td width="50%" align="center"><strong>物品清單</strong><br>支援搜尋，可依組別 / 箱子 / 狀態過濾</td>
+<td width="50%" align="center"><strong>箱子清單</strong><br>每箱重量、件數、QR 貼紙</td>
+</tr>
+<tr>
+<td width="50%" align="center"><img src="docs/images/Web_ItemDetail.png" alt="物品詳情" width="100%"></td>
+<td width="50%" align="center"><img src="docs/images/Web_Stickers.png" alt="貼紙列印" width="30%"></td>
+</tr>
+<tr>
+<td width="50%" align="center"><strong>物品詳情</strong><br>照片上傳、Ollama AI 自動標籤</td>
+<td width="50%" align="center"><strong>貼紙列印（手機）</strong><br>批次選擇物品／箱子，產生 A4 PDF</td>
+</tr>
+<tr>
+<td width="50%" align="center"><img src="docs/images/Admin_Events.png" alt="活動管理" width="100%"></td>
+<td width="50%" align="center"><img src="docs/images/Admin_Ollama.png" alt="Ollama 設定" width="100%"></td>
+</tr>
+<tr>
+<td width="50%" align="center"><strong>管理 — 活動管理</strong><br>多活動分區、即時切換使用中</td>
+<td width="50%" align="center"><strong>管理 — Ollama</strong><br>視覺模型設定與自動標籤佇列</td>
 </tr>
 </table>
 
