@@ -1,6 +1,6 @@
 FROM node:24-alpine AS base
 RUN apk add --no-cache openssl font-noto-cjk
-RUN corepack enable && corepack prepare pnpm@latest --activate
+RUN corepack enable && corepack prepare pnpm@9 --activate
 WORKDIR /app
 
 # Install dependencies
