@@ -1,14 +1,39 @@
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { useQuery, useMutation, useQueryClient, useInfiniteQuery } from '@tanstack/react-query'
 import { useState, useEffect, useRef } from 'react'
-import { Plus, Search, Trash2, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react'
-import { useToast, useConfirm } from '@packman/ui'
-import { itemsApi, groupsApi, usersApi, selectOptionsApi, type ItemSortKey } from '../lib/api'
+import { Plus, Search, Trash2, ArrowUpDown, ArrowUp, ArrowDown, Pencil } from 'lucide-react'
+import { useToast, useConfirm, Modal } from '@packman/ui'
+import { itemsApi, groupsApi, usersApi, boxesApi, selectOptionsApi, type ItemSortKey } from '../lib/api'
 import { STATUS_COLORS, getLabelFromOptions, cn, formatApiError, sortUsersForOwnerSelect } from '../lib/utils'
 import { Select } from '../lib/select'
 import { useAuth } from '../lib/auth-context'
 import { useT } from '../lib/i18n'
-import type { Item, PackingStatus, PaginatedResponse } from '@packman/shared'
+import { isRecentPopNavigation } from '../lib/scroll-restoration'
+import type { Item, PackingStatus, PaginatedResponse, BatchUpdateItemsInput } from '@packman/shared'
+
+// Persist filters + sort so back-navigating from a detail page keeps the
+// user's context. Restoration only happens when the mount is the result of a
+// browser back/forward (isRecentPopNavigation); refresh, nav clicks, and
+// deep links start clean.
+const FILTERS_STORAGE_KEY = 'packman:items-filters'
+interface PersistedItemFilters {
+  search?: string
+  status?: PackingStatus | ''
+  shipping?: string
+  group?: string
+  owner?: string
+  sortBy?: ItemSortKey
+  sortDir?: 'asc' | 'desc'
+}
+function loadItemFilters(): PersistedItemFilters {
+  try {
+    const raw = sessionStorage.getItem(FILTERS_STORAGE_KEY)
+    return raw ? (JSON.parse(raw) as PersistedItemFilters) : {}
+  } catch { return {} }
+}
+function saveItemFilters(f: PersistedItemFilters) {
+  try { sessionStorage.setItem(FILTERS_STORAGE_KEY, JSON.stringify(f)) } catch {}
+}
 
 function ItemsPage() {
   const t = useT()
@@ -19,16 +44,45 @@ function ItemsPage() {
   const isAdmin = user?.role === 'ADMIN'
   const { status: statusFromUrl } = Route.useSearch()
 
-  const [search, setSearch] = useState('')
-  const [debouncedSearch, setDebouncedSearch] = useState('')
-  const [statusFilter, setStatusFilter] = useState<PackingStatus | ''>(statusFromUrl ?? '')
-  const [shippingFilter, setShippingFilter] = useState('')
-  const [groupFilter, setGroupFilter] = useState('')
-  const [ownerFilter, setOwnerFilter] = useState('')
-  const [sortBy, setSortBy] = useState<ItemSortKey>('createdAt')
-  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
+  // Restore only when this mount is the result of a browser back/forward.
+  // For refresh / nav click / deep link we wipe the saved snapshot so the
+  // page starts clean.
+  const persistedRef = useRef<PersistedItemFilters | null>(null)
+  if (persistedRef.current === null) {
+    if (isRecentPopNavigation()) {
+      persistedRef.current = loadItemFilters()
+    } else {
+      persistedRef.current = {}
+      saveItemFilters({})
+    }
+  }
+  const persisted = persistedRef.current
+
+  const [search, setSearch] = useState(persisted.search ?? '')
+  const [debouncedSearch, setDebouncedSearch] = useState(persisted.search ?? '')
+  const [statusFilter, setStatusFilter] = useState<PackingStatus | ''>(
+    persisted.status !== undefined ? persisted.status : (statusFromUrl ?? ''),
+  )
+  const [shippingFilter, setShippingFilter] = useState(persisted.shipping ?? '')
+  const [groupFilter, setGroupFilter] = useState(persisted.group ?? '')
+  const [ownerFilter, setOwnerFilter] = useState(persisted.owner ?? '')
+  const [sortBy, setSortBy] = useState<ItemSortKey>(persisted.sortBy ?? 'createdAt')
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>(persisted.sortDir ?? 'desc')
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const sentinelRef = useRef<HTMLDivElement>(null)
+
+  // Persist filter/sort on every change.
+  useEffect(() => {
+    saveItemFilters({
+      search: debouncedSearch || undefined,
+      status: statusFilter || undefined,
+      shipping: shippingFilter || undefined,
+      group: groupFilter || undefined,
+      owner: ownerFilter || undefined,
+      sortBy,
+      sortDir,
+    })
+  }, [debouncedSearch, statusFilter, shippingFilter, groupFilter, ownerFilter, sortBy, sortDir])
 
   const toggleSort = (key: ItemSortKey) => {
     if (sortBy === key) {
@@ -85,6 +139,35 @@ function ItemsPage() {
   const { data: groups } = useQuery({ queryKey: ['groups'], queryFn: groupsApi.list })
   const { data: users } = useQuery({ queryKey: ['users'], queryFn: usersApi.list })
   const { data: shippingOpts = [] } = useQuery({ queryKey: ['options', 'SHIPPING_METHOD'], queryFn: () => selectOptionsApi.list('SHIPPING_METHOD') })
+  const { data: boxes } = useQuery({ queryKey: ['boxes'], queryFn: () => boxesApi.list() })
+
+  type BulkField = 'ownerId' | 'groupId' | 'shippingMethod' | 'boxId' | 'status'
+  type BulkValue = string | null | undefined
+  const [bulkEditOpen, setBulkEditOpen] = useState(false)
+  const [bulkValues, setBulkValues] = useState<Record<BulkField, BulkValue>>({
+    ownerId: undefined,
+    groupId: undefined,
+    shippingMethod: undefined,
+    boxId: undefined,
+    status: undefined,
+  })
+  const openBulkEdit = () => {
+    setBulkValues({ ownerId: undefined, groupId: undefined, shippingMethod: undefined, boxId: undefined, status: undefined })
+    setBulkEditOpen(true)
+  }
+
+  const batchUpdate = useMutation({
+    mutationFn: (input: BatchUpdateItemsInput) => itemsApi.batchUpdate(input),
+    onSuccess: (res, vars) => {
+      vars.ids.forEach((id) => qc.invalidateQueries({ queryKey: ['item', id] }))
+      qc.invalidateQueries({ queryKey: ['items'] })
+      qc.invalidateQueries({ queryKey: ['boxes'] })
+      setBulkEditOpen(false)
+      setSelected(new Set())
+      showToast(t('items.batchEdit.success', { n: res.count }), 'success')
+    },
+    onError: (e: unknown) => showToast(formatApiError(e, t('common.opFailed'), t('common.requiredHint')), 'error'),
+  })
 
   const updateStatus = useMutation({
     mutationFn: ({ id, status }: { id: string; status: PackingStatus }) =>
@@ -141,6 +224,22 @@ function ItemsPage() {
     })
   }
 
+  const handleBatchEditApply = () => {
+    const data: BatchUpdateItemsInput['data'] = {}
+    if (bulkValues.ownerId !== undefined) data.ownerId = bulkValues.ownerId
+    if (bulkValues.groupId !== undefined) data.groupId = bulkValues.groupId
+    if (bulkValues.shippingMethod !== undefined) data.shippingMethod = bulkValues.shippingMethod
+    if (bulkValues.boxId !== undefined) data.boxId = bulkValues.boxId
+    if (bulkValues.status !== undefined && bulkValues.status !== null) {
+      data.status = bulkValues.status as 'NOT_PACKED' | 'PACKED'
+    }
+    if (Object.keys(data).length === 0) {
+      showToast(t('items.batchEdit.nothingChanged'), 'error')
+      return
+    }
+    batchUpdate.mutate({ ids: [...selected], data })
+  }
+
   const handleBatchDelete = async () => {
     const ok = await confirm({
       title: t('items.batchDelete.title'),
@@ -160,7 +259,15 @@ function ItemsPage() {
           <h1 className="page-title">{t('items.title')}</h1>
           <p className="page-subtitle">{t('items.subtitle', { total, loaded: items.length })}</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
+          {selected.size > 0 && (
+            <button
+              onClick={openBulkEdit}
+              className="btn-secondary gap-1"
+            >
+              <Pencil className="h-4 w-4" /> {t('items.batchEdit.button', { n: selected.size })}
+            </button>
+          )}
           {isAdmin && selected.size > 0 && (
             <button
               onClick={handleBatchDelete}
@@ -272,20 +379,18 @@ function ItemsPage() {
                       key={item.id}
                       className={cn(
                         'p-4 transition-colors active:bg-black/5 dark:active:bg-white/5',
-                        isAdmin && selected.has(item.id) && 'bg-brand-500/5',
+                        selected.has(item.id) && 'bg-brand-500/5',
                       )}
-                      onClick={isAdmin ? () => toggle(item.id) : undefined}
+                      onClick={() => toggle(item.id)}
                     >
                       <div className="flex items-start gap-3">
-                        {isAdmin && (
-                          <input
-                            type="checkbox"
-                            checked={selected.has(item.id)}
-                            onChange={() => toggle(item.id)}
-                            onClick={(e) => e.stopPropagation()}
-                            className="mt-1 h-5 w-5 shrink-0 cursor-pointer accent-brand-500"
-                          />
-                        )}
+                        <input
+                          type="checkbox"
+                          checked={selected.has(item.id)}
+                          onChange={() => toggle(item.id)}
+                          onClick={(e) => e.stopPropagation()}
+                          className="mt-1 h-5 w-5 shrink-0 cursor-pointer accent-brand-500"
+                        />
                         <div className="min-w-0 flex-1">
                           <div className="flex min-w-0 items-start justify-between gap-3">
                             <Link
@@ -369,17 +474,15 @@ function ItemsPage() {
           <table className="w-full text-sm">
             <thead className="border-b border-black/10 bg-black/5 dark:border-white/10 dark:bg-white/5">
               <tr>
-                {isAdmin && (
-                  <th className="px-4 py-3 w-10">
-                    <input
-                      type="checkbox"
-                      checked={allChecked}
-                      ref={(el) => { if (el) el.indeterminate = someChecked }}
-                      onChange={toggleAll}
-                      className="h-4 w-4 cursor-pointer accent-brand-500"
-                    />
-                  </th>
-                )}
+                <th className="px-4 py-3 w-10">
+                  <input
+                    type="checkbox"
+                    checked={allChecked}
+                    ref={(el) => { if (el) el.indeterminate = someChecked }}
+                    onChange={toggleAll}
+                    className="h-4 w-4 cursor-pointer accent-brand-500"
+                  />
+                </th>
                 {([
                   ['name', t('items.col.item')],
                   ['owner', t('items.col.owner')],
@@ -403,7 +506,7 @@ function ItemsPage() {
               {isLoading
                 ? Array.from({ length: 5 }).map((_, i) => (
                     <tr key={i}>
-                      {Array.from({ length: isAdmin ? 9 : 8 }).map((_, j) => (
+                      {Array.from({ length: 9 }).map((_, j) => (
                         <td key={j} className="px-4 py-3">
                           <div className="h-4 animate-pulse rounded bg-white/10" />
                         </td>
@@ -413,19 +516,17 @@ function ItemsPage() {
                 : items.map((item) => (
                     <tr
                       key={item.id}
-                      className={cn(isAdmin && selected.has(item.id) ? 'bg-brand-500/5' : 'hover:bg-black/5 dark:hover:bg-white/5')}
-                      onClick={isAdmin ? () => toggle(item.id) : undefined}
+                      className={cn(selected.has(item.id) ? 'bg-brand-500/5' : 'hover:bg-black/5 dark:hover:bg-white/5')}
+                      onClick={() => toggle(item.id)}
                     >
-                      {isAdmin && (
-                        <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
-                          <input
-                            type="checkbox"
-                            checked={selected.has(item.id)}
-                            onChange={() => toggle(item.id)}
-                            className="h-4 w-4 cursor-pointer accent-brand-500"
-                          />
-                        </td>
-                      )}
+                      <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                        <input
+                          type="checkbox"
+                          checked={selected.has(item.id)}
+                          onChange={() => toggle(item.id)}
+                          className="h-4 w-4 cursor-pointer accent-brand-500"
+                        />
+                      </td>
                       <td className="max-w-[16rem] px-4 py-3 align-top">
                         <Link
                           to="/items/$id"
@@ -508,6 +609,99 @@ function ItemsPage() {
           <div className="h-6 w-6 animate-spin rounded-full border-4 border-brand-500 border-t-transparent" />
         </div>
       )}
+
+      <Modal open={bulkEditOpen} onClose={() => setBulkEditOpen(false)}>
+        <div className="card w-full max-w-md overflow-hidden p-6">
+          <h3 className="text-lg font-bold text-app">{t('items.batchEdit.title', { n: selected.size })}</h3>
+          <p className="mt-1 text-sm text-muted">{t('items.batchEdit.hint')}</p>
+          <div className="mt-4 space-y-3">
+            <div>
+              <label className="label">{t('items.batchEdit.field.owner')}</label>
+              <Select
+                className="mt-1"
+                value={bulkValues.ownerId === undefined ? '' : bulkValues.ownerId === null ? '__null__' : bulkValues.ownerId}
+                onChange={(v) =>
+                  setBulkValues((s) => ({ ...s, ownerId: v === '' ? undefined : v === '__null__' ? null : v }))
+                }
+                options={[
+                  { value: '', label: t('items.batchEdit.fieldUnchanged') },
+                  { value: '__null__', label: t('items.batchEdit.fieldClear') },
+                  ...sortUsersForOwnerSelect(users, user).map((u) => ({ value: u.id, label: u.name })),
+                ]}
+              />
+            </div>
+            <div>
+              <label className="label">{t('items.batchEdit.field.group')}</label>
+              <Select
+                className="mt-1"
+                value={bulkValues.groupId === undefined ? '' : bulkValues.groupId === null ? '__null__' : bulkValues.groupId}
+                onChange={(v) =>
+                  setBulkValues((s) => ({ ...s, groupId: v === '' ? undefined : v === '__null__' ? null : v }))
+                }
+                options={[
+                  { value: '', label: t('items.batchEdit.fieldUnchanged') },
+                  { value: '__null__', label: t('items.batchEdit.fieldClear') },
+                  ...(groups?.map((g) => ({ value: g.id, label: g.name })) ?? []),
+                ]}
+              />
+            </div>
+            <div>
+              <label className="label">{t('items.batchEdit.field.shipping')}</label>
+              <Select
+                className="mt-1"
+                value={bulkValues.shippingMethod === undefined ? '' : bulkValues.shippingMethod === null ? '__null__' : bulkValues.shippingMethod}
+                onChange={(v) =>
+                  setBulkValues((s) => ({ ...s, shippingMethod: v === '' ? undefined : v === '__null__' ? null : v }))
+                }
+                options={[
+                  { value: '', label: t('items.batchEdit.fieldUnchanged') },
+                  { value: '__null__', label: t('items.batchEdit.fieldClear') },
+                  ...shippingOpts.map((o) => ({ value: o.value, label: o.label })),
+                ]}
+              />
+            </div>
+            <div>
+              <label className="label">{t('items.batchEdit.field.box')}</label>
+              <Select
+                className="mt-1"
+                value={bulkValues.boxId === undefined ? '' : bulkValues.boxId === null ? '__null__' : bulkValues.boxId}
+                onChange={(v) =>
+                  setBulkValues((s) => ({ ...s, boxId: v === '' ? undefined : v === '__null__' ? null : v }))
+                }
+                options={[
+                  { value: '', label: t('items.batchEdit.fieldUnchanged') },
+                  { value: '__null__', label: t('items.batchEdit.fieldClear') },
+                  ...(boxes?.map((b) => ({ value: b.id, label: b.label, hint: b.notes?.trim() || undefined })) ?? []),
+                ]}
+              />
+            </div>
+            <div>
+              <label className="label">{t('items.batchEdit.field.status')}</label>
+              <Select
+                className="mt-1"
+                value={bulkValues.status === undefined ? '' : (bulkValues.status as string)}
+                onChange={(v) =>
+                  setBulkValues((s) => ({ ...s, status: v === '' ? undefined : v }))
+                }
+                options={[
+                  { value: '', label: t('items.batchEdit.fieldUnchanged') },
+                  { value: 'NOT_PACKED', label: t('status.NOT_PACKED') },
+                  { value: 'PACKED', label: t('status.PACKED') },
+                ]}
+              />
+            </div>
+          </div>
+          <div className="mt-5 flex justify-end gap-2">
+            <button type="button" className="btn-secondary" onClick={() => setBulkEditOpen(false)} disabled={batchUpdate.isPending}>
+              {t('common.cancel')}
+            </button>
+            <button type="button" className="btn-primary" onClick={handleBatchEditApply} disabled={batchUpdate.isPending}>
+              {batchUpdate.isPending ? t('items.batchEdit.applying') : t('items.batchEdit.apply')}
+            </button>
+          </div>
+        </div>
+      </Modal>
+
       {confirmDialog}
     </div>
   )

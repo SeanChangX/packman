@@ -5,7 +5,7 @@ import type {
 import type {
   CreateGroupInput, UpdateGroupInput,
   CreateBoxInput, UpdateBoxInput,
-  CreateItemInput, UpdateItemInput,
+  CreateItemInput, UpdateItemInput, BatchUpdateItemsInput,
   CreateBatteryInput, UpdateBatteryInput,
   UpdateUserInput, StickerRequest,
 } from '@packman/shared'
@@ -133,6 +133,11 @@ export const itemsApi = {
     request<void>(`${BASE}/items/${id}`, { method: 'DELETE' }),
   batchDelete: (ids: string[]) =>
     request<void>(`${BASE}/items/batch-delete`, { method: 'POST', body: JSON.stringify({ ids }) }),
+  batchUpdate: (input: BatchUpdateItemsInput) =>
+    request<{ count: number }>(`${BASE}/items/batch-update`, {
+      method: 'POST',
+      body: JSON.stringify(input),
+    }),
   uploadPhoto: (
     id: string,
     file: File,

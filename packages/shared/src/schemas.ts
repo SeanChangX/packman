@@ -47,6 +47,19 @@ export const UpdateItemSchema = CreateItemSchema.partial().extend({
   status: z.enum(['NOT_PACKED', 'PACKED', 'SEALED']).optional(),
 })
 
+export const BatchUpdateItemsSchema = z.object({
+  ids: z.array(z.string().uuid()).min(1).max(500),
+  data: z
+    .object({
+      groupId: z.string().uuid().nullable().optional(),
+      ownerId: z.string().uuid().nullable().optional(),
+      shippingMethod: z.string().nullable().optional(),
+      boxId: z.string().uuid().nullable().optional(),
+      status: z.enum(['NOT_PACKED', 'PACKED']).optional(),
+    })
+    .refine((d) => Object.keys(d).length > 0, { message: 'No fields to update' }),
+})
+
 export const CreateBatterySchema = z.object({
   batteryId: z.string().min(1).max(100),
   ownerId: z.string().uuid().optional(),
@@ -163,6 +176,7 @@ export type CreateBoxInput = z.infer<typeof CreateBoxSchema>
 export type UpdateBoxInput = z.infer<typeof UpdateBoxSchema>
 export type CreateItemInput = z.infer<typeof CreateItemSchema>
 export type UpdateItemInput = z.infer<typeof UpdateItemSchema>
+export type BatchUpdateItemsInput = z.infer<typeof BatchUpdateItemsSchema>
 export type CreateBatteryInput = z.infer<typeof CreateBatterySchema>
 export type UpdateBatteryInput = z.infer<typeof UpdateBatterySchema>
 export type CreateBatteryRegulationInput = z.infer<typeof CreateBatteryRegulationSchema>

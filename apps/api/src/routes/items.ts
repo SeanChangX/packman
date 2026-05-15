@@ -2,7 +2,7 @@ import { FastifyInstance } from 'fastify'
 import QRCode from 'qrcode'
 import { prisma } from '../plugins/prisma'
 import { requireAuth, requireAdmin } from '../plugins/auth'
-import { CreateItemSchema, UpdateItemSchema } from '@packman/shared'
+import { CreateItemSchema, UpdateItemSchema, BatchUpdateItemsSchema } from '@packman/shared'
 import { uploadToMinio, getPresignedUrl, deleteObject, getObjectBuffer, objectNameFromUrl } from '../services/minio'
 import { enqueueAiTagJob } from '../services/ai-tag-queue'
 import { isAiTaggingEnabled } from '../services/ollama'
@@ -316,6 +316,20 @@ export async function itemRoutes(app: FastifyInstance) {
       })
       await enqueueAiTagJob(item.id, objectName)
       return { ok: true }
+    }
+  )
+
+  app.post(
+    '/batch-update',
+    { preHandler: requireAuth },
+    async (request, reply) => {
+      const { ids, data } = BatchUpdateItemsSchema.parse(request.body)
+      const eventId = await getActiveEventId()
+      const result = await prisma.item.updateMany({
+        where: { id: { in: ids }, eventId },
+        data,
+      })
+      return { count: result.count }
     }
   )
 
