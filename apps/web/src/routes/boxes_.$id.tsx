@@ -1,4 +1,4 @@
-import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
+import { createFileRoute, Link } from '@tanstack/react-router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useState, useEffect, useMemo, useRef } from 'react'
 import { ArrowLeft, Download, Eye, CheckSquare, Square, AlertTriangle } from 'lucide-react'
@@ -10,6 +10,7 @@ import { STATUS_LABEL_KEYS, STATUS_COLORS, SHIPPING_LABEL_KEYS, cn, formatApiErr
 import { Select } from '../lib/select'
 import { useT } from '../lib/i18n'
 import { useAuth } from '../lib/auth-context'
+import { useGoBack } from '../lib/scroll-restoration'
 import type { Item, PackingStatus, PaginatedResponse, UpdateBoxInput, User } from '@packman/shared'
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker
@@ -17,7 +18,7 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker
 function BoxDetailPage() {
   const t = useT()
   const { id } = Route.useParams()
-  const navigate = useNavigate()
+  const goBack = useGoBack({ to: '/boxes' })
   const qc = useQueryClient()
   const { showToast } = useToast()
   const { user } = useAuth()
@@ -218,7 +219,7 @@ function BoxDetailPage() {
   return (
     <div className="mx-auto max-w-2xl page-stack">
       <div className="flex items-center gap-3">
-        <button onClick={() => navigate({ to: '/boxes' })} className="rounded-2xl p-2 text-muted transition-colors hover:bg-white/10 hover:text-app">
+        <button onClick={goBack} className="rounded-2xl p-2 text-muted transition-colors hover:bg-white/10 hover:text-app">
           <ArrowLeft className="h-5 w-5" />
         </button>
         <div className="min-w-0 flex-1">

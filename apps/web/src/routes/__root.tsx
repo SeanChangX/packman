@@ -3,11 +3,12 @@ import {
   Package, ClipboardList, Battery, Printer, QrCode,
   LayoutDashboard, LogOut, Menu, X, UserCircle, AlertTriangle, RotateCcw,
 } from 'lucide-react'
-import { useState, useEffect, type ElementType } from 'react'
+import { useState, useEffect, useRef, type ElementType } from 'react'
 import { useAuth } from '../lib/auth-context'
 import { authApi, eventsApi } from '../lib/api'
 import { cn } from '../lib/utils'
 import { useT } from '../lib/i18n'
+import { useScrollRestoration } from '../lib/scroll-restoration'
 
 function ErrorPage({ error, reset }: { error: Error; reset: () => void }) {
   const t = useT()
@@ -74,6 +75,8 @@ function Layout() {
   const [mobileOpen, setMobileOpen] = useState(false)
   const [activeEventName, setActiveEventName] = useState<string | null>(null)
   const isScanPage = location.pathname === '/scan'
+  const mainRef = useRef<HTMLElement>(null)
+  useScrollRestoration(mainRef)
 
   useEffect(() => {
     eventsApi.active().then((e) => setActiveEventName(e?.name ?? null)).catch(() => {})
@@ -181,7 +184,7 @@ function Layout() {
           </div>
         )}
 
-        <main className="min-h-0 min-w-0 flex-1 overflow-auto">
+        <main ref={mainRef} className="min-h-0 min-w-0 flex-1 overflow-auto">
           <div className="page">
             {loading
               ? <div className="flex min-h-[60vh] items-center justify-center"><div className="h-8 w-8 animate-spin rounded-full border-4 border-brand-500 border-t-transparent" /></div>

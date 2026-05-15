@@ -9,6 +9,7 @@ import { SelectController } from '../lib/select'
 import { useAuth } from '../lib/auth-context'
 import { cn, formatApiError, optionsToSelectItems, sortUsersForOwnerSelect } from '../lib/utils'
 import { useT } from '../lib/i18n'
+import { useGoBack } from '../lib/scroll-restoration'
 import type { CreateItemInput } from '@packman/shared'
 
 function NewItemPage() {
@@ -17,6 +18,7 @@ function NewItemPage() {
   const qc = useQueryClient()
   const { user } = useAuth()
   const { showToast, updateToast, dismissToast } = useToast()
+  const goBack = useGoBack({ to: '/items', search: { status: undefined } })
   const [photoFile, setPhotoFile] = useState<File | null>(null)
   const [photoPreview, setPhotoPreview] = useState('')
   const { data: groups } = useQuery({ queryKey: ['groups'], queryFn: groupsApi.list })
@@ -93,7 +95,7 @@ function NewItemPage() {
   return (
     <div className="mx-auto max-w-2xl page-stack">
       <div className="flex items-center gap-3">
-        <button onClick={() => navigate({ to: '/items', search: { status: undefined } })} className="rounded-2xl p-2 text-muted transition-colors hover:bg-white/10 hover:text-app">
+        <button onClick={goBack} className="rounded-2xl p-2 text-muted transition-colors hover:bg-white/10 hover:text-app">
           <ArrowLeft className="h-5 w-5" />
         </button>
         <h1 className="page-title">{t('items.new.title')}</h1>
@@ -277,7 +279,7 @@ function NewItemPage() {
         )}
 
         <div className="flex justify-end gap-3">
-          <button type="button" onClick={() => navigate({ to: '/items', search: { status: undefined } })} className="btn-secondary">
+          <button type="button" onClick={goBack} className="btn-secondary">
             {t('common.cancel')}
           </button>
           <button type="submit" className="btn-primary" disabled={create.isPending}>

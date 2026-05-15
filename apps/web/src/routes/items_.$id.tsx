@@ -9,6 +9,7 @@ import { STATUS_LABEL_KEYS, STATUS_COLORS, getLabelFromOptions, optionsToSelectI
 import { SelectController } from '../lib/select'
 import { useAuth } from '../lib/auth-context'
 import { useT } from '../lib/i18n'
+import { useGoBack } from '../lib/scroll-restoration'
 import type { Item, PackingStatus, PaginatedResponse, UpdateItemInput } from '@packman/shared'
 
 function ItemDetailPage() {
@@ -19,6 +20,7 @@ function ItemDetailPage() {
   const { showToast, updateToast, dismissToast } = useToast()
   const { confirm, dialog: confirmDialog } = useConfirm()
   const { user: me } = useAuth()
+  const goBack = useGoBack({ to: '/items', search: { status: undefined } })
   const fileRef = useRef<HTMLInputElement>(null)
   const [editing, setEditing] = useState(false)
   const [tags, setTags] = useState<string[]>([])
@@ -183,7 +185,7 @@ function ItemDetailPage() {
   return (
     <div className="mx-auto max-w-3xl page-stack">
       <div className="flex items-center gap-3">
-        <button onClick={() => navigate({ to: '/items', search: { status: undefined } })} className="rounded-2xl p-2 text-muted transition-colors hover:bg-white/10 hover:text-app">
+        <button onClick={goBack} className="rounded-2xl p-2 text-muted transition-colors hover:bg-white/10 hover:text-app">
           <ArrowLeft className="h-5 w-5" />
         </button>
         <div className="flex-1">
