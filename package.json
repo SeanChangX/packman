@@ -10,5 +10,10 @@
   },
   "devDependencies": {
     "concurrently": "^9.2.1"
+  },
+  "pnpm": {
+    "overrides": {
+      "launch-editor": ">=2.14.1"
+    }
   }
 }
